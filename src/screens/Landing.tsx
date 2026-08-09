@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Landing.css';
 
 interface LandingProps {
@@ -17,15 +18,7 @@ const Landing: React.FC<LandingProps> = ({ eventName = "NINA & ALDRIN'S WEDDING"
     <div className="landing-screen">
       <div className="landing-content">
         <div className="camera-icon">
-          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-            <rect x="15" y="25" width="50" height="35" rx="4" stroke="currentColor" strokeWidth="2"/>
-            <circle cx="40" cy="42" r="12" stroke="currentColor" strokeWidth="2"/>
-            <circle cx="40" cy="42" r="8" fill="currentColor"/>
-            <rect x="35" y="20" width="10" height="5" rx="2" fill="currentColor"/>
-            <circle cx="55" cy="32" r="2" fill="currentColor"/>
-            {/* Decorative lines */}
-            <path d="M 25 20 L 20 15 M 55 20 L 60 15" stroke="currentColor" strokeWidth="1.5"/>
-          </svg>
+          <img src={cameraIconSvg} alt="Camera" width="120" height="120" />
         </div>
 
         <h1 className="landing-title handwritten">you're in!</h1>

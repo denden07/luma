@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { savePhoto, getEventPhotos } from '../utils/photoStorage';
 import { getParticipant } from '../utils/participant';
+import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
 
 interface CameraProps {
@@ -34,6 +35,8 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const [photoCount, setPhotoCount] = useState(0);
   const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
   const [streamVersion, setStreamVersion] = useState(0);
+  const [supportedZoomLevels, setSupportedZoomLevels] = useState<number[]>([0.5, 1, 2]);
+  const [activeCameraLabel, setActiveCameraLabel] = useState<string>('');
   const navigate = useNavigate();
   
   const device = getUserAgent();
@@ -41,6 +44,8 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   useEffect(() => {
+    // Reset zoom to 1x on initial load (especially important for Android)
+    setZoom(1);
     startCamera();
     updatePhotoCount();
     
@@ -152,12 +157,81 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       
       let constraints: MediaStreamConstraints;
       
+      // If no deviceId provided and on Android, enumerate and select best rear camera
+      if (!deviceId && device.isAndroid && isInitialLoad.current) {
+        console.log('[startCamera] Android detected - enumerating cameras to select best rear camera');
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const cameras = devices.filter(d => d.kind === 'videoinput');
+          
+          console.log('[startCamera] Available cameras:', cameras.length);
+          cameras.forEach((cam, idx) => {
+            console.log(`[startCamera]   Camera ${idx}:`, cam.label);
+          });
+          
+          // Find rear cameras, excluding telephoto/zoom lenses
+          const rearCameras = cameras.filter(cam => {
+            const label = cam.label.toLowerCase();
+            const isRear = label.includes('back') || label.includes('rear');
+            
+            // Comprehensive telephoto detection
+            const isTelephoto = label.includes('telephoto') || 
+                              label.includes('tele') ||
+                              label.includes('zoom') || 
+                              label.includes('2x') || label.includes('3x') || 
+                              label.includes('5x') || label.includes('10x') ||
+                              label.includes('periscope') ||
+                              label.match(/\d+x/) || // Catches any "Nx" pattern
+                              (label.includes('camera') && (label.includes(' 2 ') || label.includes('(2)'))) ||
+                              // Filter out higher numbered cameras (Camera 3, Camera 4, etc.)
+                              // These are usually telephoto on multi-camera phones
+                              label.match(/camera\s*[3-9]/) || label.match(/camera\s*\d{2,}/);
+            
+            return isRear && !isTelephoto;
+          });
+          
+          console.log('[startCamera] Non-telephoto rear cameras:', rearCameras.length);
+          rearCameras.forEach((cam, idx) => {
+            console.log(`[startCamera]   Rear camera ${idx}:`, cam.label);
+          });
+          
+          // Prefer ultra-wide or main camera, or lowest numbered camera
+          let selectedCamera = rearCameras.find(cam => 
+            cam.label.toLowerCase().includes('ultra') || 
+            cam.label.toLowerCase().includes('wide')
+          );
+          
+          // If not found, prefer Camera 0 or Camera 1 (main cameras)
+          if (!selectedCamera) {
+            selectedCamera = rearCameras.find(cam => 
+              cam.label.toLowerCase().match(/camera\s*[0-1](?!\d)/)
+            );
+          }
+          
+          // Fallback to first non-telephoto rear camera
+          if (!selectedCamera && rearCameras.length > 0) {
+            selectedCamera = rearCameras[0];
+          }
+          
+          if (selectedCamera) {
+            console.log('[startCamera] ✅ Selected Android camera:', selectedCamera.label);
+            deviceId = selectedCamera.deviceId;
+          } else {
+            console.log('[startCamera] ⚠️ No suitable rear camera found, using facingMode');
+          }
+        } catch (e) {
+          console.log('[startCamera] Could not enumerate devices, using facingMode:', e);
+        }
+      }
+      
       if (deviceId) {
         // Use specific device ID when switching cameras
         console.log('[startCamera] Building constraints with deviceId:', deviceId);
         constraints = {
           video: { 
-            deviceId: { exact: deviceId }
+            deviceId: { exact: deviceId },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           },
           audio: false,
         };
@@ -166,7 +240,9 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
         console.log('[startCamera] Building constraints with facingMode: environment');
         constraints = {
           video: { 
-            facingMode: { ideal: 'environment' }
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           },
           audio: false,
         };
@@ -177,11 +253,82 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       console.log('[startCamera] getUserMedia succeeded');
       
       const track = mediaStream.getVideoTracks()[0];
+      const settings = track?.getSettings();
       console.log('[startCamera] ✅ Camera access granted');
       console.log('[startCamera] Track label:', track?.label);
-      console.log('[startCamera] Track settings:', track?.getSettings());
+      console.log('[startCamera] Track settings:', settings);
       console.log('[startCamera] Track capabilities:', track?.getCapabilities());
       console.log('[startCamera] Track readyState:', track?.readyState);
+      
+      // Store active camera label for on-screen display
+      setActiveCameraLabel(track?.label || 'Unknown Camera');
+      
+      // Check if we accidentally got a zoomed camera
+      if (settings?.deviceId) {
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const selectedDevice = allDevices.find(d => d.deviceId === settings.deviceId);
+        if (selectedDevice) {
+          const label = selectedDevice.label.toLowerCase();
+          if (label.includes('telephoto') || label.includes('tele') || 
+              label.includes('zoom') || label.includes('2x') || 
+              label.includes('3x') || label.match(/\d+x/) ||
+              label.match(/camera\s*[3-9]/) || label.match(/camera\s*\d{2,}/)) {
+            console.warn('[startCamera] ⚠️ WARNING: Selected camera appears to be telephoto/zoom:', selectedDevice.label);
+            console.warn('[startCamera] This may cause unwanted zoom effect');
+            
+            // Try to switch to a better camera automatically
+            if (isInitialLoad.current) {
+              console.log('[startCamera] Attempting to switch to non-telephoto camera...');
+              const devices = await navigator.mediaDevices.enumerateDevices();
+              const cameras = devices.filter(d => d.kind === 'videoinput');
+              
+              // Find non-telephoto rear cameras
+              const nonTelephotoRear = cameras.filter(cam => {
+                const l = cam.label.toLowerCase();
+                const isRear = l.includes('back') || l.includes('rear');
+                const isTele = l.includes('telephoto') || l.includes('tele') || 
+                             l.includes('zoom') || l.match(/\d+x/) ||
+                             l.match(/camera\s*[3-9]/) || l.match(/camera\s*\d{2,}/);
+                return isRear && !isTele && cam.deviceId !== settings.deviceId;
+              });
+              
+              console.log('[startCamera] Found alternative cameras:', nonTelephotoRear.length);
+              
+              // Prefer Camera 0 or Camera 1
+              let betterCamera = nonTelephotoRear.find(cam =>
+                cam.label.toLowerCase().match(/camera\s*[0-1](?!\d)/)
+              );
+              
+              // Or prefer wide/ultra-wide
+              if (!betterCamera) {
+                betterCamera = nonTelephotoRear.find(cam =>
+                  cam.label.toLowerCase().includes('wide') ||
+                  cam.label.toLowerCase().includes('ultra')
+                );
+              }
+              
+              // Or just take first available
+              if (!betterCamera && nonTelephotoRear.length > 0) {
+                betterCamera = nonTelephotoRear[0];
+              }
+              
+              if (betterCamera) {
+                console.log('[startCamera] 🔄 Switching to better camera:', betterCamera.label);
+                // Restart with the better camera
+                await startCamera(betterCamera.deviceId);
+                return; // Exit early, new camera will continue the flow
+              } else {
+                console.log('[startCamera] ⚠️ No better camera found, continuing with telephoto');
+              }
+            }
+          }
+        }
+      }
+      
+      // Log actual zoom level from camera
+      if (settings) {
+        console.log('[startCamera] Current zoom from camera settings:', (settings as any).zoom || 'not reported');
+      }
       
       // Store stream in ref
       streamRef.current = mediaStream;
@@ -190,9 +337,74 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       // Mark initial load as complete
       isInitialLoad.current = false;
       
+      // Determine supported zoom levels
+      if (track) {
+        const capabilities = track.getCapabilities() as any;
+        if (capabilities.zoom) {
+          const minZoom = capabilities.zoom.min || 1;
+          const maxZoom = capabilities.zoom.max || 1;
+          console.log('[startCamera] Zoom range:', minZoom, '-', maxZoom);
+          
+          // Determine which preset zoom levels are supported
+          const presetLevels = [0.5, 1, 2];
+          const supported = presetLevels.filter(level => level >= minZoom && level <= maxZoom);
+          
+          // Always include 1x if possible
+          if (!supported.includes(1) && minZoom <= 1 && maxZoom >= 1) {
+            supported.push(1);
+            supported.sort((a, b) => a - b);
+          }
+          
+          console.log('[startCamera] Supported zoom levels:', supported);
+          setSupportedZoomLevels(supported);
+          
+          // If current zoom is not supported, reset to 1x
+          if (!supported.includes(zoom)) {
+            console.log('[startCamera] Current zoom not supported, resetting to 1x');
+            setZoom(1);
+          }
+        } else {
+          console.log('[startCamera] Zoom not supported on this camera');
+          setSupportedZoomLevels([1]); // Only show 1x
+        }
+      }
+      
       // Increment stream version to trigger useEffect
       setStreamVersion(prev => prev + 1);
       console.log('[startCamera] Stream version incremented to trigger attachment');
+      
+      // For Android on initial load, explicitly ensure zoom starts at 1x (not zoomed)
+      if (device.isAndroid && isInitialLoad.current && mediaStream.getVideoTracks().length > 0) {
+        const track = mediaStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities() as any;
+        
+        if (capabilities.zoom) {
+          try {
+            console.log('[startCamera] Android initial load - resetting zoom to 1x to avoid telephoto zoom');
+            const minZoom = capabilities.zoom.min || 1;
+            const maxZoom = capabilities.zoom.max || 1;
+            
+            // Only reset if 1x is in range
+            if (minZoom <= 1 && maxZoom >= 1) {
+              await track.applyConstraints({
+                // @ts-ignore
+                advanced: [{ zoom: 1 }]
+              });
+              setZoom(1); // Update state as well
+              console.log('[startCamera] ✅ Android zoom reset to 1x (range: ' + minZoom + '-' + maxZoom + ')');
+            } else {
+              console.log('[startCamera] ⚠️ 1x not in zoom range, using minZoom:', minZoom);
+              await track.applyConstraints({
+                // @ts-ignore
+                advanced: [{ zoom: minZoom }]
+              });
+              setZoom(minZoom);
+            }
+          } catch (e) {
+            console.log('[startCamera] Could not reset zoom:', e);
+          }
+        }
+      }
       
       // Apply zoom if not default (after getting the stream)
       if (zoom !== 1 && mediaStream.getVideoTracks().length > 0) {
@@ -333,16 +545,68 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
         // Currently on front camera (or unknown), switch to rear
         console.log('[switchCamera] Currently on FRONT camera, switching to REAR');
         
-        // Prefer "Back Dual Wide Camera" for rear
-        targetCamera = cameras.find(cam => 
-          cam.label.includes('Back Dual Wide')
-        ) || null;
-        
-        // Fallback to any rear camera
-        if (!targetCamera) {
+        // For iOS: Prefer "Back Dual Wide Camera"
+        if (device.isIOS) {
           targetCamera = cameras.find(cam => 
-            cam.label.toLowerCase().includes('back')
+            cam.label.includes('Back Dual Wide')
           ) || null;
+          
+          // Fallback to any rear camera
+          if (!targetCamera) {
+            targetCamera = cameras.find(cam => 
+              cam.label.toLowerCase().includes('back')
+            ) || null;
+          }
+        } else {
+          // For Android: Avoid telephoto/zoom lenses
+          const rearCameras = cameras.filter(cam => {
+            const label = cam.label.toLowerCase();
+            const isRear = label.includes('back') || label.includes('rear');
+            
+            // Comprehensive telephoto detection
+            const isTelephoto = label.includes('telephoto') || 
+                              label.includes('tele') ||
+                              label.includes('zoom') || 
+                              label.includes('2x') || label.includes('3x') || 
+                              label.includes('5x') || label.includes('10x') ||
+                              label.includes('periscope') ||
+                              label.match(/\d+x/) || // Catches any "Nx" pattern
+                              (label.includes('camera') && (label.includes(' 2 ') || label.includes('(2)'))) ||
+                              // Filter out higher numbered cameras (Camera 3, Camera 4, etc.)
+                              label.match(/camera\s*[3-9]/) || label.match(/camera\s*\d{2,}/);
+            
+            return isRear && !isTelephoto;
+          });
+          
+          console.log('[switchCamera] Android non-telephoto rear cameras:', rearCameras.length);
+          rearCameras.forEach((cam, idx) => {
+            console.log(`[switchCamera]   Option ${idx}:`, cam.label);
+          });
+          
+          // Prefer ultra-wide or wide camera
+          targetCamera = rearCameras.find(cam => 
+            cam.label.toLowerCase().includes('ultra') || 
+            cam.label.toLowerCase().includes('wide')
+          ) || null;
+          
+          // If not found, prefer Camera 0 or Camera 1 (main cameras)
+          if (!targetCamera) {
+            targetCamera = rearCameras.find(cam => 
+              cam.label.toLowerCase().match(/camera\s*[0-1](?!\d)/)
+            ) || null;
+          }
+          
+          // Fallback to first non-telephoto rear camera
+          if (!targetCamera && rearCameras.length > 0) {
+            targetCamera = rearCameras[0];
+          }
+          
+          // Last resort: any rear camera
+          if (!targetCamera) {
+            targetCamera = cameras.find(cam => 
+              cam.label.toLowerCase().includes('back')
+            ) || null;
+          }
         }
         
         // Fallback to environment facing mode
@@ -408,6 +672,10 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   };
 
   const changeZoom = async (newZoom: number) => {
+    console.log('[changeZoom] Requested zoom:', newZoom);
+    console.log('[changeZoom] Current zoom:', zoom);
+    console.log('[changeZoom] Supported levels:', supportedZoomLevels);
+    
     setZoom(newZoom);
     
     // Apply zoom to current stream without restarting camera
@@ -415,25 +683,38 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       const track = streamRef.current.getVideoTracks()[0];
       const capabilities = track.getCapabilities() as any;
       
+      console.log('[changeZoom] Track capabilities:', capabilities);
+      
       if (capabilities.zoom) {
         try {
           const minZoom = capabilities.zoom.min || 1;
           const maxZoom = capabilities.zoom.max || 1;
           
+          console.log('[changeZoom] Camera zoom range:', minZoom, '-', maxZoom);
+          
           // Clamp zoom to supported range
           const clampedZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
           
-          await track.applyConstraints({
-            // @ts-ignore
-            advanced: [{ zoom: clampedZoom }]
-          });
-          console.log('Zoom applied:', clampedZoom);
+          console.log('[changeZoom] Clamped zoom value:', clampedZoom);
+          
+          // Only apply if within range
+          if (clampedZoom >= minZoom && clampedZoom <= maxZoom) {
+            await track.applyConstraints({
+              // @ts-ignore
+              advanced: [{ zoom: clampedZoom }]
+            });
+            console.log('[changeZoom] ✅ Zoom applied successfully:', clampedZoom);
+          } else {
+            console.log('[changeZoom] ⚠️ Requested zoom out of range, ignoring');
+          }
         } catch (e) {
-          console.log('Could not apply zoom:', e);
+          console.error('[changeZoom] ❌ Could not apply zoom:', e);
         }
       } else {
-        console.log('Zoom not supported on this camera');
+        console.log('[changeZoom] ⚠️ Zoom not supported on this camera');
       }
+    } else {
+      console.log('[changeZoom] ⚠️ No active stream or track');
     }
   };
 
@@ -496,13 +777,13 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   if (permissionState === 'checking' || permissionState === 'prompt') {
     return (
       <div className="camera-loading">
-        <h2>Starting Camera...</h2>
-        <p>Please allow camera access when prompted</p>
-        <div className="device-info">
-          {device.isIOS && 'iOS Safari'}
-          {device.isAndroid && device.isChrome && 'Android Chrome'}
-          {device.isAndroid && device.isFirefox && 'Android Firefox'}
-          {device.isAndroid && !device.isChrome && !device.isFirefox && 'Android Browser'}
+        <div className="loading-content">
+          <div className="camera-icon">
+            <img src={cameraIconSvg} alt="Camera" width="120" height="120" />
+          </div>
+          <div className="loading-spinner"></div>
+          <h2>Initializing Camera</h2>
+          <p className="loading-hint">Preparing your capture experience...</p>
         </div>
       </div>
     );
@@ -618,27 +899,48 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
           </button>
         </div>
 
+        {/* Debug: Show active camera name (especially for Android troubleshooting) */}
+        {activeCameraLabel && (device.isAndroid || device.isIOS) && (
+          <div className="camera-debug-info">
+            📷 {activeCameraLabel}
+            {activeCameraLabel.toLowerCase().match(/camera\s*[3-9]|camera\s*\d{2,}|telephoto|tele|zoom|\d+x/) && (
+              <span style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>
+                ⚠️ Telephoto detected - may look zoomed
+              </span>
+            )}
+            <span style={{ display: 'block', fontSize: '10px', marginTop: '4px', opacity: 0.8 }}>
+              Zoom: {supportedZoomLevels.join('x, ')}x
+            </span>
+          </div>
+        )}
+
         <div className="camera-footer">
           {/* Zoom Controls */}
           <div className="zoom-controls">
-            <button 
-              className={`zoom-button ${zoom === 0.5 ? 'active' : ''}`}
-              onClick={() => changeZoom(0.5)}
-            >
-              0.5x
-            </button>
-            <button 
-              className={`zoom-button ${zoom === 1 ? 'active' : ''}`}
-              onClick={() => changeZoom(1)}
-            >
-              1x
-            </button>
-            <button 
-              className={`zoom-button ${zoom === 2 ? 'active' : ''}`}
-              onClick={() => changeZoom(2)}
-            >
-              2x
-            </button>
+            {supportedZoomLevels.includes(0.5) && (
+              <button 
+                className={`zoom-button ${zoom === 0.5 ? 'active' : ''}`}
+                onClick={() => changeZoom(0.5)}
+              >
+                0.5x
+              </button>
+            )}
+            {supportedZoomLevels.includes(1) && (
+              <button 
+                className={`zoom-button ${zoom === 1 ? 'active' : ''}`}
+                onClick={() => changeZoom(1)}
+              >
+                1x
+              </button>
+            )}
+            {supportedZoomLevels.includes(2) && (
+              <button 
+                className={`zoom-button ${zoom === 2 ? 'active' : ''}`}
+                onClick={() => changeZoom(2)}
+              >
+                2x
+              </button>
+            )}
           </div>
 
           <div className="camera-controls-row">

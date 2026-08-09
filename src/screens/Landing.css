@@ -19,6 +19,12 @@
   animation: gentle-bounce 2s ease-in-out infinite;
 }
 
+.camera-icon img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+}
+
 @keyframes gentle-bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }

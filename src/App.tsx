@@ -34,8 +34,33 @@ function EventRoute() {
   };
 
   const handleCapture = (blob: Blob) => {
-    // Photo captured - will be uploaded in the uploading screen
+    // Photo captured and saved locally - decrement shots
     console.log('Photo captured:', blob.size, 'bytes');
+    
+    const newShotsLeft = Math.max(0, shotsLeft - 1);
+    setShotsLeft(newShotsLeft);
+    
+    if (eventToken) {
+      const participant = getParticipant(eventToken);
+      if (participant) {
+        updatePhotosRemaining(participant, newShotsLeft);
+      }
+    }
+  };
+
+  const handlePhotoDeleted = () => {
+    // Photo deleted - increment shots back
+    console.log('Photo deleted, incrementing shots');
+    
+    const newShotsLeft = shotsLeft + 1;
+    setShotsLeft(newShotsLeft);
+    
+    if (eventToken) {
+      const participant = getParticipant(eventToken);
+      if (participant) {
+        updatePhotosRemaining(participant, newShotsLeft);
+      }
+    }
   };
 
   const handleUploadComplete = () => {
@@ -78,7 +103,7 @@ function EventRoute() {
         path="gallery" 
         element={
           checkParticipant() && eventToken ? 
-            <PhotoGallery eventToken={eventToken} /> : 
+            <PhotoGallery eventToken={eventToken} onPhotoDeleted={handlePhotoDeleted} /> : 
             <Navigate to="../enter-name" replace />
         } 
       />

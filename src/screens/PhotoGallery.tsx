@@ -6,9 +6,10 @@ import './PhotoGallery.css';
 
 interface PhotoGalleryProps {
   eventToken: string;
+  onPhotoDeleted?: () => void;
 }
 
-const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken }) => {
+const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const navigate = useNavigate();
@@ -27,6 +28,11 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken }) => {
       deletePhoto(photoId);
       loadPhotos();
       setSelectedPhoto(null);
+      
+      // Notify parent that a photo was deleted (increments shotsLeft)
+      if (onPhotoDeleted) {
+        onPhotoDeleted();
+      }
     }
   };
 
@@ -38,13 +44,23 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken }) => {
     navigate('../camera');
   };
 
+  const handleBackButton = () => {
+    if (selectedPhoto) {
+      // If viewing a photo, go back to grid
+      setSelectedPhoto(null);
+    } else {
+      // If in grid view, go back to camera
+      handleClose();
+    }
+  };
+
   return (
     <div className="photo-gallery">
       {/* Header */}
       <div className="gallery-header">
-        <button className="close-button" onClick={handleClose}>
+        <button className="close-button" onClick={handleBackButton}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M18 6L6 18M6 6l12 12"/>
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
         </button>
         <h2>My Photos</h2>
@@ -78,15 +94,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken }) => {
       {/* Full View */}
       {selectedPhoto && (
         <div className="photo-viewer">
-          <button 
-            className="back-to-grid" 
-            onClick={() => setSelectedPhoto(null)}
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-          </button>
-
           <div className="photo-container">
             <img src={selectedPhoto.dataUrl} alt="Photo" />
           </div>
