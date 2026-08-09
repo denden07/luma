@@ -25,14 +25,15 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const { eventToken } = useParams<{ eventToken: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const streamRef = useRef<MediaStream | null>(null);
+  const isInitialLoad = useRef(true);
   const [zoom, setZoom] = useState<number>(1);
   const [flashEnabled, setFlashEnabled] = useState(false);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied' | 'checking'>('checking');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [photoCount, setPhotoCount] = useState(0);
   const [latestPhotoUrl, setLatestPhotoUrl] = useState<string | null>(null);
+  const [streamVersion, setStreamVersion] = useState(0);
   const navigate = useNavigate();
   
   const device = getUserAgent();
@@ -40,13 +41,37 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   useEffect(() => {
-    checkPermissionAndStartCamera();
+    startCamera();
     updatePhotoCount();
     
     return () => {
       stopCamera();
     };
-  }, [facingMode]); // Only restart camera when facing mode changes
+  }, []); // Only run on mount, do not restart on facingMode change
+
+  // Attach stream to video element after React renders
+  useEffect(() => {
+    if (permissionState === 'granted' && streamRef.current) {
+      console.log('[useEffect] Stream version changed:', streamVersion);
+      console.log('[useEffect] Waiting for video element to be ready...');
+      
+      // Use requestAnimationFrame to ensure React has rendered the video element
+      requestAnimationFrame(() => {
+        if (videoRef.current && streamRef.current) {
+          console.log('[useEffect] Attaching stream to video element');
+          videoRef.current.srcObject = streamRef.current;
+          
+          videoRef.current.play().then(() => {
+            console.log('[useEffect] ✅ Video playing successfully');
+          }).catch(error => {
+            console.error('[useEffect] ❌ Video play failed:', error);
+          });
+        } else {
+          console.error('[useEffect] ❌ videoRef or streamRef is null after RAF');
+        }
+      });
+    }
+  }, [permissionState, streamVersion]);
 
   const updatePhotoCount = () => {
     if (eventToken) {
@@ -59,10 +84,31 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
     }
   };
 
-  const checkPermissionAndStartCamera = async () => {
+  const stopCamera = () => {
+    console.log('[stopCamera] Stopping camera...');
+    if (streamRef.current) {
+      const tracks = streamRef.current.getTracks();
+      console.log('[stopCamera] Stopping', tracks.length, 'track(s)');
+      tracks.forEach(track => {
+        console.log('[stopCamera] Stopping track:', track.label, 'state:', track.readyState);
+        track.stop();
+      });
+      streamRef.current = null;
+      console.log('[stopCamera] Stream ref cleared');
+    } else {
+      console.log('[stopCamera] No active stream to stop');
+    }
+  };
+
+  const startCamera = async (deviceId?: string) => {
+    console.log('[startCamera] Called with deviceId:', deviceId || 'none (using facingMode)');
+    console.log('[startCamera] Device info:', device);
+    console.log('[startCamera] isHTTPS:', isHTTPS, 'isLocalhost:', isLocalhost);
+    
     try {
       // Check HTTPS requirement for iOS
       if (device.isIOS && !isHTTPS && !isLocalhost) {
+        console.error('[startCamera] iOS requires HTTPS');
         setPermissionState('denied');
         setErrorMessage('iOS requires HTTPS for camera access.');
         return;
@@ -70,6 +116,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
 
       // Check HTTPS requirement for Android Chrome
       if (device.isAndroid && device.isChrome && !isHTTPS && !isLocalhost) {
+        console.error('[startCamera] Android Chrome requires HTTPS');
         setPermissionState('denied');
         setErrorMessage('Chrome on Android requires HTTPS for camera access.');
         return;
@@ -92,44 +139,89 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       }
 
       // Stop existing stream before requesting new one
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        setStream(null);
+      stopCamera();
+
+      // Only set permission state to 'prompt' on initial load
+      // During camera switching, keep the video element mounted
+      if (isInitialLoad.current) {
+        console.log('[startCamera] Setting permission state to prompt (initial load)');
+        setPermissionState('prompt');
+      } else {
+        console.log('[startCamera] Keeping permission state as granted (camera switching)');
+      }
+      
+      let constraints: MediaStreamConstraints;
+      
+      if (deviceId) {
+        // Use specific device ID when switching cameras
+        console.log('[startCamera] Building constraints with deviceId:', deviceId);
+        constraints = {
+          video: { 
+            deviceId: { exact: deviceId }
+          },
+          audio: false,
+        };
+      } else {
+        // Use facingMode preference for initial load
+        console.log('[startCamera] Building constraints with facingMode: environment');
+        constraints = {
+          video: { 
+            facingMode: { ideal: 'environment' }
+          },
+          audio: false,
+        };
       }
 
-      // Request camera access
-      setPermissionState('prompt');
-      console.log('Requesting camera with facingMode:', facingMode, 'zoom:', zoom);
-      
-      const constraints: MediaStreamConstraints = {
-        video: { 
-          facingMode: facingMode,
-        },
-        audio: false,
-      };
-
+      console.log('[startCamera] Calling getUserMedia with constraints:', JSON.stringify(constraints));
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      console.log('[startCamera] getUserMedia succeeded');
       
-      // Apply zoom if supported (after getting the stream)
+      const track = mediaStream.getVideoTracks()[0];
+      console.log('[startCamera] ✅ Camera access granted');
+      console.log('[startCamera] Track label:', track?.label);
+      console.log('[startCamera] Track settings:', track?.getSettings());
+      console.log('[startCamera] Track capabilities:', track?.getCapabilities());
+      console.log('[startCamera] Track readyState:', track?.readyState);
+      
+      // Store stream in ref
+      streamRef.current = mediaStream;
+      console.log('[startCamera] Stream stored in ref');
+      
+      // Mark initial load as complete
+      isInitialLoad.current = false;
+      
+      // Increment stream version to trigger useEffect
+      setStreamVersion(prev => prev + 1);
+      console.log('[startCamera] Stream version incremented to trigger attachment');
+      
+      // Apply zoom if not default (after getting the stream)
       if (zoom !== 1 && mediaStream.getVideoTracks().length > 0) {
+        console.log('[startCamera] Applying zoom:', zoom);
         const track = mediaStream.getVideoTracks()[0];
         const capabilities = track.getCapabilities() as any;
         
         if (capabilities.zoom) {
           try {
+            const minZoom = capabilities.zoom.min || 1;
+            const maxZoom = capabilities.zoom.max || 1;
+            const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+            
             await track.applyConstraints({
               // @ts-ignore
-              advanced: [{ zoom: zoom }]
+              advanced: [{ zoom: clampedZoom }]
             });
-            console.log('Zoom applied:', zoom);
+            console.log('[startCamera] ✅ Zoom applied:', clampedZoom);
           } catch (e) {
-            console.log('Zoom not supported on this camera:', e);
+            console.log('[startCamera] ❌ Zoom not supported on this camera:', e);
           }
+        } else {
+          console.log('[startCamera] Zoom not available in capabilities');
         }
       }
       
       // Apply torch (flash) if enabled and supported
       if (flashEnabled && mediaStream.getVideoTracks().length > 0) {
+        console.log('[startCamera] Applying torch (flash enabled)');
         const track = mediaStream.getVideoTracks()[0];
         const capabilities = track.getCapabilities() as any;
         
@@ -139,79 +231,167 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
               // @ts-ignore - torch is not in TypeScript types yet
               advanced: [{ torch: true }]
             });
+            console.log('[startCamera] ✅ Torch applied');
           } catch (e) {
-            console.log('Torch not supported on this camera');
+            console.log('[startCamera] ❌ Torch not supported on this camera:', e);
+            setFlashEnabled(false); // Disable flash if not supported
           }
+        } else {
+          console.log('[startCamera] Torch not available on this camera');
+          setFlashEnabled(false); // Disable flash if not supported
         }
       }
       
-      console.log('Camera access granted');
+      // Set permission state to granted (after streamVersion is set)
+      // This will trigger the useEffect that attaches the stream to the video element
+      console.log('[startCamera] Setting permission state to granted');
       setPermissionState('granted');
-      setStream(mediaStream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      console.log('[startCamera] ✅ Camera started successfully (stream will be attached by useEffect after React renders)');  
     } catch (error: any) {
-      console.error('Camera access error:', error);
+      console.error('[startCamera] ❌❌❌ Camera access error:', error);
+      console.error('[startCamera] Error name:', error.name);
+      console.error('[startCamera] Error message:', error.message);
+      console.error('[startCamera] Error stack:', error.stack);
       
       // Check the specific error type
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        console.error('[startCamera] Permission denied');
         setPermissionState('denied');
         setErrorMessage('Camera permission was denied. Please allow camera access.');
       } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        console.error('[startCamera] No camera found');
         setPermissionState('denied');
         setErrorMessage('No camera found on this device.');
       } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        console.error('[startCamera] Camera in use');
         setPermissionState('denied');
         setErrorMessage('Camera is already in use by another application.');
       } else if (error.name === 'OverconstrainedError') {
+        console.error('[startCamera] Constraints not supported');
         setPermissionState('denied');
         setErrorMessage('Camera constraints not supported. Try a different zoom level.');
       } else if (error.name === 'NotSupportedError') {
+        console.error('[startCamera] Not supported');
         setPermissionState('denied');
         setErrorMessage('Camera not supported on this browser.');
       } else {
+        console.error('[startCamera] Unknown error');
         setPermissionState('denied');
         setErrorMessage(`Camera error: ${error.message || 'Unknown error'}`);
       }
     }
   };
 
-  const startCamera = async () => {
-    await checkPermissionAndStartCamera();
-  };
-
-  const stopCamera = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-  };
-
   const switchCamera = async () => {
-    // Stop current stream and wait a moment for cleanup
-    if (stream) {
-      stream.getTracks().forEach(track => {
-        track.stop();
+    console.log('[switchCamera] ==================== SWITCH CAMERA CALLED ====================');
+    try {
+      // Get all available video input devices
+      console.log('[switchCamera] Enumerating devices...');
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      console.log('[switchCamera] All devices:', devices);
+      
+      const cameras = devices.filter(device => device.kind === 'videoinput');
+      console.log('[switchCamera] Available cameras:', cameras.length);
+      cameras.forEach((cam, idx) => {
+        console.log(`[switchCamera]   Camera ${idx}:`, {
+          deviceId: cam.deviceId,
+          label: cam.label,
+          groupId: cam.groupId
+        });
       });
-      setStream(null);
+      
+      if (cameras.length < 2) {
+        console.warn('[switchCamera] ⚠️ Only one camera available, cannot switch');
+        return;
+      }
+      
+      // Get the currently active camera's facing mode
+      const currentTrack = streamRef.current?.getVideoTracks()[0];
+      const currentSettings = currentTrack?.getSettings();
+      const currentFacingMode = currentSettings?.facingMode;
+      const currentLabel = currentTrack?.label || '';
+      
+      console.log('[switchCamera] Current camera:', {
+        deviceId: currentSettings?.deviceId,
+        label: currentLabel,
+        facingMode: currentFacingMode,
+        settings: currentSettings
+      });
+      
+      // Determine which camera to switch to
+      let targetCamera: MediaDeviceInfo | null = null;
+      
+      if (currentFacingMode === 'environment' || currentLabel.toLowerCase().includes('back')) {
+        // Currently on rear camera, switch to front
+        console.log('[switchCamera] Currently on REAR camera, switching to FRONT');
+        targetCamera = cameras.find(cam => 
+          cam.label.toLowerCase().includes('front')
+        ) || cameras.find(cam => 
+          cam.deviceId !== currentSettings?.deviceId
+        ) || null;
+      } else {
+        // Currently on front camera (or unknown), switch to rear
+        console.log('[switchCamera] Currently on FRONT camera, switching to REAR');
+        
+        // Prefer "Back Dual Wide Camera" for rear
+        targetCamera = cameras.find(cam => 
+          cam.label.includes('Back Dual Wide')
+        ) || null;
+        
+        // Fallback to any rear camera
+        if (!targetCamera) {
+          targetCamera = cameras.find(cam => 
+            cam.label.toLowerCase().includes('back')
+          ) || null;
+        }
+        
+        // Fallback to environment facing mode
+        if (!targetCamera) {
+          targetCamera = cameras.find(cam => 
+            cam.deviceId !== currentSettings?.deviceId
+          ) || null;
+        }
+      }
+      
+      if (!targetCamera) {
+        console.error('[switchCamera] ❌ Could not find target camera');
+        return;
+      }
+      
+      console.log('[switchCamera] 🔄 Switching to:', {
+        deviceId: targetCamera.deviceId,
+        label: targetCamera.label,
+      });
+      
+      // Start the new camera using its device ID
+      console.log('[switchCamera] Calling startCamera with deviceId:', targetCamera.deviceId);
+      await startCamera(targetCamera.deviceId);
+      console.log('[switchCamera] ✅ Switch completed successfully');
+    } catch (error) {
+      console.error('[switchCamera] ❌❌❌ Failed to switch camera:', error);
+      console.error('[switchCamera] Error details:', {
+        name: (error as any).name,
+        message: (error as any).message,
+        stack: (error as any).stack
+      });
+       
+      // Attempt recovery: try to restart with any available camera
+      console.log('[switchCamera] Attempting recovery...');
+      try {
+        await startCamera();
+        console.log('[switchCamera] ✅ Recovery succeeded');
+      } catch (recoveryError) {
+        console.error('[switchCamera] ❌ Recovery failed:', recoveryError);
+      }
     }
-    
-    // Small delay to ensure cleanup completes on mobile devices
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    // Change facing mode - useEffect will detect this and restart camera
-    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(newFacingMode);
   };
 
   const toggleFlash = async () => {
     setFlashEnabled(!flashEnabled);
     
     // Apply flash to current stream
-    if (stream && stream.getVideoTracks().length > 0) {
-      const track = stream.getVideoTracks()[0];
+    if (streamRef.current && streamRef.current.getVideoTracks().length > 0) {
+      const track = streamRef.current.getVideoTracks()[0];
       const capabilities = track.getCapabilities() as any;
       
       if (capabilities.torch) {
@@ -231,8 +411,8 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
     setZoom(newZoom);
     
     // Apply zoom to current stream without restarting camera
-    if (stream && stream.getVideoTracks().length > 0) {
-      const track = stream.getVideoTracks()[0];
+    if (streamRef.current && streamRef.current.getVideoTracks().length > 0) {
+      const track = streamRef.current.getVideoTracks()[0];
       const capabilities = track.getCapabilities() as any;
       
       if (capabilities.zoom) {
@@ -380,7 +560,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
         ) : (
           <>
             <p>{errorMessage}</p>
-            <button className="primary-button" onClick={startCamera}>
+            <button className="primary-button" onClick={() => startCamera()}>
               Try Again
             </button>
           </>
