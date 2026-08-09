@@ -861,14 +861,18 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   return (
     <div className="camera-screen">
       <div className="flash-effect"></div>
-      
-      <video 
-        ref={videoRef} 
-        autoPlay 
-        playsInline 
-        muted
-        className="camera-preview"
-      />
+        <div className="polaroid-container"> 
+          <div className="polaroid-frame">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                playsInline 
+                muted
+                className="camera-preview"
+              />
+            </div>
+        </div>
+ 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
       <div className="camera-overlay">
@@ -884,8 +888,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
           </button>
 
           <div className="shots-counter">
-            <span className="shots-label">shots left</span>
-            <span className="shots-number handwritten">{shotsLeft}</span>
+            <span className="shots-number handwritten" key={shotsLeft}>{shotsLeft}</span>
           </div>
 
           <button 
@@ -949,10 +952,8 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
             onClick={switchCamera}
             aria-label="Switch camera"
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 9V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
-              <path d="M7 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2"/>
-              <circle cx="14" cy="15" r="3"/>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+              <path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h4.05l1.83-2h4.24l1.83 2H20v12zM12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/>
             </svg>
           </button>
 
