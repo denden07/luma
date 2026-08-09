@@ -38,7 +38,7 @@ const Uploading: React.FC<UploadingProps> = ({ onUploadComplete }) => {
       }
       
       setTimeout(() => {
-        navigate('/complete');
+        navigate('../complete');
       }, 500);
     }, 2500);
   };

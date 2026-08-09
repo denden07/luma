@@ -15,12 +15,12 @@ const Message: React.FC = () => {
     setSubmitted(true);
     
     setTimeout(() => {
-      navigate('/');
+      navigate('..');
     }, 2000);
   };
 
   const handleSkip = () => {
-    navigate('/');
+    navigate('..');
   };
 
   if (submitted) {

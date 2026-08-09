@@ -14,7 +14,7 @@ const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
     e.preventDefault();
     if (name.trim()) {
       onNameSubmit(name.trim());
-      navigate('/camera');
+      navigate('../camera');
     }
   };
 

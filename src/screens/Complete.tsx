@@ -14,11 +14,11 @@ const Complete: React.FC<CompleteProps> = ({ shotsLeft, onTakeAnother }) => {
     if (onTakeAnother) {
       onTakeAnother();
     }
-    navigate('/camera');
+    navigate('../camera');
   };
 
   const handleDone = () => {
-    navigate('/message');
+    navigate('../message');
   };
 
   return (

@@ -14,7 +14,7 @@ const Developing: React.FC<DevelopingProps> = ({ onComplete }) => {
       if (onComplete) {
         onComplete();
       }
-      navigate('/uploading');
+      navigate('../uploading');
     }, 2000);
 
     return () => clearTimeout(timer);

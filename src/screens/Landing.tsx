@@ -10,7 +10,7 @@ const Landing: React.FC<LandingProps> = ({ eventName = "NINA & ALDRIN'S WEDDING"
   const navigate = useNavigate();
 
   const handleStart = () => {
-    navigate('/enter-name');
+    navigate('./enter-name');
   };
 
   return (
