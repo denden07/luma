@@ -1,0 +1,202 @@
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+  animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Polaroid Modal Variant */
+.modal-content.polaroid-modal {
+  background: #f5f5f0;
+  padding: 24px 24px 64px 24px;
+  border-radius: 8px;
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  max-width: 500px;
+  width: calc(100% - 40px);
+}
+
+.polaroid-modal-image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--color-soft-black);
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.polaroid-modal-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.polaroid-action-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: rgba(0, 0, 0, 0.05);
+  border: 2px solid transparent;
+}
+
+.polaroid-action-button:active {
+  transform: scale(0.92);
+}
+
+.polaroid-action-button.download {
+  background: var(--color-film-yellow);
+  color: var(--color-soft-black);
+  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.3);
+}
+
+.polaroid-action-button.download:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+}
+
+.polaroid-action-button.download:active {
+  background: #d4a905;
+  transform: scale(0.92);
+}
+
+.polaroid-action-button.delete {
+  background: rgba(255, 59, 48, 0.1);
+  color: #ff3b30;
+  border: 2px solid rgba(255, 59, 48, 0.3);
+  box-shadow: 0 4px 16px rgba(255, 59, 48, 0.2);
+}
+
+.polaroid-action-button.delete:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 59, 48, 0.15);
+  box-shadow: 0 6px 20px rgba(255, 59, 48, 0.3);
+}
+
+.polaroid-action-button.delete:active {
+  background: rgba(255, 59, 48, 0.2);
+  transform: scale(0.92);
+}
+
+.polaroid-action-button svg {
+  width: 26px;
+  height: 26px;
+}
+
+/* Confirm Modal Variant */
+.modal-content.confirm-modal {
+  background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+  padding: 40px 28px;
+  border-radius: 20px;
+  box-shadow: 
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 340px;
+  width: calc(100% - 40px);
+  text-align: center;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.confirm-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-off-white);
+  margin-bottom: 16px;
+  letter-spacing: 0.3px;
+}
+
+.confirm-modal-message {
+  font-size: 15px;
+  color: var(--color-warm-gray);
+  margin-bottom: 32px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-button {
+  flex: 1;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.confirm-button.cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-off-white);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.confirm-button.cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.confirm-button.cancel:active {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.95);
+}
+
+.confirm-button.confirm {
+  background: linear-gradient(135deg, #ff3b30 0%, #d32f2f 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(255, 59, 48, 0.4);
+}
+
+.confirm-button.confirm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 59, 48, 0.5);
+}
+
+.confirm-button.confirm:active {
+  background: linear-gradient(135deg, #d32f2f 0%, #b71c1c 100%);
+  transform: scale(0.95);
+}

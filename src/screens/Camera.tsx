@@ -960,7 +960,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
           <button 
             className="capture-button"
             onClick={capturePhoto}
-            disabled={shotsLeft <= 0}
+            disabled={shotsLeft < 1}
             aria-label="Capture photo"
           >
             <div className="capture-button-inner"></div>
