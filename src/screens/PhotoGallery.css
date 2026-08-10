@@ -147,6 +147,19 @@
   display: block;
 }
 
+.photo-date {
+  position: absolute;
+  bottom: 8px;
+  left: 12px;
+  right: 12px;
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: bold;
+  color: #888;
+  letter-spacing: 1px;
+}
+
 .empty-state {
   grid-column: 1 / -1;
   display: flex;
@@ -163,4 +176,169 @@
   color: var(--color-warm-gray);
   margin-bottom: 32px;
   opacity: 0.8;
+}
+
+/* Selection Mode Styles */
+.select-all-btn {
+  background: transparent;
+  color: black;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 16px;
+  border: 2px solid var(--color-film-yellow);
+  transition: all 0.3s ease;
+}
+
+.select-all-btn:hover {
+  background: var(--color-film-yellow);
+  color: var(--color-soft-black);
+}
+
+.gallery-item.selected {
+  transform: scale(0.95);
+  box-shadow: 
+    0 0 0 3px var(--color-film-yellow),
+    0 10px 30px rgba(255, 193, 7, 0.4);
+}
+
+.selection-checkbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.gallery-item.selected .selection-checkbox {
+  background: var(--color-film-yellow);
+  border-color: var(--color-film-yellow);
+}
+
+.selection-checkbox svg {
+  color: white;
+  stroke-width: 3;
+}
+
+.uploaded-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #4caf50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.uploaded-badge svg {
+  color: white;
+}
+
+/* Selection Actions Bar */
+.selection-actions {
+  padding: 16px 24px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 193, 7, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.upload-btn {
+  background: linear-gradient(135deg, var(--color-film-yellow) 0%, #f0d068 100%);
+  color: var(--color-soft-black);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 24px;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.3);
+  transition: all 0.3s ease;
+}
+
+.delete-btn {
+    display: none !important;
+}
+
+.upload-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+}
+
+.upload-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.upload-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upload-info {
+  font-size: 14px;
+  color: var(--color-warm-gray);
+  font-style: italic;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--color-soft-black);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Modal Upload Button */
+.polaroid-action-button.upload {
+  background: var(--color-film-yellow);
+  color: var(--color-soft-black);
+  border: none;
+}
+
+.polaroid-action-button.upload:hover:not(:disabled) {
+  background: #f0d068;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+}
+
+.polaroid-action-button.upload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.uploaded-text {
+  color: #4caf50;
+  font-weight: 600;
+  font-size: 13px;
 }

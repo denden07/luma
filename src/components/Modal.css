@@ -64,6 +64,17 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+.polaroid-modal-date {
+  text-align: center;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: bold;
+  color: #888;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+}
+
 .polaroid-modal-actions {
   display: flex;
   gap: 16px;

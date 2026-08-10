@@ -36,10 +36,23 @@ export function savePhoto(eventToken: string, participantName: string, blob: Blo
       photos.push(photo);
       
       try {
-        localStorage.setItem(PHOTOS_KEY, JSON.stringify(photos));
+        const jsonData = JSON.stringify(photos);
+        const sizeKB = (new Blob([jsonData]).size / 1024).toFixed(1);
+        console.log('[photoStorage] Saving photo, total storage size:', sizeKB, 'KB');
+        
+        localStorage.setItem(PHOTOS_KEY, jsonData);
         resolve(photo);
-      } catch (error) {
-        reject(new Error('Failed to save photo. Storage may be full.'));
+      } catch (error: any) {
+        console.error('[photoStorage] Save failed:', error);
+        
+        // Provide more specific error
+        if (error.name === 'QuotaExceededError' || error.message?.includes('quota')) {
+          const err = new Error('Storage quota exceeded') as any;
+          err.name = 'QuotaExceededError';
+          reject(err);
+        } else {
+          reject(new Error('Failed to save photo'));
+        }
       }
     };
 
@@ -87,28 +100,66 @@ export function deletePhoto(photoId: string): boolean {
 }
 
 /**
- * Download a photo to device
- */
-export function downloadPhoto(photo: Photo): void {
-  const link = document.createElement('a');
-  link.href = photo.dataUrl;
-  link.download = `luma-${photo.participantName}-${photo.timestamp}.jpg`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Get total storage size estimate (in MB)
+ * Get current storage usage in KB
  */
 export function getStorageSize(): number {
   try {
-    const photos = getAllPhotos();
-    const jsonString = JSON.stringify(photos);
-    const bytes = new Blob([jsonString]).size;
-    return bytes / (1024 * 1024); // Convert to MB
+    const stored = localStorage.getItem(PHOTOS_KEY);
+    if (!stored) return 0;
+    return new Blob([stored]).size / 1024; // Return KB
   } catch (error) {
+    console.error('Failed to check storage size:', error);
     return 0;
+  }
+}
+
+/**
+ * Check if storage is getting full (>80% of iOS Safari ~5MB limit)
+ */
+export function isStorageNearFull(): boolean {
+  const sizeKB = getStorageSize();
+  const limitKB = 4 * 1024; // Conservative 4MB limit for iOS Safari
+  return sizeKB > (limitKB * 0.8);
+}
+
+/**
+ * Download a photo to device (iOS Safari compatible)
+ */
+export function downloadPhoto(photo: Photo): void {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+  if (isIOS || isSafari) {
+    // iOS Safari doesn't support download attribute well
+    // Open in new tab so user can long-press and save
+    const win = window.open();
+    if (win) {
+      win.document.write(`
+        <html>
+          <head>
+            <title>Download Photo</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+              img { max-width: 100%; height: auto; }
+              .instructions { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 20px; border-radius: 8px; font-family: system-ui; font-size: 14px; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="instructions">Long press image and tap "Save to Photos"</div>
+            <img src="${photo.dataUrl}" alt="Photo" />
+          </body>
+        </html>
+      `);
+    }
+  } else {
+    // Standard download for other browsers
+    const link = document.createElement('a');
+    link.href = photo.dataUrl;
+    link.download = `luma-${photo.participantName}-${photo.timestamp}.jpg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }
 

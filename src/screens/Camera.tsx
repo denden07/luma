@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { savePhoto, getEventPhotos } from '../utils/photoStorage';
+import { savePhoto, getEventPhotos } from '../utils/indexedDBStorage';
 import { getParticipant } from '../utils/participant';
 import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
@@ -37,6 +37,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const [streamVersion, setStreamVersion] = useState(0);
   const [supportedZoomLevels, setSupportedZoomLevels] = useState<number[]>([0.5, 1, 2]);
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('');
+  const [isVideoReady, setIsVideoReady] = useState(false);
   const navigate = useNavigate();
   
   const device = getUserAgent();
@@ -60,16 +61,43 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       console.log('[useEffect] Stream version changed:', streamVersion);
       console.log('[useEffect] Waiting for video element to be ready...');
       
+      // Mark video as not ready when switching cameras
+      setIsVideoReady(false);
+      
       // Use requestAnimationFrame to ensure React has rendered the video element
       requestAnimationFrame(() => {
         if (videoRef.current && streamRef.current) {
           console.log('[useEffect] Attaching stream to video element');
           videoRef.current.srcObject = streamRef.current;
           
+          // Add loadedmetadata listener to ensure video is ready
+          const handleLoadedMetadata = () => {
+            console.log('[useEffect] Video metadata loaded');
+            console.log('[useEffect] Video dimensions:', videoRef.current?.videoWidth, 'x', videoRef.current?.videoHeight);
+            
+            // Mark video as ready once dimensions are available
+            if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+              setIsVideoReady(true);
+              console.log('[useEffect] ✅ Video ready for capture');
+            } else {
+              console.warn('[useEffect] ⚠️ Video metadata loaded but dimensions still 0');
+            }
+          };
+          
+          videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+          
           videoRef.current.play().then(() => {
             console.log('[useEffect] ✅ Video playing successfully');
           }).catch(error => {
             console.error('[useEffect] ❌ Video play failed:', error);
+            // Try playing again after a short delay (helps on iOS)
+            setTimeout(() => {
+              if (videoRef.current) {
+                videoRef.current.play().catch(e => {
+                  console.error('[useEffect] ❌ Retry play failed:', e);
+                });
+              }
+            }, 100);
           });
         } else {
           console.error('[useEffect] ❌ videoRef or streamRef is null after RAF');
@@ -78,13 +106,13 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
     }
   }, [permissionState, streamVersion]);
 
-  const updatePhotoCount = () => {
+  const updatePhotoCount = async () => {
     if (eventToken) {
-      const photos = getEventPhotos(eventToken);
+      const photos = await getEventPhotos(eventToken);
       setPhotoCount(photos.length);
-      // Get latest photo for preview
+      // Get latest photo for preview (use thumbnail)
       if (photos.length > 0) {
-        setLatestPhotoUrl(photos[photos.length - 1].dataUrl);
+        setLatestPhotoUrl(photos[0].thumbnailUrl); // IndexedDB returns newest first
       }
     }
   };
@@ -724,8 +752,25 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Check if video has valid dimensions (critical for iOS/Android)
+    if (!video.videoWidth || !video.videoHeight) {
+      console.error('[capturePhoto] Video not ready - dimensions are 0');
+      console.error('[capturePhoto] videoWidth:', video.videoWidth, 'videoHeight:', video.videoHeight);
+      console.error('[capturePhoto] readyState:', video.readyState);
+      alert('Camera not ready yet. Please wait a moment and try again.');
+      return;
+    }
+    
+    console.log('[capturePhoto] Capturing photo:', video.videoWidth, 'x', video.videoHeight);
+    
+    // Resize to max 1200px width to save storage space (iOS Safari has strict localStorage limits)
+    const maxWidth = 1200;
+    const scaleFactor = video.videoWidth > maxWidth ? maxWidth / video.videoWidth : 1;
+    
+    canvas.width = Math.floor(video.videoWidth * scaleFactor);
+    canvas.height = Math.floor(video.videoHeight * scaleFactor);
+    
+    console.log('[capturePhoto] Output size:', canvas.width, 'x', canvas.height, 'scale:', scaleFactor.toFixed(2));
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -739,29 +784,215 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
       }, 150);
     }
 
-    ctx.drawImage(video, 0, 0);
+    // Draw video frame with scaling
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
+    // Apply film filter effects
+    applyFilmFilter(ctx, canvas.width, canvas.height);
+
+    // Add date stamp
+    addDateStamp(ctx, canvas.width, canvas.height);
+
+    // Lower quality for disposable camera look + smaller file size (iOS Safari has strict limits)
     canvas.toBlob(async (blob) => {
       if (blob) {
         // Save photo locally instead of uploading
         const participant = getParticipant(eventToken);
         const participantName = participant?.name || 'Unknown';
         
+        console.log('[capturePhoto] Photo blob size:', (blob.size / 1024).toFixed(1), 'KB');
+        
         try {
           await savePhoto(eventToken, participantName, blob);
-          updatePhotoCount();
+          await updatePhotoCount();
           
           // Still call onCapture for backward compatibility (but won't upload)
           onCapture(blob);
           
           // Show success feedback
-          console.log('Photo saved locally!');
-        } catch (error) {
+          console.log('Photo saved to IndexedDB!');
+        } catch (error: any) {
           console.error('Failed to save photo:', error);
-          alert('Failed to save photo. Storage may be full.');
+          alert('Failed to save photo. Please try again.');
         }
       }
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', 0.75);
+  };
+
+  // Apply disposable camera filter
+const applyFilmFilter = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number
+) => {
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+
+  // Random exposure variation per photo
+  const exposure = 0.96 + Math.random() * 0.12;
+
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // -------------------------------------------------------
+    // 1. Slightly warm / faded exposure
+    // -------------------------------------------------------
+    r *= 1.08 * exposure;
+    g *= 1.04 * exposure;
+    b *= 0.97 * exposure;
+
+    // Lift shadows slightly = faded film blacks
+    r += 7;
+    g += 6;
+    b += 4;
+
+    // -------------------------------------------------------
+    // 2. Slight yellow/green disposable-camera color cast
+    // -------------------------------------------------------
+    g *= 1.035;
+    b *= 0.97;
+
+    // Warm highlights
+    if (r > 150) {
+      r += 4;
+      g += 2;
+    }
+
+    // -------------------------------------------------------
+    // 3. Reduce digital contrast
+    // -------------------------------------------------------
+    const avg = (r + g + b) / 3;
+
+    r = avg + (r - avg) * 0.82;
+    g = avg + (g - avg) * 0.82;
+    b = avg + (b - avg) * 0.78;
+
+    // -------------------------------------------------------
+    // 4. Slightly faded blacks
+    // -------------------------------------------------------
+    if (r < 45) r += 5;
+    if (g < 45) g += 5;
+    if (b < 45) b += 4;
+
+    // -------------------------------------------------------
+    // 5. Film grain
+    // -------------------------------------------------------
+    const grain = (Math.random() - 0.5) * 32;
+
+    // Give each channel slightly different grain
+    r += grain;
+    g += grain * 0.9;
+    b += grain * 0.75;
+
+    // -------------------------------------------------------
+    // 6. Very subtle color noise
+    // -------------------------------------------------------
+    const colorNoise = (Math.random() - 0.5) * 8;
+
+    r += colorNoise * 0.8;
+    g -= colorNoise * 0.15;
+    b -= colorNoise * 0.5;
+
+    // Clamp
+    data[i] = Math.max(0, Math.min(255, r));
+    data[i + 1] = Math.max(0, Math.min(255, g));
+    data[i + 2] = Math.max(0, Math.min(255, b));
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // ---------------------------------------------------------
+  // 7. Strong disposable-camera vignette
+  // ---------------------------------------------------------
+  const vignette = ctx.createRadialGradient(
+    width / 2,
+    height / 2,
+    Math.min(width, height) * 0.15,
+    width / 2,
+    height / 2,
+    Math.max(width, height) * 0.72
+  );
+
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(0.55, 'rgba(0, 0, 0, 0.02)');
+  vignette.addColorStop(0.78, 'rgba(0, 0, 0, 0.12)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.38)');
+
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+
+  // ---------------------------------------------------------
+  // 8. Random warm light leak
+  // ---------------------------------------------------------
+  const corner = Math.floor(Math.random() * 4);
+
+  const leakX = corner % 2 === 0 ? 0 : width;
+  const leakY = corner < 2 ? 0 : height;
+
+  const leak = ctx.createRadialGradient(
+    leakX,
+    leakY,
+    0,
+    leakX,
+    leakY,
+    Math.max(width, height) * 0.55
+  );
+
+  leak.addColorStop(0, 'rgba(255, 170, 80, 0.18)');
+  leak.addColorStop(0.25, 'rgba(255, 120, 60, 0.08)');
+  leak.addColorStop(0.7, 'rgba(255, 100, 40, 0.025)');
+  leak.addColorStop(1, 'rgba(255, 80, 20, 0)');
+
+  ctx.fillStyle = leak;
+  ctx.fillRect(0, 0, width, height);
+
+  // ---------------------------------------------------------
+  // 9. Very subtle yellow film haze
+  // ---------------------------------------------------------
+  const haze = ctx.createLinearGradient(
+    0,
+    0,
+    width,
+    height
+  );
+
+  haze.addColorStop(0, 'rgba(255, 220, 150, 0.025)');
+  haze.addColorStop(0.5, 'rgba(255, 240, 190, 0)');
+  haze.addColorStop(1, 'rgba(255, 190, 100, 0.025)');
+
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, 0, width, height);
+};
+
+
+
+  // Add date stamp like disposable cameras
+  const addDateStamp = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const timestamp = `${year} ${month} ${day}  ${hours}:${minutes}`;
+
+    // Calculate font size based on image dimensions
+    const fontSize = Math.max(width * 0.025, 18);
+    
+    ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+    ctx.fillStyle = 'rgba(255, 100, 0, 0.9)';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.lineWidth = 3;
+    
+    const padding = fontSize * 1.2;
+    const x = width - ctx.measureText(timestamp).width - padding;
+    const y = height - padding;
+    
+    // Draw with more visible stroke
+    ctx.strokeText(timestamp, x, y);
+    ctx.fillText(timestamp, x, y);
   };
 
   const handleExit = () => {
@@ -960,8 +1191,9 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
           <button 
             className="capture-button"
             onClick={capturePhoto}
-            disabled={shotsLeft < 1}
+            disabled={shotsLeft <= 0 || !isVideoReady}
             aria-label="Capture photo"
+            title={!isVideoReady ? 'Camera loading...' : shotsLeft <= 0 ? 'No shots left' : 'Capture photo'}
           >
             <div className="capture-button-inner"></div>
           </button>
