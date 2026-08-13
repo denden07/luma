@@ -1,7 +1,12 @@
 /**
  * Photo Storage Utility
  * Manages photos in localStorage using base64 encoding
+ * 
+ * NOTE: This file is deprecated in favor of indexedDBStorage.ts
+ * Keeping for backward compatibility only
  */
+
+import { generateUUID } from './indexedDBStorage';
 
 interface Photo {
   id: string;
@@ -25,7 +30,7 @@ export function savePhoto(eventToken: string, participantName: string, blob: Blo
     
     reader.onload = () => {
       const photo: Photo = {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: generateUUID(),
         eventToken,
         participantName,
         timestamp: Date.now(),

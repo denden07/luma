@@ -228,23 +228,55 @@
   stroke-width: 3;
 }
 
-.uploaded-badge {
+/* Photo Status Badges */
+.photo-status-badge {
   position: absolute;
   top: 8px;
   left: 8px;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: #4caf50;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
+  padding: 0 8px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.photo-status-badge.uploaded {
+  background: #4caf50;
+  color: white;
   box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
 }
 
-.uploaded-badge svg {
+.photo-status-badge.uploading {
+  background: #2196F3;
   color: white;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.photo-status-badge.failed {
+  background: #f44336;
+  color: white;
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.4);
+}
+
+.badge-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* Selection Actions Bar */
@@ -339,6 +371,12 @@
 
 .uploaded-text {
   color: #4caf50;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.failed-text {
+  color: #f44336;
   font-weight: 600;
   font-size: 13px;
 }

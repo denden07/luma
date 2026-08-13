@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventPhotos, deletePhoto, downloadPhoto, markAsUploaded } from '../utils/indexedDBStorage';
+import { getEventPhotos, deletePhoto, downloadPhoto } from '../utils/indexedDBStorage';
 import type { Photo } from '../utils/indexedDBStorage';
 import Modal from '../components/Modal';
+import UploadPanel from '../components/UploadPanel';
 import './PhotoGallery.css';
 
 interface PhotoGalleryProps {
@@ -17,7 +18,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
-  const [uploading, setUploading] = useState(false);
   const [longPressTimer, setLongPressTimer] = useState<number | null>(null);
   const navigate = useNavigate();
 
@@ -121,50 +121,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     setSelectedPhotos(new Set());
   };
 
-  // Upload functionality
-  const uploadSelectedPhotos = async () => {
-    if (selectedPhotos.size === 0) return;
-    
-    setUploading(true);
-    
-    try {
-      const photosToUpload = photos.filter(p => selectedPhotos.has(p.id) && !p.uploaded);
-      
-      if (photosToUpload.length === 0) {
-        alert('All selected photos have already been uploaded!');
-        setUploading(false);
-        return;
-      }
-
-      // Simulate upload (replace with actual API call)
-      console.log('[Upload] Uploading', photosToUpload.length, 'photos...');
-      
-      // TODO: Replace this with actual upload API
-      // Example:
-      // for (const photo of photosToUpload) {
-      //   const blob = await fetch(photo.fullImageUrl).then(r => r.blob());
-      //   await uploadPhotoToServer(blob, photo.id);
-      // }
-      
-      // For now, just mark as uploaded after delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mark photos as uploaded
-      await markAsUploaded(photosToUpload.map(p => p.id));
-      
-      // Reload photos
-      await loadPhotos();
-      
-      alert(`✅ Successfully uploaded ${photosToUpload.length} photo(s)!`);
-      exitSelectionMode();
-    } catch (error) {
-      console.error('[Upload] Failed:', error);
-      alert('Failed to upload photos. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   // Bulk delete functionality
   const deleteSelectedPhotos = async () => {
     if (selectedPhotos.size === 0) return;
@@ -199,36 +155,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     }
   };
 
-  const uploadSinglePhoto = async (photo: Photo) => {
-    if (photo.uploaded) {
-      alert('This photo has already been uploaded!');
-      return;
-    }
-
-    setUploading(true);
-    
-    try {
-      console.log('[Upload] Uploading photo:', photo.id);
-      
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Mark as uploaded
-      await markAsUploaded([photo.id]);
-      
-      // Reload photos and close modal
-      await loadPhotos();
-      setSelectedPhoto(null);
-      
-      alert('✅ Photo uploaded successfully!');
-    } catch (error) {
-      console.error('[Upload] Failed:', error);
-      alert('Failed to upload photo. Please try again.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
     const year = date.getFullYear().toString().slice(-2);
@@ -237,7 +163,16 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     return `${year} ${month} ${day}`;
   };
 
-  const unuploadedCount = photos.filter(p => !p.uploaded).length;
+  const getStatusBadge = (photo: Photo) => {
+    if (photo.status === 'uploaded') {
+      return { icon: '✓', className: 'uploaded', label: 'Uploaded' };
+    } else if (photo.status === 'uploading') {
+      return { icon: '↑', className: 'uploading', label: 'Uploading...' };
+    } else if (photo.status === 'failed') {
+      return { icon: '!', className: 'failed', label: 'Failed' };
+    }
+    return null;
+  };
 
   return (
     <div className="photo-gallery">
@@ -273,25 +208,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
       {selectionMode && (
         <div className="selection-actions">
           <button 
-            className="upload-btn"
-            onClick={uploadSelectedPhotos}
-            disabled={selectedPhotos.size === 0 || uploading}
-          >
-            {uploading ? (
-              <>
-                <div className="spinner"></div>
-                Uploading...
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                </svg>
-                Upload {selectedPhotos.size > 0 ? `(${selectedPhotos.size})` : ''}
-              </>
-            )}
-          </button>
-          <button 
             className="delete-btn"
             onClick={deleteSelectedPhotos}
             disabled={selectedPhotos.size === 0}
@@ -301,11 +217,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             </svg>
             Delete {selectedPhotos.size > 0 ? `(${selectedPhotos.size})` : ''}
           </button>
-          {unuploadedCount > 0 && (
-            <div className="upload-info">
-              {unuploadedCount} photo(s) not uploaded yet
-            </div>
-          )}
         </div>
       )}
 
@@ -332,11 +243,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             >
               <img src={photo.thumbnailUrl} alt="Photo" />
               <div className="photo-date">{formatDate(photo.timestamp)}</div>
-              {photo.uploaded && (
-                <div className="uploaded-badge">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M20 6L9 17l-5-5"/>
-                  </svg>
+              {getStatusBadge(photo) && (
+                <div className={`photo-status-badge ${getStatusBadge(photo)!.className}`}>
+                  <span className="badge-icon">{getStatusBadge(photo)!.icon}</span>
                 </div>
               )}
               {selectionMode && (
@@ -353,6 +262,14 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
         )}
       </div>
 
+      {/* Upload Panel - Manual Upload UI */}
+      {!selectionMode && (
+        <UploadPanel 
+          eventId={eventToken} 
+          onUploadComplete={loadPhotos}
+        />
+      )}
+
       {/* Polaroid Photo Viewer Modal */}
       <Modal 
         isOpen={!!selectedPhoto} 
@@ -368,27 +285,14 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             />
             <div className="polaroid-modal-date">
               {formatDate(selectedPhoto.timestamp)}
-              {selectedPhoto.uploaded && (
+              {selectedPhoto.status === 'uploaded' && (
                 <span className="uploaded-text"> • Uploaded</span>
+              )}
+              {selectedPhoto.status === 'failed' && (
+                <span className="failed-text"> • Upload Failed</span>
               )}
             </div>
             <div className="polaroid-modal-actions">
-              {!selectedPhoto.uploaded && (
-                <button 
-                  className="polaroid-action-button upload"
-                  onClick={() => uploadSinglePhoto(selectedPhoto)}
-                  disabled={uploading}
-                  aria-label="Upload photo"
-                >
-                  {uploading ? (
-                    <div className="spinner-small"></div>
-                  ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                    </svg>
-                  )}
-                </button>
-              )}
               <button 
                 className="polaroid-action-button download"
                 onClick={() => handleDownload(selectedPhoto)}

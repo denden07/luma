@@ -8,8 +8,16 @@ import Developing from './screens/Developing';
 import Uploading from './screens/Uploading';
 import Complete from './screens/Complete';
 import Message from './screens/Message';
-import { getParticipant, createParticipant, updatePhotosRemaining } from './utils/participant';
+import HostDashboard from './screens/HostDashboard';
+import EventCreation from './screens/EventCreation';
+import HostEventsList from './screens/HostEventsList';
+import HostLogin from './screens/HostLogin';
+import ErrorBoundary from './components/ErrorBoundary';
+import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipant } from './utils/participant';
+import { createParticipant as createParticipantAPI } from './services/apiService';
+import { migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
 import { isLocalMode } from './utils/env';
+import { isHostLoggedIn } from './utils/hostAuth';
 import './App.css';
 
 function EventRoute() {
@@ -26,10 +34,26 @@ function EventRoute() {
     }
   }, [eventToken]);
 
-  const handleNameSubmit = (name: string) => {
+  const handleNameSubmit = async (name: string) => {
     if (eventToken) {
-      const participant = createParticipant(eventToken, name, 10);
-      setShotsLeft(participant.photosRemaining);
+      try {
+        // First create participant in backend database to get the ID
+        const backendParticipant = await createParticipantAPI(eventToken, name);
+        console.log('Participant created in database:', backendParticipant.id);
+        
+        // Then create participant locally with the same ID from backend
+        const participant = createParticipant(eventToken, name, 10);
+        // Override the participant ID with the one from backend
+        participant.participantId = backendParticipant.id;
+        saveParticipant(participant);
+        
+        setShotsLeft(participant.photosRemaining);
+      } catch (error) {
+        console.error('Failed to create participant in database:', error);
+        // Fallback: create locally only
+        const participant = createParticipant(eventToken, name, 10);
+        setShotsLeft(participant.photosRemaining);
+      }
     }
   };
 
@@ -117,7 +141,23 @@ function EventRoute() {
     </Routes>
   );
 }
+
+// Protected route for host pages
+function ProtectedHostRoute({ children }: { children: React.ReactNode }) {
+  if (!isHostLoggedIn()) {
+    return <Navigate to="/host/login" replace />;
+  }
+  return <>{children}</>;
+}
+
 function App() {
+  // Run migration on app startup to fix photos with invalid UUIDs
+  useEffect(() => {
+    migrateInvalidPhotoUUIDs().catch(error => {
+      console.error('[App] Photo UUID migration failed:', error);
+    });
+  }, []);
+
   return (
     <Router>
       <div className="app">
@@ -127,7 +167,25 @@ function App() {
         
         <Routes>
           <Route path="/e/:eventToken/*" element={<EventRoute />} />
-          <Route path="/" element={<Navigate to="/e/demo" replace />} />
+          <Route path="/host/login" element={<HostLogin />} />
+          <Route path="/host" element={
+            <ProtectedHostRoute>
+              <HostEventsList />
+            </ProtectedHostRoute>
+          } />
+          <Route path="/host/create" element={
+            <ProtectedHostRoute>
+              <EventCreation />
+            </ProtectedHostRoute>
+          } />
+          <Route path="/host/dashboard/:eventId" element={
+            <ProtectedHostRoute>
+              <ErrorBoundary>
+                <HostDashboard />
+              </ErrorBoundary>
+            </ProtectedHostRoute>
+          } />
+          <Route path="/" element={<Navigate to="/host/login" replace />} />
         </Routes>
       </div>
     </Router>

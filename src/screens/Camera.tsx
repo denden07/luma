@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { savePhoto, getEventPhotos } from '../utils/indexedDBStorage';
+import { savePhoto, getEventPhotos, generateUUID } from '../utils/indexedDBStorage';
 import { getParticipant } from '../utils/participant';
 import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
@@ -38,6 +38,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const [supportedZoomLevels, setSupportedZoomLevels] = useState<number[]>([0.5, 1, 2]);
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('');
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const navigate = useNavigate();
   
   const device = getUserAgent();
@@ -747,7 +748,10 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   };
 
   const capturePhoto = async () => {
-    if (!videoRef.current || !canvasRef.current || !eventToken) return;
+    if (!videoRef.current || !canvasRef.current || !eventToken || isCapturing) return;
+
+    // Prevent double-capture
+    setIsCapturing(true);
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -796,25 +800,42 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
     // Lower quality for disposable camera look + smaller file size (iOS Safari has strict limits)
     canvas.toBlob(async (blob) => {
       if (blob) {
-        // Save photo locally instead of uploading
+        // Save photo locally - no automatic upload
         const participant = getParticipant(eventToken);
-        const participantName = participant?.name || 'Unknown';
+        if (!participant) {
+          console.error('[capturePhoto] No participant found');
+          alert('Session expired. Please restart.');
+          return;
+        }
+        
+        const participantName = participant.name;
+        const participantId = participant.participantId;
         
         console.log('[capturePhoto] Photo blob size:', (blob.size / 1024).toFixed(1), 'KB');
         
         try {
-          await savePhoto(eventToken, participantName, blob);
+          // Generate a unique UUID for this photo
+          const photoId = generateUUID();
+          console.log('[capturePhoto] Generated photo ID:', photoId);
+          
+          await savePhoto(eventToken, participantId, participantName, blob, photoId);
           await updatePhotoCount();
           
-          // Still call onCapture for backward compatibility (but won't upload)
+          // Still call onCapture for backward compatibility (decrements shots)
           onCapture(blob);
           
           // Show success feedback
-          console.log('Photo saved to IndexedDB!');
+          console.log('✅ Photo saved locally with ID:', photoId);
         } catch (error: any) {
           console.error('Failed to save photo:', error);
           alert('Failed to save photo. Please try again.');
+        } finally {
+          // Re-enable capture button
+          setIsCapturing(false);
         }
+      } else {
+        // Re-enable capture button if blob creation failed
+        setIsCapturing(false);
       }
     }, 'image/jpeg', 0.75);
   };
@@ -1191,9 +1212,14 @@ const applyFilmFilter = (
           <button 
             className="capture-button"
             onClick={capturePhoto}
-            disabled={shotsLeft <= 0 || !isVideoReady}
+            disabled={shotsLeft <= 0 || !isVideoReady || isCapturing}
             aria-label="Capture photo"
-            title={!isVideoReady ? 'Camera loading...' : shotsLeft <= 0 ? 'No shots left' : 'Capture photo'}
+            title={
+              isCapturing ? 'Processing...' :
+              !isVideoReady ? 'Camera loading...' : 
+              shotsLeft <= 0 ? 'No shots left' : 
+              'Capture photo'
+            }
           >
             <div className="capture-button-inner"></div>
           </button>

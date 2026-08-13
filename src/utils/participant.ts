@@ -1,17 +1,30 @@
 // Participant management utilities
+// Updated to support stable UUIDs and event IDs
 
 interface Participant {
-  participantToken: string;
-  eventToken: string;
+  participantId: string; // UUID
+  participantToken: string; // For backwards compatibility
+  eventId: string; // Changed from eventToken
   name: string;
   photosRemaining: number;
   createdAt: string;
 }
 
-const STORAGE_KEY = 'luma_participant';
+const STORAGE_KEY = 'madetogether_participant';
 
 /**
- * Generate a cryptographically random participant token
+ * Generate a UUID v4
+ */
+export function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+/**
+ * Generate a cryptographically random participant token (for backwards compatibility)
  */
 export function generateParticipantToken(): string {
   const array = new Uint8Array(16);
@@ -36,15 +49,23 @@ export function saveParticipant(participant: Participant): void {
 /**
  * Get participant from localStorage for a specific event
  */
-export function getParticipant(eventToken: string): Participant | null {
+export function getParticipant(eventId: string): Participant | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
 
     const participant: Participant = JSON.parse(stored);
     
+    // Support both old eventToken and new eventId
+    const participantEventId = participant.eventId || (participant as any).eventToken;
+    
     // Only return if it matches the current event
-    if (participant.eventToken === eventToken) {
+    if (participantEventId === eventId) {
+      // Ensure participant has an ID
+      if (!participant.participantId) {
+        participant.participantId = generateUUID();
+        saveParticipant(participant);
+      }
       return participant;
     }
     
@@ -58,10 +79,11 @@ export function getParticipant(eventToken: string): Participant | null {
 /**
  * Create a new participant
  */
-export function createParticipant(eventToken: string, name: string, maxPhotos: number = 10): Participant {
+export function createParticipant(eventId: string, name: string, maxPhotos: number = 10): Participant {
   const participant: Participant = {
+    participantId: generateUUID(),
     participantToken: generateParticipantToken(),
-    eventToken,
+    eventId,
     name,
     photosRemaining: maxPhotos,
     createdAt: new Date().toISOString(),
