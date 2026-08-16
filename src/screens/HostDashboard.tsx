@@ -22,6 +22,7 @@ const HostDashboard: React.FC = () => {
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [showDownloadInfo, setShowDownloadInfo] = useState(false);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
+  const [usedShareSheet, setUsedShareSheet] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
@@ -122,14 +123,32 @@ const HostDashboard: React.FC = () => {
     setIsPreparingDownload(true);
     try {
       const archive = await downloadEventPhotosZip(eventId);
+      const filename = 'madetogether-event-photos.zip';
+
+      if (isIOS && navigator.share && typeof File !== 'undefined') {
+        const file = new File([archive], filename, { type: 'application/zip' });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: 'Event photos' });
+            setUsedShareSheet(true);
+            setShowDownloadInfo(true);
+            return;
+          } catch (shareError) {
+            if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+            console.error('Could not open the iOS ZIP share sheet:', shareError);
+          }
+        }
+      }
+
       const downloadUrl = URL.createObjectURL(archive);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = 'madetogether-event-photos.zip';
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setUsedShareSheet(false);
       setShowDownloadInfo(true);
     } catch (downloadError) {
       setError(downloadError instanceof Error ? downloadError.message : 'Could not prepare photo download');
@@ -381,7 +400,9 @@ const HostDashboard: React.FC = () => {
       <Modal isOpen={showDownloadInfo} onClose={() => setShowDownloadInfo(false)} className="download-info-modal">
         <h2 className="handwritten">Download started</h2>
         <p><strong>madetogether-event-photos.zip</strong></p>
-        <p>{isIOS
+        <p>{usedShareSheet
+          ? 'Use the share sheet to save or send the ZIP file.'
+          : isIOS
           ? 'Find it in Safari Downloads or the Files app.'
           : 'Find it in your browser Downloads or the Files app.'}
         </p>

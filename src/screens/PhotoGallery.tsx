@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventPhotos, deletePhoto, downloadPhoto } from '../utils/indexedDBStorage';
+import { getEventPhotos, deletePhoto, downloadAllPhotos, downloadPhoto } from '../utils/indexedDBStorage';
 import type { Photo } from '../utils/indexedDBStorage';
 import Modal from '../components/Modal';
 import UploadPanel from '../components/UploadPanel';
@@ -18,6 +18,8 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
+  const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [gridColumns, setGridColumns] = useState<1 | 2>(() => {
     return localStorage.getItem('gallery-grid-columns') === '1' ? 1 : 2;
   });
@@ -58,8 +60,23 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     setPhotoToDelete(null);
   };
 
-  const handleDownload = (photo: Photo) => {
-    downloadPhoto(photo);
+  const handleDownload = async (photo: Photo) => {
+    const result = await downloadPhoto(photo);
+    setDownloadNotice(result === 'shared' ? 'Choose Save Image in the share sheet.' : 'Your photo download has started.');
+  };
+
+  const handleDownloadAll = async () => {
+    if (photos.length === 0 || isPreparingDownload) return;
+
+    setIsPreparingDownload(true);
+    try {
+      const result = await downloadAllPhotos(photos);
+      setDownloadNotice(result === 'shared'
+        ? 'Choose Save to Files in the share sheet.'
+        : 'madetogether-guest-photos.zip download has started.');
+    } finally {
+      setIsPreparingDownload(false);
+    }
   };
 
   const handleClose = () => {
@@ -208,6 +225,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
                   <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                 </svg>
               </button>
+              <button className="download-all-btn" onClick={handleDownloadAll} disabled={isPreparingDownload} aria-label="Download all photos" title="Download all photos">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+              </button>
               <span className="photo-count">{photos.length}</span>
             </>
           )}
@@ -341,6 +361,18 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             Delete
           </button>
         </div>
+      </Modal>
+
+      <Modal isOpen={!!downloadNotice} onClose={() => setDownloadNotice(null)} className="guest-download-modal">
+        <h3>Download ready</h3>
+        <p>{downloadNotice}</p>
+        <button onClick={() => setDownloadNotice(null)}>Done</button>
+      </Modal>
+
+      <Modal isOpen={isPreparingDownload} onClose={() => undefined} className="guest-download-progress-modal">
+        <h3>Preparing ZIP</h3>
+        <p>Packaging {photos.length} photos into one download.</p>
+        <div className="guest-download-progress-track" aria-label="Preparing photo ZIP"><div /></div>
       </Modal>
     </div>
   );

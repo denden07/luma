@@ -63,7 +63,8 @@
 }
 
 .photo-count,
-.select-mode-btn {
+.select-mode-btn,
+.download-all-btn {
   background: var(--color-film-yellow);
   color: var(--color-soft-black);
   font-weight: bold;
@@ -76,6 +77,31 @@
   border: 1px solid rgba(255, 193, 7, 0.3);
   display: grid;
   place-items: center;
+}
+
+.guest-download-modal {
+  width: min(320px, calc(100vw - 40px));
+  padding: 24px;
+  background: var(--color-soft-black);
+  color: var(--color-off-white);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.guest-download-modal h3 { color: var(--color-film-yellow); font-size: 24px; }
+.guest-download-modal p { margin-top: 12px; color: var(--color-warm-gray); line-height: 1.5; }
+.guest-download-modal button { width: 100%; min-height: 42px; margin-top: 20px; border-radius: 5px; background: var(--color-film-yellow); color: var(--color-charcoal); }
+
+.guest-download-progress-modal { width: min(320px, calc(100vw - 40px)); padding: 24px; background: var(--color-soft-black); color: var(--color-off-white); border: 1px solid var(--color-border); border-radius: 8px; text-align: center; }
+.guest-download-progress-modal h3 { color: var(--color-film-yellow); font-size: 24px; }
+.guest-download-progress-modal p { margin-top: 12px; color: var(--color-warm-gray); line-height: 1.5; }
+.guest-download-progress-track { height: 5px; margin-top: 20px; overflow: hidden; border-radius: 999px; background: var(--color-border); }
+.guest-download-progress-track div { width: 38%; height: 100%; border-radius: inherit; background: var(--color-film-yellow); animation: guest-zip-progress 1s ease-in-out infinite; }
+
+@keyframes guest-zip-progress {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(310%); }
 }
 
 .grid-toggle,

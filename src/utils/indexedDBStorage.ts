@@ -1,3 +1,5 @@
+import JSZip from 'jszip';
+
 /**
  * IndexedDB Storage Utility
  * Manages photos with thumbnails and upload tracking
@@ -456,42 +458,87 @@ export async function clearAllPhotos(): Promise<void> {
   }
 }
 
-/**
- * Download a photo (for backwards compatibility)
- */
-export function downloadPhoto(photo: Photo): void {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  
-  if (isIOS || isSafari) {
-    const win = window.open();
-    if (win) {
-      win.document.write(`
-        <html>
-          <head>
-            <title>Download Photo</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <style>
-              body { margin: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-              img { max-width: 100%; height: auto; }
-              .instructions { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 12px 20px; border-radius: 8px; font-family: system-ui; font-size: 14px; text-align: center; }
-            </style>
-          </head>
-          <body>
-            <div class="instructions">Long press image and tap "Save to Photos"</div>
-            <img src="${photo.fullImageUrl}" alt="Photo" />
-          </body>
-        </html>
-      `);
-    }
-  } else {
-    const link = document.createElement('a');
-    link.href = photo.fullImageUrl;
-    link.download = `luma-${photo.participantName}-${photo.timestamp}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+function getPhotoFilename(photo: Photo): string {
+  const participantName = photo.participantName.replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'guest';
+  return `luma-${participantName}-${photo.timestamp}.jpg`;
+}
+
+async function sharePhotosOnIOS(photos: Photo[]): Promise<boolean> {
+  if (!navigator.share || typeof File === 'undefined') return false;
+
+  const files = photos.map(photo => new File([photo.blob], getPhotoFilename(photo), {
+    type: photo.blob.type || 'image/jpeg',
+  }));
+
+  if (navigator.canShare && !navigator.canShare({ files })) return false;
+
+  try {
+    await navigator.share({
+      files,
+      title: photos.length === 1 ? 'Photo' : 'Event photos',
+    });
+    return true;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return true;
+    console.error('Could not open the iOS share sheet:', error);
+    return false;
   }
+}
+
+function triggerPhotoDownload(photo: Photo): void {
+  const downloadUrl = URL.createObjectURL(photo.blob);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = getPhotoFilename(photo);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+}
+
+/** Download one photo, using the iOS share sheet when available. */
+export async function downloadPhoto(photo: Photo): Promise<'shared' | 'downloaded'> {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS && await sharePhotosOnIOS([photo])) {
+    return 'shared';
+  }
+
+  triggerPhotoDownload(photo);
+  return 'downloaded';
+}
+
+/** Download all local event photos, or share them together from iOS. */
+export async function downloadAllPhotos(photos: Photo[]): Promise<'shared' | 'downloaded'> {
+  const zip = new JSZip();
+  for (const photo of photos) {
+    zip.file(getPhotoFilename(photo), photo.blob);
+  }
+
+  const archive = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const filename = 'madetogether-guest-photos.zip';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS && navigator.share && typeof File !== 'undefined') {
+    const file = new File([archive], filename, { type: 'application/zip' });
+    if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Guest photos' });
+        return 'shared';
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return 'shared';
+        console.error('Could not open the iOS ZIP share sheet:', error);
+      }
+    }
+  }
+
+  const downloadUrl = URL.createObjectURL(archive);
+  const link = document.createElement('a');
+  link.href = downloadUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+  return 'downloaded';
 }
 
 /**
