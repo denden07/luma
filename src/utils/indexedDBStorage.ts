@@ -376,11 +376,13 @@ export async function getPhotosByStatus(
 }
 
 /**
- * Get photos that need to be uploaded (local or failed)
+ * Get photos that need to be uploaded or reconciled after an interrupted upload.
  */
 export async function getPhotosToUpload(eventId: string): Promise<Photo[]> {
   const photos = await getEventPhotos(eventId);
-  return photos.filter(photo => photo.status === 'local' || photo.status === 'failed');
+  return photos.filter(photo =>
+    photo.status === 'local' || photo.status === 'failed' || photo.status === 'uploading'
+  );
 }
 
 /**

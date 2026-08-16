@@ -3,18 +3,29 @@ import { useNavigate } from 'react-router-dom';
 import './NameEntry.css';
 
 interface NameEntryProps {
-  onNameSubmit: (name: string) => void;
+  onNameSubmit: (name: string) => Promise<void>;
 }
 
 const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
   const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onNameSubmit(name.trim());
+    if (!name.trim() || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await onNameSubmit(name.trim());
       navigate('../camera');
+    } catch (submitError) {
+      console.error('Could not start participant session:', submitError);
+      setError('We could not save your name. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -32,16 +43,19 @@ const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
             onChange={(e) => setName(e.target.value)}
             autoFocus
             maxLength={50}
+            disabled={isSubmitting}
           />
 
           <button 
             type="submit" 
             className="primary-button"
-            disabled={!name.trim()}
+            disabled={!name.trim() || isSubmitting}
           >
-            START CAMERA
+            {isSubmitting ? 'STARTING...' : 'START CAMERA'}
           </button>
         </form>
+
+        {error && <p className="name-entry-error">{error}</p>}
 
         <p className="name-help-text">
           your name helps us identify<br />

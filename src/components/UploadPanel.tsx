@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getUploadStats, uploadPendingPhotos, type UploadProgress } from '../services/uploadService';
+import Modal from './Modal';
 import './UploadPanel.css';
 
 interface UploadPanelProps {
@@ -13,6 +14,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [uploadResult, setUploadResult] = useState<'success' | 'partial' | 'error' | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [showUploadConfirm, setShowUploadConfirm] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -86,6 +88,17 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
     }
   };
 
+  const requestUpload = () => {
+    if (!isUploading && stats.totalPending > 0) {
+      setShowUploadConfirm(true);
+    }
+  };
+
+  const confirmUpload = async () => {
+    setShowUploadConfirm(false);
+    await handleUpload();
+  };
+
   const handleRetry = async () => {
     await handleUpload();
   };
@@ -102,12 +115,12 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
         <div className="upload-count">
           {stats.totalPending > 0 && (
             <>
-              <span className="count">{stats.totalPending}</span>{' '}
-              {stats.totalPending === 1 ? 'photo' : 'photos'} ready to upload
+              <span className="count">{stats.totalPending}</span>
+              <span className="upload-copy">{stats.totalPending === 1 ? 'photo ready' : 'photos ready'}</span>
             </>
           )}
           {stats.failedCount > 0 && (
-            <div style={{ fontSize: '14px', color: '#FF6B6B', marginTop: '4px' }}>
+            <div className="upload-failed-count">
               {stats.failedCount} failed
             </div>
           )}
@@ -117,11 +130,15 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
       {!isUploading && !uploadResult && (
         <button
           className="upload-button"
-          onClick={handleUpload}
+          onClick={requestUpload}
           disabled={stats.totalPending === 0 || isUploading}
+          aria-label={`Upload ${stats.totalPending} ${stats.totalPending === 1 ? 'photo' : 'photos'}`}
+          title="Upload photos"
         >
-          <span className="icon">↑</span>
-          Upload {stats.totalPending} {stats.totalPending === 1 ? 'Photo' : 'Photos'}
+          <svg className="upload-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2">
+            <path d="M12 16V4m0 0-4 4m4-4 4 4M4 20h16" />
+          </svg>
+          <span className="upload-button-label">Upload</span>
         </button>
       )}
 
@@ -159,6 +176,15 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
           </button>
         </div>
       )}
+
+      <Modal isOpen={showUploadConfirm} onClose={() => setShowUploadConfirm(false)} className="upload-confirm-modal">
+        <h2>Upload {stats.totalPending} {stats.totalPending === 1 ? 'photo' : 'photos'}?</h2>
+        <p>Photos will be shared with the event host.</p>
+        <div className="upload-confirm-actions">
+          <button onClick={() => setShowUploadConfirm(false)}>Cancel</button>
+          <button onClick={confirmUpload}>Upload</button>
+        </div>
+      </Modal>
     </div>
   );
 };

@@ -66,6 +66,14 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
+.create-new-button:disabled,
+.host-events-list .primary-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .logout-button {
   background: rgba(255, 255, 255, 0.15);
   color: white;
@@ -253,3 +261,20 @@
     width: 100%;
   }
 }
+
+/* Host camera palette */
+.host-events-list { background: var(--color-charcoal); }
+.events-header h1 { color: var(--color-film-yellow); }
+.host-code-badge, .loading-state, .error-state, .empty-state, .event-card { background: var(--color-soft-black); border: 1px solid var(--color-border); color: var(--color-off-white); border-radius: 8px; }
+.host-code-badge { color: var(--color-off-white); }
+.create-new-button, .retry-button, .host-events-list .primary-button { background: var(--color-film-yellow); color: var(--color-charcoal); }
+.logout-button { background: transparent; border: 1px solid var(--color-border); color: var(--color-off-white); }
+.logout-button:hover { background: #292824; }
+.spinner { border-color: var(--color-border); border-top-color: var(--color-film-yellow); }
+.error-state h2, .empty-state h2, .event-card-name { color: var(--color-off-white); }
+.error-state p, .empty-state p, .event-info { color: var(--color-warm-gray); }
+.event-card-header { border-color: var(--color-border); }
+.event-date { color: var(--color-film-yellow); }
+.view-dashboard-button { background: transparent; color: var(--color-film-yellow); border: 1px solid var(--color-film-yellow); }
+.view-dashboard-button:hover { background: rgba(231, 185, 60, 0.12); }
+

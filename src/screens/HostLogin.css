@@ -186,3 +186,19 @@
     letter-spacing: 0.2em;
   }
 }
+
+/* Host camera palette */
+.host-login { background: var(--color-charcoal); }
+.login-container { background: var(--color-soft-black); border: 1px solid var(--color-border); border-radius: 8px; }
+.host-login h1, .help-section h3 { color: var(--color-film-yellow); }
+.login-subtitle, .form-group small, .help-section p, .divider { color: var(--color-warm-gray); }
+.form-group label { color: var(--color-off-white); }
+.code-input { background: var(--color-charcoal); color: var(--color-off-white); border-color: var(--color-border); border-radius: 6px; }
+.code-input:focus { border-color: var(--color-film-yellow); box-shadow: 0 0 0 3px rgba(231, 185, 60, 0.12); }
+.code-input:disabled { background: #242320; }
+.host-login .primary-button { background: var(--color-film-yellow); color: var(--color-charcoal); }
+.host-login .primary-button:hover:not(:disabled) { box-shadow: 0 5px 15px rgba(231, 185, 60, 0.2); }
+.host-login .secondary-button { background: transparent; color: var(--color-off-white); border: 1px solid var(--color-border); }
+.host-login .secondary-button:hover:not(:disabled) { background: #292824; }
+.divider::before, .divider::after, .help-section { border-color: var(--color-border); background-color: var(--color-border); }
+

@@ -14,7 +14,8 @@ import HostEventsList from './screens/HostEventsList';
 import HostLogin from './screens/HostLogin';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipant } from './utils/participant';
-import { createParticipant as createParticipantAPI } from './services/apiService';
+import { createParticipant as createParticipantAPI, getEvent } from './services/apiService';
+import type { Event } from './services/apiService';
 import { migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
 import { isLocalMode } from './utils/env';
 import { isHostLoggedIn } from './utils/hostAuth';
@@ -22,27 +23,52 @@ import './App.css';
 
 function EventRoute() {
   const { eventToken } = useParams<{ eventToken: string }>();
-  const [shotsLeft, setShotsLeft] = useState<number>(10);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [isLoadingEvent, setIsLoadingEvent] = useState(true);
+  const [shotsLeft, setShotsLeft] = useState<number>(20);
 
   useEffect(() => {
-    if (eventToken) {
-      // Check for existing participant
-      const existingParticipant = getParticipant(eventToken);
-      if (existingParticipant) {
-        setShotsLeft(existingParticipant.photosRemaining);
+    let isCurrent = true;
+
+    const loadEvent = async () => {
+      if (!eventToken) {
+        setEventError('This event link is incomplete.');
+        setIsLoadingEvent(false);
+        return;
       }
-    }
+
+      setIsLoadingEvent(true);
+      setEventError(null);
+      try {
+        const loadedEvent = await getEvent(eventToken);
+        if (!isCurrent) return;
+        setEvent(loadedEvent);
+        const existingParticipant = getParticipant(eventToken);
+        setShotsLeft(existingParticipant?.photosRemaining ?? loadedEvent.photo_limit);
+      } catch {
+        if (isCurrent) {
+          setEvent(null);
+          setEventError('This event is unavailable. Check the link with your host.');
+        }
+      } finally {
+        if (isCurrent) setIsLoadingEvent(false);
+      }
+    };
+
+    loadEvent();
+    return () => { isCurrent = false; };
   }, [eventToken]);
 
   const handleNameSubmit = async (name: string) => {
-    if (eventToken) {
+    if (eventToken && event) {
       try {
         // First create participant in backend database to get the ID
         const backendParticipant = await createParticipantAPI(eventToken, name);
         console.log('Participant created in database:', backendParticipant.id);
         
         // Then create participant locally with the same ID from backend
-        const participant = createParticipant(eventToken, name, 10);
+        const participant = createParticipant(eventToken, name, event.photo_limit);
         // Override the participant ID with the one from backend
         participant.participantId = backendParticipant.id;
         saveParticipant(participant);
@@ -51,7 +77,7 @@ function EventRoute() {
       } catch (error) {
         console.error('Failed to create participant in database:', error);
         // Fallback: create locally only
-        const participant = createParticipant(eventToken, name, 10);
+        const participant = createParticipant(eventToken, name, event.photo_limit);
         setShotsLeft(participant.photosRemaining);
       }
     }
@@ -104,9 +130,31 @@ function EventRoute() {
     return eventToken ? getParticipant(eventToken) !== null : false;
   };
 
+  const isEventOpen = event && (!event.start_time || (
+    Date.now() >= new Date(event.start_time).getTime() &&
+    (!event.end_time || Date.now() <= new Date(event.end_time).getTime())
+  ));
+
+  if (isLoadingEvent) {
+    return <div className="event-state"><p>Loading event...</p></div>;
+  }
+
+  if (eventError || !event) {
+    return <div className="event-state"><h1 className="handwritten">Event unavailable</h1><p>{eventError}</p></div>;
+  }
+
+  if (!isEventOpen) {
+    const schedule = event.start_time && event.end_time
+      ? `${new Date(event.start_time).toLocaleString()} - ${new Date(event.end_time).toLocaleString()}`
+      : event.start_time
+        ? `The camera opens ${new Date(event.start_time).toLocaleString()}.`
+        : 'The host has not opened the camera yet.';
+    return <div className="event-state"><h1 className="handwritten">Camera is closed</h1><p>{schedule}</p></div>;
+  }
+
   return (
     <Routes>
-      <Route path="/" element={<Landing eventName="NINA & ALDRIN'S WEDDING" />} />
+      <Route path="/" element={<Landing eventName={event.name} />} />
       <Route 
         path="enter-name" 
         element={

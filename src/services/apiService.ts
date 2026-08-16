@@ -10,6 +10,9 @@ export interface Event {
   name: string;
   date: string;
   guest_limit: number;
+  photo_limit: number;
+  start_time: string | null;
+  end_time: string | null;
   host_code: string;
   created_at: string;
   updated_at: string;
@@ -47,13 +50,24 @@ export function getPhotoUrl(storagePath: string): string {
 export async function createEvent(
   name: string,
   date: string,
-  guestLimit: number = 50,
-  hostCode: string
+  guestLimit: number = 30,
+  hostCode: string,
+  startTime?: string,
+  endTime?: string,
+  photoLimit: number = 20
 ): Promise<Event> {
   const response = await fetch(`${API_BASE_URL}/api/events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, date, guest_limit: guestLimit, host_code: hostCode }),
+    body: JSON.stringify({
+      name,
+      date,
+      guest_limit: guestLimit,
+      photo_limit: photoLimit,
+      start_time: startTime,
+      end_time: endTime,
+      host_code: hostCode,
+    }),
   });
 
   if (!response.ok) {

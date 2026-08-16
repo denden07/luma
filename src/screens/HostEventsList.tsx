@@ -58,6 +58,8 @@ const HostEventsList: React.FC = () => {
     }
   };
 
+  const hasReachedEventLimit = events.length >= 2;
+
   return (
     <div className="host-events-list">
       <div className="events-header">
@@ -69,8 +71,10 @@ const HostEventsList: React.FC = () => {
           <button 
             className="create-new-button"
             onClick={() => navigate('/host/create')}
+            disabled={hasReachedEventLimit || isLoading}
+            title={hasReachedEventLimit ? 'You can create up to two events' : 'Create a new event'}
           >
-            + Create New Event
+            {hasReachedEventLimit ? 'Event limit reached' : '+ Create New Event'}
           </button>
           <button 
             className="logout-button"
@@ -105,8 +109,9 @@ const HostEventsList: React.FC = () => {
             <button 
               className="primary-button"
               onClick={() => navigate('/host/create')}
+              disabled={hasReachedEventLimit}
             >
-              Create Event
+              {hasReachedEventLimit ? 'Event limit reached' : 'Create Event'}
             </button>
           </div>
         ) : (

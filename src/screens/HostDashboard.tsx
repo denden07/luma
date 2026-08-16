@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { getEvent, getEventPhotos, getPhotoUrl } from '../services/apiService';
-import type { PhotoMetadata } from '../services/apiService';
+import type { Event, PhotoMetadata } from '../services/apiService';
 import Modal from '../components/Modal';
 import './HostDashboard.css';
 
@@ -12,8 +13,14 @@ const HostDashboard: React.FC = () => {
   const [filterParticipant, setFilterParticipant] = useState<string>('all');
   const [participants, setParticipants] = useState<string[]>([]);
   const [eventName, setEventName] = useState<string>('');
+  const [eventDetails, setEventDetails] = useState<Event | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gridColumns, setGridColumns] = useState<1 | 2>(2);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [showFilter, setShowFilter] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,6 +51,7 @@ const HostDashboard: React.FC = () => {
       const event = await getEvent(eventId);
       console.log('[HostDashboard] Event loaded:', event);
       setEventName(event.name);
+      setEventDetails(event);
 
       // Load photos from server (photos uploaded from all devices)
       const serverPhotos = await getEventPhotos(eventId);
@@ -70,6 +78,40 @@ const HostDashboard: React.FC = () => {
   const filteredPhotos = filterParticipant === 'all' 
     ? photos 
     : photos.filter(p => p.participant_name === filterParticipant);
+  const displayedPhotos = [...filteredPhotos].sort((first, second) => {
+    const direction = sortOrder === 'newest' ? -1 : 1;
+    return direction * (new Date(first.created_at).getTime() - new Date(second.created_at).getTime());
+  });
+
+  const guestLink = eventId ? `${window.location.origin}/e/${eventId}` : '';
+
+  const setQrPreviewCanvas = (canvas: HTMLCanvasElement | null) => {
+    qrCanvasRef.current = canvas;
+    if (canvas && guestLink) {
+      QRCode.toCanvas(canvas, guestLink, {
+        width: 132,
+        margin: 1,
+        errorCorrectionLevel: 'H',
+      }).catch((qrError) => console.error('Could not generate QR code:', qrError));
+    }
+  };
+
+  const copyGuestLink = async () => {
+    try {
+      await navigator.clipboard.writeText(guestLink);
+    } catch (copyError) {
+      console.error('Could not copy guest link:', copyError);
+    }
+  };
+
+  const downloadQrCode = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = `${eventName || 'event'}-qr.png`;
+    link.click();
+  };
 
   const handleDownloadAll = () => {
     filteredPhotos.forEach((photo, index) => {
@@ -112,11 +154,11 @@ const HostDashboard: React.FC = () => {
             <button 
               className="back-button"
               onClick={() => navigate('/host')}
+              aria-label="Back to events list"
               title="Back to events list"
             >
-              &larr; Back
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
             </button>
-            <h1 className="dashboard-title handwritten">host dashboard</h1>
           </div>
         </div>
         <div className="dashboard-content">
@@ -140,11 +182,11 @@ const HostDashboard: React.FC = () => {
           <button 
             className="back-button"
             onClick={() => navigate('/host')}
+            aria-label="Back to events list"
             title="Back to events list"
           >
-            &larr; Back
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
-          <h1 className="dashboard-title handwritten">host dashboard</h1>
           <p className="event-name editorial">{eventName || 'Loading...'}</p>
         </div>
         
@@ -156,8 +198,36 @@ const HostDashboard: React.FC = () => {
         )}
 
         {!error && !isLoading && (
-          <div className="dashboard-controls">
-            <div className="filter-section">
+          <>
+            <div className="dashboard-controls">
+              <button className="dashboard-icon-button" onClick={() => setShowFilter(!showFilter)} aria-label="Filter photos" title="Filter photos">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M7 12h10m-7 6h4"/></svg>
+              </button>
+              <button className="dashboard-icon-button" onClick={() => setGridColumns(gridColumns === 1 ? 2 : 1)} aria-label={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`} title={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`}>
+                {gridColumns === 1 ? (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="8" height="18" rx="2" />
+                    <rect x="13" y="3" width="8" height="18" rx="2" />
+                    <path d="M5 8h4M5 12h4M15 8h4M15 12h4" />
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="4" y="3" width="16" height="18" rx="2" />
+                    <path d="M7 8h10M7 12h10M7 16h10" />
+                  </svg>
+                )}
+              </button>
+              <button className="dashboard-icon-button" onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')} aria-label="Change sort order" title="Change sort order">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 6h8M6 12h12m-8 6h4"/></svg>
+              </button>
+              <button className="dashboard-icon-button" onClick={loadEventData} aria-label="Refresh photos" title="Refresh photos">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4m-4 4a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg>
+              </button>
+              <button className="dashboard-icon-button" onClick={handleDownloadAll} disabled={filteredPhotos.length === 0} aria-label="Download displayed photos" title="Download displayed photos">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
+              </button>
+            </div>
+            {showFilter && <div className="filter-section">
               <label htmlFor="participant-filter" className="filter-label">Filter by:</label>
               <select 
                 id="participant-filter"
@@ -172,16 +242,20 @@ const HostDashboard: React.FC = () => {
                   </option>
                 ))}
               </select>
+            </div>}
+            <div className="share-panel">
+              <button className="qr-trigger" onClick={() => setIsQrModalOpen(true)} aria-label="Open and download guest QR code" title="Open QR code">
+                <canvas ref={setQrPreviewCanvas} aria-label="Guest event QR code" />
+              </button>
+              <button className="share-link-button" onClick={copyGuestLink} title="Copy guest link">
+                <span className="share-title">Share with guests</span><span className="share-link">{guestLink}</span>
+              </button>
+              <button className="dashboard-icon-button" onClick={copyGuestLink} aria-label="Copy guest link" title="Copy guest link">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
             </div>
-
-            <button 
-              className="download-all-button"
-              onClick={handleDownloadAll}
-              disabled={filteredPhotos.length === 0}
-            >
-              Download All ({filteredPhotos.length})
-            </button>
-          </div>
+            {eventDetails && <div className="event-health"><span>{participants.length} / {eventDetails.guest_limit} guests</span><span>{photos.length} photos</span><span>{eventDetails.start_time ? 'Scheduled' : 'Open'}</span></div>}
+          </>
         )}
       </div>
 
@@ -207,8 +281,8 @@ const HostDashboard: React.FC = () => {
             <p>Photos captured by guests will appear here.</p>
           </div>
         ) : (
-          <div className="photos-grid">
-            {filteredPhotos.map((photo) => (
+          <div className={`photos-grid columns-${gridColumns}`}>
+            {displayedPhotos.map((photo) => (
               <div 
                 key={photo.id} 
                 className="photo-card"
@@ -264,6 +338,19 @@ const HostDashboard: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      <Modal isOpen={isQrModalOpen} onClose={() => setIsQrModalOpen(false)} className="qr-modal">
+        <div className="qr-modal-content">
+          <h2 className="handwritten">Share with guests</h2>
+          <canvas ref={(canvas) => {
+            if (canvas && eventId) {
+              QRCode.toCanvas(canvas, guestLink, { width: 200, margin: 1, errorCorrectionLevel: 'H' })
+                .catch((qrError) => console.error('Could not generate QR code:', qrError));
+            }
+          }} />
+          <button className="preview-download-button" onClick={downloadQrCode}>Download QR image</button>
+        </div>
+      </Modal>
     </div>
   );
 };

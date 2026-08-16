@@ -12,8 +12,8 @@
   --color-cream: #FAF4E6;
   --color-off-white: #F5EFE3;
   --color-ink: #171615;
-  --color-dusty-rose: #E88F99;
-  --color-soft-pink: #F3B8B8;
+  --color-dusty-rose: #E7B93C;
+  --color-soft-pink: #F0D068;
   --color-film-yellow: #E7B93C;
   --color-warm-gray: #A8A096;
   --color-border: #393733;
@@ -101,4 +101,20 @@ input {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Keep touch camera controls responsive on Safari without removing browser zoom. */
+.camera-screen,
+.photo-gallery {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.camera-screen input,
+.photo-gallery input,
+.photo-gallery textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }

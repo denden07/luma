@@ -18,7 +18,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set());
-  const [longPressTimer, setLongPressTimer] = useState<number | null>(null);
+  const [gridColumns, setGridColumns] = useState<1 | 2>(() => {
+    return localStorage.getItem('gallery-grid-columns') === '1' ? 1 : 2;
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,8 +32,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     setPhotos(eventPhotos); // IndexedDB already returns newest first
   };
 
-  const handleDelete = (photoId: string) => {
-    setPhotoToDelete(photoId);
+  const handleDelete = (photo: Photo) => {
+    if (photo.status === 'uploaded') return;
+    setPhotoToDelete(photo.id);
     setShowDeleteConfirm(true);
   };
 
@@ -67,26 +70,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     }
   };
 
-  // Long press handling
-  const handleTouchStart = (photoId: string) => {
-    if (selectionMode) return; // Already in selection mode
-    
-    const timer = setTimeout(() => {
-      // Enter selection mode and select this photo
-      setSelectionMode(true);
-      setSelectedPhotos(new Set([photoId]));
-    }, 500); // 500ms long press
-    
-    setLongPressTimer(timer);
-  };
-
-  const handleTouchEnd = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      setLongPressTimer(null);
-    }
-  };
-
   const handlePhotoClick = (photo: Photo) => {
     if (selectionMode) {
       togglePhotoSelection(photo.id);
@@ -96,6 +79,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
   };
 
   const togglePhotoSelection = (photoId: string) => {
+    if (photos.find(photo => photo.id === photoId)?.status === 'uploaded') return;
     setSelectedPhotos(prev => {
       const newSet = new Set(prev);
       if (newSet.has(photoId)) {
@@ -112,27 +96,32 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     setSelectedPhotos(new Set());
   };
 
-  const selectAll = () => {
-    const allIds = photos.map(p => p.id);
-    setSelectedPhotos(new Set(allIds));
+  const enterSelectionMode = () => {
+    setSelectedPhoto(null);
+    setSelectionMode(true);
   };
 
-  const deselectAll = () => {
-    setSelectedPhotos(new Set());
+  const changeGridColumns = (columns: 1 | 2) => {
+    setGridColumns(columns);
+    localStorage.setItem('gallery-grid-columns', String(columns));
   };
 
   // Bulk delete functionality
   const deleteSelectedPhotos = async () => {
     if (selectedPhotos.size === 0) return;
     
-    const count = selectedPhotos.size;
+    const deletablePhotoIds = [...selectedPhotos].filter(photoId =>
+      photos.find(photo => photo.id === photoId)?.status !== 'uploaded'
+    );
+    const count = deletablePhotoIds.length;
+    if (count === 0) return;
     const confirmed = window.confirm(`Delete ${count} photo(s)? This cannot be undone.`);
     
     if (!confirmed) return;
     
     try {
       // Delete all selected photos
-      for (const photoId of selectedPhotos) {
+      for (const photoId of deletablePhotoIds) {
         await deletePhoto(photoId);
       }
       
@@ -190,16 +179,37 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
           )}
         </button>
         <h2>{selectionMode ? `${selectedPhotos.size} Selected` : 'My Photos'}</h2>
-        <div className="photo-count">
+        <div className="gallery-tools">
           {selectionMode ? (
-            <button 
-              className="select-all-btn"
-              onClick={selectedPhotos.size === photos.length ? deselectAll : selectAll}
-            >
-              {selectedPhotos.size === photos.length ? 'Deselect All' : 'Select All'}
-            </button>
+            <span className="selection-count">{selectedPhotos.size}</span>
           ) : (
-            <span>{photos.length}</span>
+            <>
+              <button
+                className="grid-toggle"
+                onClick={() => changeGridColumns(gridColumns === 1 ? 2 : 1)}
+                aria-label={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`}
+                title={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`}
+              >
+                {gridColumns === 1 ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="8" height="18" rx="2" />
+                    <rect x="13" y="3" width="8" height="18" rx="2" />
+                    <path d="M5 8h4M5 12h4M15 8h4M15 12h4" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="4" y="3" width="16" height="18" rx="2" />
+                    <path d="M7 8h10M7 12h10M7 16h10" />
+                  </svg>
+                )}
+              </button>
+              <button className="select-mode-btn" onClick={enterSelectionMode} aria-label="Select photos" title="Select photos">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                </svg>
+              </button>
+              <span className="photo-count">{photos.length}</span>
+            </>
           )}
         </div>
       </div>
@@ -221,7 +231,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
       )}
 
       {/* Grid View */}
-      <div className="gallery-grid">
+      <div className={`gallery-grid grid-${gridColumns}`}>
         {photos.length === 0 ? (
           <div className="empty-state">
             <p>No photos yet</p>
@@ -235,11 +245,6 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
               key={photo.id} 
               className={`gallery-item ${selectionMode && selectedPhotos.has(photo.id) ? 'selected' : ''}`}
               onClick={() => handlePhotoClick(photo)}
-              onTouchStart={() => handleTouchStart(photo.id)}
-              onTouchEnd={handleTouchEnd}
-              onMouseDown={() => handleTouchStart(photo.id)}
-              onMouseUp={handleTouchEnd}
-              onMouseLeave={handleTouchEnd}
             >
               <img src={photo.thumbnailUrl} alt="Photo" />
               <div className="photo-date">{formatDate(photo.timestamp)}</div>
@@ -302,15 +307,17 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                 </svg>
               </button>
-              <button 
-                className="polaroid-action-button delete"
-                onClick={() => handleDelete(selectedPhoto.id)}
-                aria-label="Delete photo"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-              </button>
+              {selectedPhoto.status !== 'uploaded' && (
+                <button 
+                  className="polaroid-action-button delete"
+                  onClick={() => handleDelete(selectedPhoto)}
+                  aria-label="Delete photo"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              )}
             </div>
           </>
         )}

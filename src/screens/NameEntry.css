@@ -57,3 +57,14 @@
   line-height: 1.6;
   margin-top: 24px;
 }
+
+.name-entry-screen .primary-button {
+  background: var(--color-film-yellow);
+  color: var(--color-charcoal);
+}
+
+.name-entry-error {
+  margin-top: 16px;
+  color: #b43333;
+  font-size: var(--font-size-label);
+}

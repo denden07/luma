@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { createEvent } from '../services/apiService';
+import { createEvent, getEventsByHostCode } from '../services/apiService';
 import { getHostCode, clearHostCode } from '../utils/hostAuth';
 import './EventCreation.css';
 
-const QRCodeCanvas: React.FC<{ value: string; size?: number }> = ({ value, size = 256 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const QRCodeCanvas: React.FC<{ value: string; canvasRef: React.RefObject<HTMLCanvasElement | null>; size?: number }> = ({ value, canvasRef, size = 256 }) => {
 
   useEffect(() => {
     if (canvasRef.current && value) {
@@ -25,11 +24,14 @@ const QRCodeCanvas: React.FC<{ value: string; size?: number }> = ({ value, size 
 
 const EventCreation: React.FC = () => {
   const [eventName, setEventName] = useState('');
-  const [eventDate, setEventDate] = useState('');
-  const [guestLimit, setGuestLimit] = useState(50);
+  const [eventStart, setEventStart] = useState('');
+  const [guestLimit, setGuestLimit] = useState(30);
+  const [photoLimit, setPhotoLimit] = useState(20);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
+  const [canCreateAnother, setCanCreateAnother] = useState(true);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,9 +45,11 @@ const EventCreation: React.FC = () => {
         throw new Error('No host code found. Please log in again.');
       }
 
-      const event = await createEvent(eventName, eventDate, guestLimit, hostCode);
+      const event = await createEvent(eventName, eventStart, guestLimit, hostCode, eventStart, undefined, photoLimit);
       console.log('[EventCreation] Event created:', event);
       setCreatedEventId(event.id);
+      const hostEvents = await getEventsByHostCode(hostCode);
+      setCanCreateAnother(hostEvents.length < 2);
       setIsCreating(false);
     } catch (err) {
       console.error('[EventCreation] Failed to create event:', err);
@@ -68,6 +72,15 @@ const EventCreation: React.FC = () => {
     }
   };
 
+  const downloadQrCode = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = `${eventName.trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'}-qr.png`;
+    link.click();
+  };
+
   const handleLogout = () => {
     if (confirm('Are you sure you want to logout? Make sure you have saved your host code!')) {
       clearHostCode();
@@ -86,12 +99,15 @@ const EventCreation: React.FC = () => {
           <div className="share-section">
             <h2>Share this QR code with guests:</h2>
             <div className="qr-code-container">
-              <QRCodeCanvas value={getShareableLink()} size={256} />
+              <QRCodeCanvas value={getShareableLink()} canvasRef={qrCanvasRef} size={256} />
             </div>
             <p className="qr-instructions">Guests can scan this to join the event</p>
             
             <button className="copy-button" onClick={copyToClipboard}>
               📋 Copy Link
+            </button>
+            <button className="copy-button" onClick={downloadQrCode}>
+              Download QR Image
             </button>
           </div>
 
@@ -107,17 +123,20 @@ const EventCreation: React.FC = () => {
             >
               Go to Dashboard
             </button>
-            <button 
-              className="secondary-button"
-              onClick={() => {
-                setCreatedEventId(null);
-                setEventName('');
-                setEventDate('');
-                setGuestLimit(50);
-              }}
-            >
-              Create Another Event
-            </button>
+            {canCreateAnother && (
+              <button 
+                className="secondary-button"
+                onClick={() => {
+                  setCreatedEventId(null);
+                  setEventName('');
+                  setEventStart('');
+                  setGuestLimit(30);
+                  setPhotoLimit(20);
+                }}
+              >
+                Create Another Event
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -155,29 +174,43 @@ const EventCreation: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="eventDate">Event Date *</label>
+            <label htmlFor="eventStart">Event Date & Time *</label>
             <input
-              type="date"
-              id="eventDate"
-              value={eventDate}
-              onChange={(e) => setEventDate(e.target.value)}
+              type="datetime-local"
+              id="eventStart"
+              value={eventStart}
+              onChange={(e) => setEventStart(e.target.value)}
               required
               disabled={isCreating}
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="guestLimit">Guest Photo Limit</label>
-            <input
-              type="number"
-              id="guestLimit"
-              value={guestLimit}
-              onChange={(e) => setGuestLimit(parseInt(e.target.value))}
-              min="1"
-              max="1000"
-              disabled={isCreating}
-            />
-            <small>Maximum number of photos each guest can take</small>
+          <div className="event-limits" aria-label="Event limits">
+            <label htmlFor="guestLimit">Guest limit
+              <input
+                type="number"
+                id="guestLimit"
+                min="1"
+                max="30"
+                value={guestLimit}
+                onChange={(event) => setGuestLimit(Math.max(1, Math.min(30, Number(event.target.value) || 1)))}
+                disabled={isCreating}
+              />
+              <small>Up to 30 guests</small>
+            </label>
+            <label htmlFor="photoLimit">Photos per guest
+              <input
+                type="number"
+                id="photoLimit"
+                min="1"
+                max="20"
+                value={photoLimit}
+                onChange={(event) => setPhotoLimit(Math.max(1, Math.min(20, Number(event.target.value) || 1)))}
+                disabled={isCreating}
+              />
+              <small>Up to 20 photos</small>
+            </label>
+            <small>Each host can create up to two events.</small>
           </div>
 
           {error && (
@@ -201,7 +234,7 @@ const EventCreation: React.FC = () => {
             <button 
               type="submit" 
               className="primary-button"
-              disabled={isCreating || !eventName || !eventDate}
+              disabled={isCreating || !eventName || !eventStart}
             >
               {isCreating ? 'Creating...' : 'Create Event'}
             </button>

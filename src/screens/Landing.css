@@ -43,7 +43,7 @@
   margin-bottom: 8px;
 }
 
-.event-name {
+.landing-screen .event-name {
   font-family: var(--font-editorial);
   font-size: var(--font-size-event);
   color: var(--color-dusty-rose);
@@ -59,9 +59,9 @@
   margin-bottom: 40px;
 }
 
-.primary-button {
-  background: var(--color-ink);
-  color: var(--color-off-white);
+.landing-screen .primary-button {
+  background: var(--color-film-yellow);
+  color: var(--color-charcoal);
   font-size: var(--font-size-button);
   font-weight: 600;
   padding: 16px 32px;
@@ -73,11 +73,11 @@
   max-width: 300px;
 }
 
-.primary-button:hover {
+.landing-screen .primary-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(231, 185, 60, 0.32);
 }
 
-.primary-button:active {
+.landing-screen .primary-button:active {
   transform: translateY(0);
 }

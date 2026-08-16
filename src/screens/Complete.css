@@ -57,12 +57,12 @@
 }
 
 .secondary-button {
-  background: transparent;
-  color: var(--color-ink);
+  background: var(--color-film-yellow);
+  color: var(--color-charcoal);
   font-size: var(--font-size-button);
   font-weight: 600;
   padding: 16px 32px;
-  border: 2px solid var(--color-ink);
+  border: 2px solid var(--color-film-yellow);
   border-radius: 28px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -73,8 +73,8 @@
 }
 
 .secondary-button:hover {
-  background: var(--color-ink);
-  color: var(--color-off-white);
+  background: #f0d068;
+  color: var(--color-charcoal);
   transform: translateY(-2px);
 }
 
