@@ -466,6 +466,22 @@
 .qr-modal-content { display: grid; width: 100%; justify-items: center; gap: 16px; padding: 18px; background: var(--color-soft-black); color: var(--color-off-white); }
 .qr-modal-content h2 { color: var(--color-film-yellow); font-size: 30px; }
 .qr-modal-content canvas { display: block; width: 200px; height: 200px; max-width: 100%; background: var(--color-off-white); padding: 6px; border-radius: 4px; }
+.modal-content.download-info-modal { width: min(340px, calc(100vw - 40px)); }
+.download-info-modal { display: grid; gap: 14px; padding: 24px; background: var(--color-soft-black); color: var(--color-off-white); text-align: center; }
+.download-info-modal h2 { color: var(--color-film-yellow); font-size: 30px; }
+.download-info-modal p { color: var(--color-warm-gray); line-height: 1.5; }
+.download-info-modal strong { color: var(--color-off-white); overflow-wrap: anywhere; }
+.modal-content.download-progress-modal { width: min(320px, calc(100vw - 40px)); }
+.download-progress-modal { display: grid; gap: 14px; padding: 24px; background: var(--color-soft-black); color: var(--color-off-white); text-align: center; }
+.download-progress-modal h2 { color: var(--color-film-yellow); font-size: 30px; }
+.download-progress-modal p { color: var(--color-warm-gray); line-height: 1.5; }
+.download-progress-track { height: 5px; overflow: hidden; border-radius: 999px; background: var(--color-border); }
+.download-progress-track div { width: 38%; height: 100%; border-radius: inherit; background: var(--color-film-yellow); animation: zip-progress 1s ease-in-out infinite; }
+
+@keyframes zip-progress {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(310%); }
+}
 
 @media (max-width: 420px) {
   .host-dashboard .dashboard-content { padding: 16px; }

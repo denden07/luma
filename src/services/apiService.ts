@@ -242,6 +242,15 @@ export async function getEventPhotos(eventId: string): Promise<PhotoMetadata[]> 
   return response.json();
 }
 
+export async function downloadEventPhotosZip(eventId: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/photos/download`);
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Could not prepare photo download' }));
+    throw new Error(error.error || 'Could not prepare photo download');
+  }
+  return response.blob();
+}
+
 export async function getPhoto(photoId: string): Promise<PhotoMetadata> {
   const response = await fetch(`${API_BASE_URL}/api/photos/${photoId}`);
 

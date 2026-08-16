@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { getEvent, getEventPhotos, getPhotoUrl } from '../services/apiService';
+import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/apiService';
 import type { Event, PhotoMetadata } from '../services/apiService';
 import Modal from '../components/Modal';
 import './HostDashboard.css';
@@ -20,6 +20,8 @@ const HostDashboard: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [showFilter, setShowFilter] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [showDownloadInfo, setShowDownloadInfo] = useState(false);
+  const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
@@ -84,6 +86,7 @@ const HostDashboard: React.FC = () => {
   });
 
   const guestLink = eventId ? `${window.location.origin}/e/${eventId}` : '';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   const setQrPreviewCanvas = (canvas: HTMLCanvasElement | null) => {
     qrCanvasRef.current = canvas;
@@ -113,12 +116,26 @@ const HostDashboard: React.FC = () => {
     link.click();
   };
 
-  const handleDownloadAll = () => {
-    filteredPhotos.forEach((photo, index) => {
-      setTimeout(() => {
-        downloadPhotoFromServer(photo);
-      }, index * 200); // Stagger downloads to avoid browser blocking
-    });
+  const handleDownloadAll = async () => {
+    if (!eventId || isPreparingDownload) return;
+
+    setIsPreparingDownload(true);
+    try {
+      const archive = await downloadEventPhotosZip(eventId);
+      const downloadUrl = URL.createObjectURL(archive);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = 'madetogether-event-photos.zip';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+      setShowDownloadInfo(true);
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Could not prepare photo download');
+    } finally {
+      setIsPreparingDownload(false);
+    }
   };
 
   const handleDownloadSingle = (photo: PhotoMetadata) => {
@@ -223,7 +240,7 @@ const HostDashboard: React.FC = () => {
               <button className="dashboard-icon-button" onClick={loadEventData} aria-label="Refresh photos" title="Refresh photos">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4m-4 4a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></svg>
               </button>
-              <button className="dashboard-icon-button" onClick={handleDownloadAll} disabled={filteredPhotos.length === 0} aria-label="Download displayed photos" title="Download displayed photos">
+              <button className="dashboard-icon-button" onClick={handleDownloadAll} disabled={photos.length === 0 || isPreparingDownload} aria-label="Download all event photos as a ZIP" title="Download all event photos as a ZIP">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
               </button>
             </div>
@@ -353,6 +370,22 @@ const HostDashboard: React.FC = () => {
           }} />
           <button className="preview-download-button" onClick={downloadQrCode}>Download QR image</button>
         </div>
+      </Modal>
+
+      <Modal isOpen={isPreparingDownload} onClose={() => undefined} className="download-progress-modal">
+        <h2 className="handwritten">Preparing download</h2>
+        <p>Collecting {photos.length} photos into one ZIP file.</p>
+        <div className="download-progress-track" aria-label="Preparing ZIP download"><div /></div>
+      </Modal>
+
+      <Modal isOpen={showDownloadInfo} onClose={() => setShowDownloadInfo(false)} className="download-info-modal">
+        <h2 className="handwritten">Download started</h2>
+        <p><strong>madetogether-event-photos.zip</strong></p>
+        <p>{isIOS
+          ? 'Find it in Safari Downloads or the Files app.'
+          : 'Find it in your browser Downloads or the Files app.'}
+        </p>
+        <button className="preview-download-button" onClick={() => setShowDownloadInfo(false)}>Done</button>
       </Modal>
     </div>
   );
