@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventsByHostCode } from '../services/apiService';
+import { getEventsByHostCode } from '../services/dataService';
 import { getHostCode, clearHostCode } from '../utils/hostAuth';
-import type { Event } from '../services/apiService';
+import type { Event } from '../services/dataService';
 import './HostEventsList.css';
 
 const HostEventsList: React.FC = () => {

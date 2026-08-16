@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/apiService';
-import type { Event, PhotoMetadata } from '../services/apiService';
+import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/dataService';
+import type { Event, PhotoMetadata } from '../services/dataService';
 import Modal from '../components/Modal';
 import './HostDashboard.css';
 
@@ -24,6 +24,7 @@ const HostDashboard: React.FC = () => {
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [usedShareSheet, setUsedShareSheet] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
+  const qrModalCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,13 +109,34 @@ const HostDashboard: React.FC = () => {
     }
   };
 
-  const downloadQrCode = () => {
-    const canvas = qrCanvasRef.current;
+  const downloadQrCode = async () => {
+    const canvas = qrModalCanvasRef.current ?? qrCanvasRef.current;
     if (!canvas) return;
+    const image = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!image) return;
+
+    const filename = `${eventName.trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'}-qr.png`;
+    if (isIOS && navigator.share && typeof File !== 'undefined') {
+      const file = new File([image], filename, { type: 'image/png' });
+      if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (shareError) {
+          if (shareError instanceof DOMException && shareError.name === 'AbortError') return;
+          console.error('Could not open the iOS QR share sheet:', shareError);
+        }
+      }
+    }
+
+    const downloadUrl = URL.createObjectURL(image);
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = `${eventName || 'event'}-qr.png`;
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
   };
 
   const handleDownloadAll = async () => {
@@ -129,7 +151,7 @@ const HostDashboard: React.FC = () => {
         const file = new File([archive], filename, { type: 'application/zip' });
         if (!navigator.canShare || navigator.canShare({ files: [file] })) {
           try {
-            await navigator.share({ files: [file], title: 'Event photos' });
+            await navigator.share({ files: [file] });
             setUsedShareSheet(true);
             setShowDownloadInfo(true);
             return;
@@ -223,8 +245,8 @@ const HostDashboard: React.FC = () => {
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
-          <p className="event-name editorial">{eventName || 'Loading...'}</p>
         </div>
+        <p className="event-name editorial">{eventName || 'Loading...'}</p>
         
         {error && (
           <div className="error-banner">
@@ -382,6 +404,7 @@ const HostDashboard: React.FC = () => {
         <div className="qr-modal-content">
           <h2 className="handwritten">Share with guests</h2>
           <canvas ref={(canvas) => {
+            qrModalCanvasRef.current = canvas;
             if (canvas && eventId) {
               QRCode.toCanvas(canvas, guestLink, { width: 200, margin: 1, errorCorrectionLevel: 'H' })
                 .catch((qrError) => console.error('Could not generate QR code:', qrError));

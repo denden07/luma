@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEventPhotos, deletePhoto, downloadAllPhotos, downloadPhoto } from '../utils/indexedDBStorage';
+import { getEvent } from '../services/dataService';
 import type { Photo } from '../utils/indexedDBStorage';
 import Modal from '../components/Modal';
 import UploadPanel from '../components/UploadPanel';
@@ -13,6 +14,7 @@ interface PhotoGalleryProps {
 
 const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [eventName, setEventName] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
@@ -27,6 +29,9 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
 
   useEffect(() => {
     loadPhotos();
+    getEvent(eventToken).then(event => setEventName(event.name)).catch(error => {
+      console.error('Could not load gallery event name:', error);
+    });
   }, [eventToken]);
 
   const loadPhotos = async () => {
@@ -195,7 +200,8 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             </svg>
           )}
         </button>
-        <h2>{selectionMode ? `${selectedPhotos.size} Selected` : 'My Photos'}</h2>
+        {!selectionMode && <p className="gallery-event-title editorial">{eventName || 'Event photos'}</p>}
+        {selectionMode && <h2>{`${selectedPhotos.size} Selected`}</h2>}
         <div className="gallery-tools">
           {selectionMode ? (
             <span className="selection-count">{selectedPhotos.size}</span>
@@ -228,10 +234,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
               <button className="download-all-btn" onClick={handleDownloadAll} disabled={isPreparingDownload} aria-label="Download all photos" title="Download all photos">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg>
               </button>
-              <span className="photo-count">{photos.length}</span>
             </>
           )}
         </div>
+        {!selectionMode && <p className="guest-photo-total">{photos.length} {photos.length === 1 ? 'photo' : 'photos'} taken</p>}
       </div>
 
       {/* Selection Mode Actions */}

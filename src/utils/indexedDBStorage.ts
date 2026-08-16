@@ -475,7 +475,6 @@ async function sharePhotosOnIOS(photos: Photo[]): Promise<boolean> {
   try {
     await navigator.share({
       files,
-      title: photos.length === 1 ? 'Photo' : 'Event photos',
     });
     return true;
   } catch (error) {
@@ -521,7 +520,7 @@ export async function downloadAllPhotos(photos: Photo[]): Promise<'shared' | 'do
     const file = new File([archive], filename, { type: 'application/zip' });
     if (!navigator.canShare || navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'Guest photos' });
+        await navigator.share({ files: [file] });
         return 'shared';
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return 'shared';

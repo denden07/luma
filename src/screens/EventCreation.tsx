@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { createEvent, getEventsByHostCode } from '../services/apiService';
+import { createEvent, getEventsByHostCode } from '../services/dataService';
 import { getHostCode, clearHostCode } from '../utils/hostAuth';
 import './EventCreation.css';
 

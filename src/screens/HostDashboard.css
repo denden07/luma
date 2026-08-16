@@ -13,9 +13,8 @@
 }
 
 .header-content {
-  text-align: center;
   min-height: 48px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   position: relative;
 }
 
@@ -93,13 +92,23 @@
   margin-bottom: 8px;
 }
 
-.event-name {
+.host-dashboard .event-name {
+  display: -webkit-box;
+  max-width: min(100%, 520px);
+  max-height: 3.6em;
+  margin: 0 auto 20px;
+  overflow: hidden;
   font-family: var(--font-editorial);
   font-size: var(--font-size-event);
-  color: var(--color-off-white);
+  color: #ffffff;
   font-weight: 700;
   letter-spacing: 1px;
   text-transform: uppercase;
+  text-overflow: ellipsis;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  text-align: center;
 }
 
 .dashboard-controls {
@@ -131,7 +140,7 @@
   border: 2px solid var(--color-border);
   border-radius: 12px;
   font-size: var(--font-size-body);
-  color: var(--color-ink);
+  color: var(--color-charcoal);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -151,7 +160,7 @@
 .download-all-button {
   padding: 14px 24px;
   background: var(--color-film-yellow);
-  color: var(--color-ink);
+  color: var(--color-charcoal);
   font-size: var(--font-size-button);
   font-weight: 600;
   border-radius: 24px;
@@ -223,7 +232,7 @@
 .empty-state h2 {
   font-family: var(--font-handwritten);
   font-size: 32px;
-  color: var(--color-ink);
+  color: var(--color-charcoal);
   margin-bottom: 12px;
 }
 
@@ -295,7 +304,7 @@
 
 .participant-name {
   font-weight: 600;
-  color: var(--color-ink);
+  color: var(--color-charcoal);
   font-size: 16px;
   margin-bottom: 4px;
   overflow: hidden;
@@ -366,7 +375,7 @@
 .preview-participant {
   font-weight: 600;
   font-size: 20px;
-  color: var(--color-ink);
+  color: var(--color-charcoal);
   margin-bottom: 8px;
 }
 
@@ -450,7 +459,7 @@
 .host-dashboard .photo-card { background: var(--color-ivory); border: 0; padding: 10px 10px 48px; box-shadow: 0 7px 18px rgba(0, 0, 0, 0.32); border-radius: 3px; }
 .host-dashboard .photo-card:hover { transform: translateY(-4px) rotate(0.35deg); box-shadow: 0 14px 28px rgba(0, 0, 0, 0.42); }
 .host-dashboard .photo-frame { margin-bottom: 10px; background: var(--color-charcoal); border-radius: 1px; }
-.host-dashboard .participant-name { color: var(--color-ink); font-family: var(--font-editorial); font-size: 17px; line-height: 1; }
+.host-dashboard .participant-name { color: var(--color-charcoal); font-family: var(--font-editorial); font-size: 17px; line-height: 1; }
 .host-dashboard .photo-date { color: #7f786d; font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.7px; }
 .host-dashboard .quick-download { opacity: 1; top: 16px; right: 16px; width: 34px; height: 34px; }
 .host-dashboard .share-panel { background: #242320; border-color: var(--color-border); padding: 10px; }

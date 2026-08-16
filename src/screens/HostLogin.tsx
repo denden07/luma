@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createHost, loginHost } from '../services/apiService';
+import { createHost, loginHost } from '../services/dataService';
 import { saveHostCode, generateHostCode } from '../utils/hostAuth';
 import './HostLogin.css';
 

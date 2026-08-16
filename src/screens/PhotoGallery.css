@@ -12,9 +12,10 @@
 }
 
 .gallery-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
   padding: max(24px, env(safe-area-inset-top)) 24px 24px;
   background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(20px);
@@ -33,7 +34,32 @@
   letter-spacing: 0.5px;
 }
 
+.gallery-event-title {
+  display: -webkit-box;
+  max-width: min(100%, 340px);
+  overflow: hidden;
+  color: var(--color-off-white);
+  margin-top: 54px;
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  text-overflow: ellipsis;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.guest-photo-total {
+  color: var(--color-warm-gray);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .close-button {
+  position: absolute;
+  top: max(24px, env(safe-area-inset-top));
+  left: 24px;
   background: rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   border-radius: 50%;
@@ -59,22 +85,23 @@
 .gallery-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  margin-top: 4px;
 }
 
 .photo-count,
 .select-mode-btn,
 .download-all-btn {
-  background: var(--color-film-yellow);
-  color: var(--color-soft-black);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
   font-weight: bold;
   min-width: 40px;
   height: 40px;
   padding: 8px;
   border-radius: 50%;
   font-size: 15px;
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   display: grid;
   place-items: center;
 }
@@ -111,9 +138,10 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--color-film-yellow);
-  color: var(--color-soft-black);
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: none;
 }
 
 .gallery-grid {
@@ -362,9 +390,7 @@
     font-size: 24px;
   }
 
-  .grid-density button {
-    width: 28px;
-  }
+  .gallery-event-title { font-size: 23px; }
 }
 
 .upload-btn {

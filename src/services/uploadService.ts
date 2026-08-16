@@ -9,7 +9,7 @@ import {
 import {
   createParticipant as createParticipantOnServer,
   uploadPhoto as apiUploadPhoto,
-} from './apiService';
+} from './dataService';
 
 export interface UploadProgress {
   total: number;
