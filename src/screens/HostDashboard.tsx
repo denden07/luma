@@ -89,7 +89,7 @@ const HostDashboard: React.FC = () => {
     qrCanvasRef.current = canvas;
     if (canvas && guestLink) {
       QRCode.toCanvas(canvas, guestLink, {
-        width: 132,
+        width: 64,
         margin: 1,
         errorCorrectionLevel: 'H',
       }).catch((qrError) => console.error('Could not generate QR code:', qrError));
@@ -246,6 +246,9 @@ const HostDashboard: React.FC = () => {
             <div className="share-panel">
               <button className="qr-trigger" onClick={() => setIsQrModalOpen(true)} aria-label="Open and download guest QR code" title="Open QR code">
                 <canvas ref={setQrPreviewCanvas} aria-label="Guest event QR code" />
+                <span className="qr-preview-icon" aria-hidden="true">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.2-4.2"/></svg>
+                </span>
               </button>
               <button className="share-link-button" onClick={copyGuestLink} title="Copy guest link">
                 <span className="share-title">Share with guests</span><span className="share-link">{guestLink}</span>

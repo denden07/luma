@@ -127,9 +127,10 @@ const HostEventsList: React.FC = () => {
                   <span className="event-date">{formatDate(event.date)}</span>
                 </div>
                 <div className="event-card-footer">
-                  <span className="event-info">
-                    📸 {event.guest_limit} photos/guest
-                  </span>
+                  <div className="event-limits-preview">
+                    <span>Guests: {event.guest_limit}</span>
+                    <span>Photos: {event.photo_limit} / guest</span>
+                  </div>
                   <button 
                     className="view-dashboard-button"
                     onClick={(e) => {

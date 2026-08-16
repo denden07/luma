@@ -308,6 +308,7 @@
 .event-creation .subtitle, .event-creation .form-group small, .event-creation .event-limits small, .qr-instructions { color: var(--color-warm-gray); }
 .event-creation .form-group label { color: var(--color-off-white); }
 .event-creation .form-group input, .event-limits input { background: var(--color-charcoal); color: var(--color-off-white); border: 1px solid var(--color-border); border-radius: 6px; }
+.event-creation input[type="datetime-local"] { width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; }
 .event-creation .form-group input:focus { border-color: var(--color-film-yellow); }
 .event-limits { border-color: var(--color-border); color: var(--color-off-white); }
 .event-limits label { display: grid; gap: 6px; color: var(--color-off-white); }
@@ -327,4 +328,5 @@
   .event-creation { padding: 16px; }
   .success-container { padding: 24px 16px; }
   .share-section { padding: 16px 12px; }
+  .event-creation input[type="datetime-local"] { width: 100%; max-width: 100%; }
 }

@@ -205,6 +205,13 @@
   font-size: 0.9rem;
 }
 
+.event-limits-preview {
+  display: grid;
+  gap: 3px;
+  color: var(--color-warm-gray);
+  font-size: 0.8rem;
+}
+
 .view-dashboard-button {
   padding: 0.625rem 1rem;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

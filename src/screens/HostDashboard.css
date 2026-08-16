@@ -454,8 +454,9 @@
 .host-dashboard .photo-date { color: #7f786d; font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.7px; }
 .host-dashboard .quick-download { opacity: 1; top: 16px; right: 16px; width: 34px; height: 34px; }
 .host-dashboard .share-panel { background: #242320; border-color: var(--color-border); padding: 10px; }
-.host-dashboard .qr-trigger { display: grid; place-items: center; width: 72px; height: 72px; background: var(--color-off-white); border-radius: 4px; overflow: hidden; flex: 0 0 auto; }
-.host-dashboard .qr-trigger canvas { width: 72px; height: 72px; }
+.host-dashboard .qr-trigger { position: relative; display: grid; place-items: center; width: 72px; height: 72px; padding: 4px; background: var(--color-off-white); border-radius: 4px; overflow: hidden; flex: 0 0 auto; }
+.host-dashboard .qr-trigger canvas { display: block; width: 64px; height: 64px; }
+.qr-preview-icon { position: absolute; right: 3px; bottom: 3px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--color-charcoal); color: var(--color-off-white); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45); }
 .share-link-button { min-width: 0; flex: 1; text-align: left; color: var(--color-off-white); }
 .share-link-button .share-title, .share-link-button .share-link { display: block; }
 .share-link-button .share-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }

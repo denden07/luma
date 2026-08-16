@@ -179,7 +179,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
 
       <Modal isOpen={showUploadConfirm} onClose={() => setShowUploadConfirm(false)} className="upload-confirm-modal">
         <h2>Upload {stats.totalPending} {stats.totalPending === 1 ? 'photo' : 'photos'}?</h2>
-        <p>Photos will be shared with the event host.</p>
+        <p>Once uploaded, photos are shared with the host and cannot be deleted. Choose your best shots.</p>
         <div className="upload-confirm-actions">
           <button onClick={() => setShowUploadConfirm(false)}>Cancel</button>
           <button onClick={confirmUpload}>Upload</button>
