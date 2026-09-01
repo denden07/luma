@@ -1,3 +1,6 @@
+.content-notice { background: rgba(20, 20, 18, .92); border: 1px solid var(--color-film-yellow); border-radius: 6px; color: var(--color-off-white); left: 16px; padding: 14px; position: absolute; right: 16px; top: 78px; z-index: 10; }
+.content-notice p { font-size: 14px; line-height: 1.4; margin: 0 0 10px; }
+.content-notice button { background: var(--color-film-yellow); border: 0; border-radius: 4px; color: var(--color-charcoal); font: inherit; font-weight: 700; padding: 8px 12px; }
 .camera-screen {
   position: fixed;
   top: 0;

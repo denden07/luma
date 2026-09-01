@@ -2,6 +2,7 @@
 // This service communicates with the local PostgreSQL backend
 
 import { generateUUID } from '../utils/indexedDBStorage';
+import type { FilterId } from '../utils/filters';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -13,6 +14,8 @@ export interface Event {
   photo_limit: number;
   start_time: string | null;
   end_time: string | null;
+  cover_photo_path: string | null;
+  enabled_filters: FilterId[];
   host_code: string;
   created_at: string;
   updated_at: string;
@@ -54,7 +57,8 @@ export async function createEvent(
   hostCode: string,
   startTime?: string,
   endTime?: string,
-  photoLimit: number = 20
+  photoLimit: number = 20,
+  enabledFilters: FilterId[] = []
 ): Promise<Event> {
   const response = await fetch(`${API_BASE_URL}/api/events`, {
     method: 'POST',
@@ -66,6 +70,7 @@ export async function createEvent(
       photo_limit: photoLimit,
       start_time: startTime,
       end_time: endTime,
+      enabled_filters: enabledFilters,
       host_code: hostCode,
     }),
   });
@@ -74,6 +79,22 @@ export async function createEvent(
     throw new Error('Failed to create event');
   }
 
+  return response.json();
+}
+
+export async function uploadEventCover(eventId: string, hostCode: string, cover: File): Promise<Event> {
+  const formData = new FormData();
+  formData.append('cover', cover);
+  formData.append('host_code', hostCode);
+
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/cover`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to upload event cover' }));
+    throw new Error(error.error || 'Failed to upload event cover');
+  }
   return response.json();
 }
 

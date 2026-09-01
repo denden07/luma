@@ -6,7 +6,15 @@
   justify-content: center;
   padding: 24px;
   text-align: center;
+  position: relative;
 }
+
+.landing-screen.has-cover-photo { background-position: center; background-size: cover; color: var(--color-off-white); }
+.landing-cover-scrim { background: rgba(18, 17, 14, .72); inset: 0; position: absolute; }
+.landing-screen.has-cover-photo .landing-content { position: relative; z-index: 1; }
+.landing-screen.has-cover-photo .landing-title, .landing-screen.has-cover-photo .landing-description { color: var(--color-off-white); text-shadow: 0 3px 16px rgba(0, 0, 0, .95); }
+.landing-screen.has-cover-photo .landing-subtitle { color: #f1e9d8; text-shadow: 0 3px 16px rgba(0, 0, 0, .95); }
+.landing-screen.has-cover-photo .event-name { color: var(--color-film-yellow); text-shadow: 0 3px 16px rgba(0, 0, 0, .95); }
 
 .landing-content {
   max-width: 400px;

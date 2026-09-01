@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { createEvent, getEventsByHostCode } from '../services/dataService';
-import { getHostCode, clearHostCode } from '../utils/hostAuth';
+import { createEvent, getEventsByHostCode, uploadEventCover } from '../services/dataService';
+import { getHostCode } from '../utils/hostAuth';
+import { FILTERS, type FilterId } from '../utils/filters';
+import filterPreviewImage from '../assets/images/pwa_camera_assets/example-filter-photo.jpg';
 import './EventCreation.css';
 
 const QRCodeCanvas: React.FC<{ value: string; canvasRef: React.RefObject<HTMLCanvasElement | null>; size?: number }> = ({ value, canvasRef, size = 256 }) => {
@@ -27,7 +29,12 @@ const EventCreation: React.FC = () => {
   const [eventStart, setEventStart] = useState('');
   const [guestLimit, setGuestLimit] = useState(30);
   const [photoLimit, setPhotoLimit] = useState(20);
+  const [enabledFilters, setEnabledFilters] = useState<FilterId[]>([]);
+  const [creationStep, setCreationStep] = useState<1 | 2 | 3>(1);
+  const [backgroundPhoto, setBackgroundPhoto] = useState<File | null>(null);
+  const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isUploadingBackground, setIsUploadingBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [canCreateAnother, setCanCreateAnother] = useState(true);
@@ -45,7 +52,15 @@ const EventCreation: React.FC = () => {
         throw new Error('No host code found. Please log in again.');
       }
 
-      const event = await createEvent(eventName, eventStart, guestLimit, hostCode, eventStart, undefined, photoLimit);
+      let event = await createEvent(eventName, eventStart, guestLimit, hostCode, eventStart, undefined, photoLimit, enabledFilters);
+      if (backgroundPhoto) {
+        setIsUploadingBackground(true);
+        try {
+          event = await uploadEventCover(event.id, hostCode, backgroundPhoto);
+        } finally {
+          setIsUploadingBackground(false);
+        }
+      }
       console.log('[EventCreation] Event created:', event);
       setCreatedEventId(event.id);
       const hostEvents = await getEventsByHostCode(hostCode);
@@ -56,6 +71,35 @@ const EventCreation: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to create event');
       setIsCreating(false);
     }
+  };
+
+  const handleDetailsSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!e.currentTarget.reportValidity()) return;
+    setCreationStep(2);
+  };
+
+  const handleFiltersSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (enabledFilters.length === 0) {
+      setError('Choose Original or at least one creative filter to continue.');
+      return;
+    }
+    setError(null);
+    setCreationStep(3);
+  };
+
+  const handleBackgroundPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (backgroundPreviewUrl) URL.revokeObjectURL(backgroundPreviewUrl);
+    setBackgroundPhoto(file);
+    setBackgroundPreviewUrl(file ? URL.createObjectURL(file) : null);
+  };
+
+  const removeBackgroundPhoto = () => {
+    if (backgroundPreviewUrl) URL.revokeObjectURL(backgroundPreviewUrl);
+    setBackgroundPhoto(null);
+    setBackgroundPreviewUrl(null);
   };
 
   const getShareableLink = () => {
@@ -79,13 +123,6 @@ const EventCreation: React.FC = () => {
     link.href = canvas.toDataURL('image/png');
     link.download = `${eventName.trim().replace(/[^a-z0-9]+/gi, '-').toLowerCase() || 'event'}-qr.png`;
     link.click();
-  };
-
-  const handleLogout = () => {
-    if (confirm('Are you sure you want to logout? Make sure you have saved your host code!')) {
-      clearHostCode();
-      navigate('/host/login');
-    }
   };
 
   if (createdEventId) {
@@ -132,6 +169,9 @@ const EventCreation: React.FC = () => {
                   setEventStart('');
                   setGuestLimit(30);
                   setPhotoLimit(20);
+                  setEnabledFilters([]);
+                  setCreationStep(1);
+                  removeBackgroundPhoto();
                 }}
               >
                 Create Another Event
@@ -151,7 +191,9 @@ const EventCreation: React.FC = () => {
         </div>
         <p className="subtitle">Set up your event and get a shareable link for guests</p>
 
-        <form onSubmit={handleSubmit} className="event-form">
+        <form onSubmit={creationStep === 1 ? handleDetailsSubmit : creationStep === 2 ? handleFiltersSubmit : handleSubmit} className="event-form">
+          <p className="creation-step">Step {creationStep} of 3</p>
+          {creationStep === 1 ? <>
           <div className="form-group">
             <label htmlFor="eventName">Event Name *</label>
             <input
@@ -204,6 +246,48 @@ const EventCreation: React.FC = () => {
             </label>
             <small>Each host can create up to two events.</small>
           </div>
+          </> : creationStep === 2 ? <>
+          <fieldset className="filter-picker" disabled={isCreating}>
+            <legend>Filters</legend>
+            <p>Choose Original for unfiltered downloads, or choose creative filters for filtered downloads. This cannot be changed after event creation.</p>
+            <div className="filter-preview-grid">
+              {FILTERS.map(filter => {
+                const isSelected = enabledFilters.includes(filter.id);
+                return (
+                  <label className={`filter-preview ${isSelected ? 'selected' : ''}`} key={filter.id}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => setEnabledFilters(current => isSelected
+                        ? current.filter(id => id !== filter.id)
+                        : [...current, filter.id])}
+                    />
+                    <img src={filterPreviewImage} alt={`${filter.label} filter preview`} style={{ filter: filter.previewFilter }} />
+                    <span>{filter.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+          </> : <>
+          <div className="background-photo-step">
+            <h2>Background Photo</h2>
+            <p>Add an optional image for the guest landing page.</p>
+            {isUploadingBackground && <p className="background-upload-status" role="status">Uploading background photo...</p>}
+            {backgroundPreviewUrl ? (
+              <div className="background-preview">
+                <img src={backgroundPreviewUrl} alt="Selected landing page background" />
+                <button type="button" className="secondary-button" onClick={removeBackgroundPhoto}>Remove photo</button>
+              </div>
+            ) : (
+              <label className="background-photo-picker" htmlFor="backgroundPhoto">
+                <span>Choose background photo</span>
+                <input id="backgroundPhoto" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleBackgroundPhotoChange} />
+              </label>
+            )}
+            {backgroundPhoto && <small>{backgroundPhoto.name}</small>}
+          </div>
+          </>}
 
           {error && (
             <div className="error-message">
@@ -218,17 +302,17 @@ const EventCreation: React.FC = () => {
             <button 
               type="button" 
               className="secondary-button"
-              onClick={() => navigate('/host')}
-              disabled={isCreating}
+              onClick={() => creationStep === 1 ? navigate('/host') : setCreationStep(creationStep === 3 ? 2 : 1)}
+              disabled={isCreating || isUploadingBackground}
             >
-              Cancel
+              {creationStep === 1 ? 'Cancel' : 'Back'}
             </button>
             <button 
               type="submit" 
               className="primary-button"
-              disabled={isCreating || !eventName || !eventStart}
+              disabled={isCreating || isUploadingBackground || (creationStep === 1 && (!eventName || !eventStart))}
             >
-              {isCreating ? 'Creating...' : 'Create Event'}
+              {creationStep === 1 ? 'Next: Filters' : creationStep === 2 ? 'Next: Background Photo' : isUploadingBackground ? 'Uploading background...' : isCreating ? 'Creating...' : 'Create Event'}
             </button>
           </div>
         </form>

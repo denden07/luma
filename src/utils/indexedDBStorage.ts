@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import type { Event } from '../services/dataService';
 
 /**
  * IndexedDB Storage Utility
@@ -28,6 +29,10 @@ const DB_VERSION = 2; // Incremented for schema changes
 const PHOTOS_STORE = 'photos';
 const EVENTS_STORE = 'events';
 const PARTICIPANTS_STORE = 'participants';
+
+interface CachedEvent extends Event {
+  cachedAt: number;
+}
 
 /** Helper to generate UUID v4 */
 export function generateUUID(): string {
@@ -262,6 +267,36 @@ export async function getAllPhotos(): Promise<Photo[]> {
   } catch (error) {
     console.error('[IndexedDB] Get all photos failed:', error);
     return [];
+  }
+}
+
+/** Cache event configuration so a previously opened guest link can work offline. */
+export async function cacheEvent(event: Event): Promise<void> {
+  const db = await openDB();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction([EVENTS_STORE], 'readwrite');
+      const request = transaction.objectStore(EVENTS_STORE).put({ ...event, cachedAt: Date.now() } satisfies CachedEvent);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(new Error('Failed to cache event'));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+/** Get the last successfully loaded event configuration for offline use. */
+export async function getCachedEvent(eventId: string): Promise<Event | null> {
+  const db = await openDB();
+  try {
+    return await new Promise<Event | null>((resolve, reject) => {
+      const transaction = db.transaction([EVENTS_STORE], 'readonly');
+      const request = transaction.objectStore(EVENTS_STORE).get(eventId);
+      request.onsuccess = () => resolve((request.result as CachedEvent | undefined) ?? null);
+      request.onerror = () => reject(new Error('Failed to load cached event'));
+    });
+  } finally {
+    db.close();
   }
 }
 

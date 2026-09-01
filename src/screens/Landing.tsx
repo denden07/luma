@@ -5,9 +5,10 @@ import './Landing.css';
 
 interface LandingProps {
   eventName?: string;
+  coverPhotoUrl?: string;
 }
 
-const Landing: React.FC<LandingProps> = ({ eventName = "NINA & ALDRIN'S WEDDING" }) => {
+const Landing: React.FC<LandingProps> = ({ eventName = "NINA & ALDRIN'S WEDDING", coverPhotoUrl }) => {
   const navigate = useNavigate();
 
   const handleStart = () => {
@@ -15,7 +16,8 @@ const Landing: React.FC<LandingProps> = ({ eventName = "NINA & ALDRIN'S WEDDING"
   };
 
   return (
-    <div className="landing-screen">
+    <div className={`landing-screen ${coverPhotoUrl ? 'has-cover-photo' : ''}`} style={coverPhotoUrl ? { backgroundImage: `url(${coverPhotoUrl})` } : undefined}>
+      {coverPhotoUrl && <div className="landing-cover-scrim" />}
       <div className="landing-content">
         <div className="camera-icon">
           <img src={cameraIconSvg} alt="Camera" width="120" height="120" />

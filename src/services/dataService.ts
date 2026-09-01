@@ -8,6 +8,7 @@ const provider = isSupabaseMode() ? supabase : local;
 
 export const getPhotoUrl = provider.getPhotoUrl;
 export const createEvent = provider.createEvent;
+export const uploadEventCover = provider.uploadEventCover;
 export const getEvent = provider.getEvent;
 export const getAllEvents = provider.getAllEvents;
 export const getEventsByHostCode = provider.getEventsByHostCode;

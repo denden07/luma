@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/service-worker.js').catch((error) => {
       console.error('Service worker registration failed:', error);

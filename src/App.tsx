@@ -14,9 +14,9 @@ import HostEventsList from './screens/HostEventsList';
 import HostLogin from './screens/HostLogin';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipant } from './utils/participant';
-import { createParticipant as createParticipantAPI, getEvent } from './services/dataService';
+import { createParticipant as createParticipantAPI, getEvent, getPhotoUrl } from './services/dataService';
 import type { Event } from './services/dataService';
-import { migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
+import { cacheEvent, getCachedEvent, migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
 import { isLocalMode } from './utils/env';
 import { isHostLoggedIn } from './utils/hostAuth';
 import './App.css';
@@ -43,13 +43,22 @@ function EventRoute() {
       try {
         const loadedEvent = await getEvent(eventToken);
         if (!isCurrent) return;
+        cacheEvent(loadedEvent).catch(error => {
+          console.error('[App] Event cache write failed:', error);
+        });
         setEvent(loadedEvent);
         const existingParticipant = getParticipant(eventToken);
         setShotsLeft(existingParticipant?.photosRemaining ?? loadedEvent.photo_limit);
       } catch {
-        if (isCurrent) {
+        const cachedEvent = await getCachedEvent(eventToken).catch(() => null);
+        if (!isCurrent) return;
+        if (cachedEvent) {
+          setEvent(cachedEvent);
+          const existingParticipant = getParticipant(eventToken);
+          setShotsLeft(existingParticipant?.photosRemaining ?? cachedEvent.photo_limit);
+        } else {
           setEvent(null);
-          setEventError('This event is unavailable. Check the link with your host.');
+          setEventError('This event is unavailable. Connect to the internet once, then try again.');
         }
       } finally {
         if (isCurrent) setIsLoadingEvent(false);
@@ -154,7 +163,7 @@ function EventRoute() {
 
   return (
     <Routes>
-      <Route path="/" element={<Landing eventName={event.name} />} />
+      <Route path="/" element={<Landing eventName={event.name} coverPhotoUrl={event.cover_photo_path ? getPhotoUrl(event.cover_photo_path) : undefined} />} />
       <Route 
         path="enter-name" 
         element={
@@ -199,6 +208,8 @@ function ProtectedHostRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const [serviceWorkerStatus, setServiceWorkerStatus] = useState<'checking' | 'active' | 'ready' | 'unsupported'>('checking');
+
   // Run migration on app startup to fix photos with invalid UUIDs
   useEffect(() => {
     migrateInvalidPhotoUUIDs().catch(error => {
@@ -206,11 +217,45 @@ function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) {
+      setServiceWorkerStatus('unsupported');
+      return;
+    }
+
+    const updateStatus = () => {
+      setServiceWorkerStatus(navigator.serviceWorker.controller ? 'active' : 'ready');
+    };
+    const handleControllerChange = () => {
+      setServiceWorkerStatus('active');
+      const reloadKey = 'luma-service-worker-reloaded';
+      if (!sessionStorage.getItem(reloadKey)) {
+        sessionStorage.setItem(reloadKey, 'true');
+        window.location.reload();
+      }
+    };
+    navigator.serviceWorker.ready.then(updateStatus).catch(() => setServiceWorkerStatus('unsupported'));
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    updateStatus();
+
+    return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+  }, []);
+
+  useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (!isIOS) return;
+
+    const preventPageZoom: globalThis.EventListener = (event) => event.preventDefault();
+    document.addEventListener('gesturestart', preventPageZoom, { passive: false });
+
+    return () => document.removeEventListener('gesturestart', preventPageZoom);
+  }, []);
+
   return (
     <Router>
       <div className="app">
         {isLocalMode() && (
-          <div className="local-mode-indicator">LOCAL</div>
+          <div className="local-mode-indicator">LOCAL · CACHE {serviceWorkerStatus.toUpperCase()}</div>
         )}
         
         <Routes>

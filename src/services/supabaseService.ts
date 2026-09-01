@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import JSZip from 'jszip';
 import type { Event, Host, Participant, PhotoMetadata } from './apiService';
+import type { FilterId } from '../utils/filters';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -32,10 +33,10 @@ export function getPhotoUrl(storagePath: string): string {
   return getClient().storage.from(photoBucket).getPublicUrl(storagePath).data.publicUrl;
 }
 
-export async function createEvent(name: string, date: string, guestLimit: number, hostCode: string, startTime?: string, endTime?: string, photoLimit: number = 20): Promise<Event> {
+export async function createEvent(name: string, date: string, guestLimit: number, hostCode: string, startTime?: string, endTime?: string, photoLimit: number = 20, enabledFilters: FilterId[] = []): Promise<Event> {
   const { data, error } = await getClient().from('events').insert({
     name, date, guest_limit: guestLimit, photo_limit: photoLimit,
-    start_time: startTime ?? null, end_time: endTime ?? null, host_code: hostCode,
+    start_time: startTime ?? null, end_time: endTime ?? null, enabled_filters: enabledFilters, host_code: hostCode,
   }).select().single();
   throwOnError(error);
   return data as Event;
@@ -143,4 +144,8 @@ export async function checkBackendHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function uploadEventCover(_eventId: string, _hostCode: string, _cover: File): Promise<Event> {
+  throw new Error('Background photo upload will be available after Cloudflare R2 is configured.');
 }

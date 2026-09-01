@@ -323,10 +323,31 @@
 .event-creation .event-name { color: var(--color-film-yellow); }
 .qr-code-container { padding: 12px; max-width: 100%; }
 .qr-code-container canvas { display: block; width: min(224px, 100%); height: auto; }
+.filter-picker { border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-off-white); padding: 12px; }
+.creation-step { color: var(--color-film-yellow); font-size: .85rem; font-weight: 700; margin: 0; text-align: center; }
+.filter-picker legend { color: var(--color-film-yellow); font-weight: 700; padding: 0 5px; }
+.filter-picker p { color: var(--color-warm-gray); font-size: 0.85rem; margin: 0 0 12px; }
+.filter-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.filter-preview { border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; display: grid; gap: 6px; overflow: hidden; padding: 6px; }
+.filter-preview.selected { border-color: var(--color-film-yellow); box-shadow: inset 0 0 0 1px var(--color-film-yellow); }
+.filter-preview input { accent-color: var(--color-film-yellow); }
+.filter-preview input:disabled { cursor: default; }
+.filter-preview img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+.filter-preview span { font-size: 0.82rem; }
+.background-photo-step { color: var(--color-off-white); display: grid; gap: 12px; }
+.background-photo-step h2, .background-photo-step p { margin: 0; }
+.background-photo-step p, .background-photo-step small { color: var(--color-warm-gray); }
+.background-photo-step .background-upload-status { color: var(--color-film-yellow); font-weight: 700; }
+.background-photo-picker { align-items: center; border: 1px dashed var(--color-border); border-radius: 6px; cursor: pointer; display: flex; justify-content: center; min-height: 148px; padding: 16px; }
+.background-photo-picker input { display: none; }
+.background-preview { display: grid; gap: 10px; }
+.background-preview img { aspect-ratio: 16 / 9; object-fit: cover; width: 100%; }
+.background-preview .secondary-button { padding: 8px 12px; }
 
 @media (max-width: 420px) {
   .event-creation { padding: 16px; }
   .success-container { padding: 24px 16px; }
   .share-section { padding: 16px 12px; }
   .event-creation input[type="datetime-local"] { width: 100%; max-width: 100%; }
+  .filter-preview-grid { grid-template-columns: 1fr; }
 }

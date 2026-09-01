@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEventPhotos, deletePhoto, downloadAllPhotos, downloadPhoto } from '../utils/indexedDBStorage';
 import { getEvent } from '../services/dataService';
@@ -25,6 +25,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
   const [gridColumns, setGridColumns] = useState<1 | 2>(() => {
     return localStorage.getItem('gallery-grid-columns') === '1' ? 1 : 2;
   });
+  const [hasSeenSwipeTutorial, setHasSeenSwipeTutorial] = useState(() => {
+    return localStorage.getItem('luma-guest-swipe-tutorial') === 'seen';
+  });
+  const touchStartX = useRef<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -99,6 +103,40 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
       setSelectedPhoto(photo);
     }
   };
+
+  const selectedPhotoIndex = selectedPhoto ? photos.findIndex(photo => photo.id === selectedPhoto.id) : -1;
+
+  const showAdjacentPhoto = (direction: -1 | 1) => {
+    const nextPhoto = photos[selectedPhotoIndex + direction];
+    if (nextPhoto) setSelectedPhoto(nextPhoto);
+  };
+
+  const handleViewerTouchStart = (event: React.TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handleViewerTouchEnd = (event: React.TouchEvent) => {
+    const startX = touchStartX.current;
+    const endX = event.changedTouches[0]?.clientX;
+    touchStartX.current = null;
+    if (startX === null || endX === undefined || Math.abs(endX - startX) < 48) return;
+    showAdjacentPhoto(endX < startX ? 1 : -1);
+  };
+
+  const dismissSwipeTutorial = () => {
+    localStorage.setItem('luma-guest-swipe-tutorial', 'seen');
+    setHasSeenSwipeTutorial(true);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!selectedPhoto) return;
+      if (event.key === 'ArrowLeft') showAdjacentPhoto(-1);
+      if (event.key === 'ArrowRight') showAdjacentPhoto(1);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPhoto, selectedPhotoIndex, photos]);
 
   const togglePhotoSelection = (photoId: string) => {
     if (photos.find(photo => photo.id === photoId)?.status === 'uploaded') return;
@@ -308,12 +346,28 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
         className="polaroid-modal"
       >
         {selectedPhoto && (
-          <>
+          <div className="guest-photo-viewer" onTouchStart={handleViewerTouchStart} onTouchEnd={handleViewerTouchEnd}>
+            <button
+              className="photo-navigation-button previous"
+              onClick={() => showAdjacentPhoto(-1)}
+              disabled={selectedPhotoIndex <= 0}
+              aria-label="Previous photo"
+            >
+              &#10094;
+            </button>
             <img 
               src={selectedPhoto.fullImageUrl} 
               alt="Photo" 
               className="polaroid-modal-image"
             />
+            <button
+              className="photo-navigation-button next"
+              onClick={() => showAdjacentPhoto(1)}
+              disabled={selectedPhotoIndex < 0 || selectedPhotoIndex >= photos.length - 1}
+              aria-label="Next photo"
+            >
+              &#10095;
+            </button>
             <div className="polaroid-modal-date">
               {formatDate(selectedPhoto.timestamp)}
               {selectedPhoto.status === 'uploaded' && (
@@ -345,7 +399,14 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
                 </button>
               )}
             </div>
-          </>
+            {photos.length > 1 && !hasSeenSwipeTutorial && (
+              <div className="swipe-tutorial" role="dialog" aria-label="Photo navigation help">
+                <div className="swipe-tutorial-cue" aria-hidden="true"><span>&#10094;</span><span>&#8596;</span><span>&#10095;</span></div>
+                <p>Swipe left or right to see more photos</p>
+                <button type="button" onClick={dismissSwipeTutorial}>Got it</button>
+              </div>
+            )}
+          </div>
         )}
       </Modal>
 

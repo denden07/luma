@@ -23,8 +23,12 @@ const HostDashboard: React.FC = () => {
   const [showDownloadInfo, setShowDownloadInfo] = useState(false);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [usedShareSheet, setUsedShareSheet] = useState(false);
+  const [hasSeenSwipeTutorial, setHasSeenSwipeTutorial] = useState(() => {
+    return localStorage.getItem('luma-host-swipe-tutorial') === 'seen';
+  });
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const qrModalCanvasRef = useRef<HTMLCanvasElement>(null);
+  const touchStartX = useRef<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -86,6 +90,7 @@ const HostDashboard: React.FC = () => {
     const direction = sortOrder === 'newest' ? -1 : 1;
     return direction * (new Date(first.created_at).getTime() - new Date(second.created_at).getTime());
   });
+  const selectedPhotoIndex = selectedPhoto ? displayedPhotos.findIndex(photo => photo.id === selectedPhoto.id) : -1;
 
   const guestLink = eventId ? `${window.location.origin}/e/${eventId}` : '';
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -191,6 +196,38 @@ const HostDashboard: React.FC = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  const showAdjacentPhoto = (direction: -1 | 1) => {
+    const nextPhoto = displayedPhotos[selectedPhotoIndex + direction];
+    if (nextPhoto) setSelectedPhoto(nextPhoto);
+  };
+
+  const handleViewerTouchStart = (event: React.TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handleViewerTouchEnd = (event: React.TouchEvent) => {
+    const startX = touchStartX.current;
+    const endX = event.changedTouches[0]?.clientX;
+    touchStartX.current = null;
+    if (startX === null || endX === undefined || Math.abs(endX - startX) < 48) return;
+    showAdjacentPhoto(endX < startX ? 1 : -1);
+  };
+
+  const dismissSwipeTutorial = () => {
+    localStorage.setItem('luma-host-swipe-tutorial', 'seen');
+    setHasSeenSwipeTutorial(true);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!selectedPhoto) return;
+      if (event.key === 'ArrowLeft') showAdjacentPhoto(-1);
+      if (event.key === 'ArrowRight') showAdjacentPhoto(1);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedPhoto, selectedPhotoIndex, displayedPhotos]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -377,13 +414,19 @@ const HostDashboard: React.FC = () => {
 
       {/* Photo Preview Modal */}
       {selectedPhoto && (
-        <Modal isOpen={true} onClose={() => setSelectedPhoto(null)}>
-          <div className="photo-preview-modal">
+        <Modal isOpen={true} onClose={() => setSelectedPhoto(null)} className="host-photo-modal">
+          <div className="photo-preview-modal" onTouchStart={handleViewerTouchStart} onTouchEnd={handleViewerTouchEnd}>
+            <button className="preview-navigation previous" onClick={() => showAdjacentPhoto(-1)} disabled={selectedPhotoIndex <= 0} aria-label="Previous photo">
+              &#10094;
+            </button>
             <img 
               src={getPhotoUrl(selectedPhoto.storage_path)} 
               alt={`By ${selectedPhoto.participant_name || 'Unknown'}`}
               className="preview-image"
             />
+            <button className="preview-navigation next" onClick={() => showAdjacentPhoto(1)} disabled={selectedPhotoIndex < 0 || selectedPhotoIndex >= displayedPhotos.length - 1} aria-label="Next photo">
+              &#10095;
+            </button>
             <div className="preview-info">
               <p className="preview-participant">{selectedPhoto.participant_name || 'Unknown'}</p>
               <p className="preview-date">{formatDate(selectedPhoto.created_at)}</p>
@@ -396,6 +439,13 @@ const HostDashboard: React.FC = () => {
                 Download Photo
               </button>
             </div>
+            {displayedPhotos.length > 1 && !hasSeenSwipeTutorial && (
+              <div className="swipe-tutorial" role="dialog" aria-label="Photo navigation help">
+                <div className="swipe-tutorial-cue" aria-hidden="true"><span>&#10094;</span><span>&#8596;</span><span>&#10095;</span></div>
+                <p>Swipe left or right to see more photos</p>
+                <button type="button" onClick={dismissSwipeTutorial}>Got it</button>
+              </div>
+            )}
           </div>
         </Modal>
       )}
