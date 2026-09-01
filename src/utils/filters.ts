@@ -12,3 +12,7 @@ export type FilterId = typeof FILTERS[number]['id'];
 export function isFilterId(value: string): value is FilterId {
   return FILTERS.some(filter => filter.id === value);
 }
+
+export function getFilter(filterId: FilterId | undefined) {
+  return FILTERS.find(filter => filter.id === filterId);
+}

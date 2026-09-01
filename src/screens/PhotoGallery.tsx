@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getEventPhotos, deletePhoto, downloadAllPhotos, downloadPhoto } from '../utils/indexedDBStorage';
 import { getEvent } from '../services/dataService';
 import type { Photo } from '../utils/indexedDBStorage';
+import { getFilter, type FilterId } from '../utils/filters';
 import Modal from '../components/Modal';
 import UploadPanel from '../components/UploadPanel';
 import './PhotoGallery.css';
@@ -15,6 +16,8 @@ interface PhotoGalleryProps {
 const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted }) => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [eventName, setEventName] = useState('');
+  const [eventFilterId, setEventFilterId] = useState<FilterId | null>(null);
+  const [isFilteredView, setIsFilteredView] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [photoToDelete, setPhotoToDelete] = useState<string | null>(null);
@@ -33,7 +36,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
 
   useEffect(() => {
     loadPhotos();
-    getEvent(eventToken).then(event => setEventName(event.name)).catch(error => {
+    getEvent(eventToken).then(event => {
+      setEventName(event.name);
+      setEventFilterId(event.enabled_filters[0] ?? null);
+    }).catch(error => {
       console.error('Could not load gallery event name:', error);
     });
   }, [eventToken]);
@@ -223,6 +229,10 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
     return null;
   };
 
+  const selectedFilter = getFilter(eventFilterId ?? undefined);
+  const canShowFilteredView = eventFilterId !== null && eventFilterId !== 'original';
+  const displayFilter = isFilteredView && canShowFilteredView ? selectedFilter?.previewFilter : 'none';
+
   return (
     <div className="photo-gallery">
       {/* Header */}
@@ -245,6 +255,13 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
             <span className="selection-count">{selectedPhotos.size}</span>
           ) : (
             <>
+              {canShowFilteredView && (
+                <button className={`gallery-filter-indicator ${isFilteredView ? 'active' : ''}`} type="button" onClick={() => setIsFilteredView(current => !current)} aria-label={isFilteredView ? `Show original instead of ${selectedFilter?.label}` : `Show ${selectedFilter?.label}`} title={isFilteredView ? `Showing ${selectedFilter?.label}` : 'Showing Original'}>
+                  <span className="gallery-filter-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="8" cy="10" r="1.3"/><path d="m4 18 5-5 3.5 3.5 2.5-2.5 4.5 4.5M18 2v4m-2-2h4"/></svg>
+                  </span>
+                </button>
+              )}
               <button
                 className="grid-toggle"
                 onClick={() => changeGridColumns(gridColumns === 1 ? 2 : 1)}
@@ -310,7 +327,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
               className={`gallery-item ${selectionMode && selectedPhotos.has(photo.id) ? 'selected' : ''}`}
               onClick={() => handlePhotoClick(photo)}
             >
-              <img src={photo.thumbnailUrl} alt="Photo" />
+              <img src={photo.thumbnailUrl} alt="Photo" style={{ filter: displayFilter }} />
               <div className="photo-date">{formatDate(photo.timestamp)}</div>
               {getStatusBadge(photo) && (
                 <div className={`photo-status-badge ${getStatusBadge(photo)!.className}`}>
@@ -359,6 +376,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
               src={selectedPhoto.fullImageUrl} 
               alt="Photo" 
               className="polaroid-modal-image"
+              style={{ filter: displayFilter }}
             />
             <button
               className="photo-navigation-button next"

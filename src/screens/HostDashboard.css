@@ -190,6 +190,7 @@
 }
 
 .dashboard-icon-button {
+  background: transparent;
   display: grid;
   place-items: center;
   width: 42px;
@@ -199,7 +200,8 @@
   color: var(--color-off-white);
 }
 
-.dashboard-icon-button:hover { background: #2c2b28; }
+.dashboard-icon-button:hover { background: rgba(255, 255, 255, .08); }
+.dashboard-icon-button.active { background: var(--color-film-yellow); border-color: var(--color-film-yellow); color: var(--color-charcoal); }
 
 .share-panel, .event-health {
   max-width: 600px;
@@ -424,6 +426,12 @@
 .preview-download-button:active {
   transform: translateY(0);
 }
+
+.host-gallery-filter-indicator { align-items: center; background: transparent; border: 1px solid var(--color-border); border-radius: 50%; color: var(--color-off-white); cursor: pointer; display: flex; height: 40px; justify-content: center; padding: 0; width: 40px; }
+.host-gallery-filter-indicator.active { background: var(--color-film-yellow); border-color: var(--color-film-yellow); color: var(--color-charcoal); }
+.host-gallery-filter-indicator .gallery-filter-icon { align-items: center; color: currentColor; display: flex; justify-content: center; }
+.host-gallery-filter-indicator.active .gallery-filter-icon { color: var(--color-charcoal); }
+.host-gallery-filter-indicator .gallery-filter-icon svg { height: 18px; width: 18px; }
 
 /* Tablet and larger screens */
 @media (min-width: 768px) {

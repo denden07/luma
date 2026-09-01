@@ -176,7 +176,7 @@ function EventRoute() {
         path="camera" 
         element={
           checkParticipant() ? 
-            <Camera shotsLeft={shotsLeft} onCapture={handleCapture} /> : 
+            <Camera shotsLeft={shotsLeft} onCapture={handleCapture} filterId={event.enabled_filters[0]} /> : 
             <Navigate to="../enter-name" replace />
         } 
       />

@@ -308,7 +308,12 @@
 .event-creation .subtitle, .event-creation .form-group small, .event-creation .event-limits small, .qr-instructions { color: var(--color-warm-gray); }
 .event-creation .form-group label { color: var(--color-off-white); }
 .event-creation .form-group input, .event-limits input { background: var(--color-charcoal); color: var(--color-off-white); border: 1px solid var(--color-border); border-radius: 6px; }
-.event-creation input[type="datetime-local"] { width: 100%; min-width: 0; -webkit-appearance: none; appearance: none; }
+.date-time-picker { align-items: center; background: var(--color-charcoal); border: 1px solid var(--color-border); border-radius: 6px; box-sizing: border-box; color: var(--color-off-white); display: flex; height: 48px; max-width: 100%; min-width: 0; padding: 0 12px; position: relative; width: 100%; }
+.date-time-value, .date-time-placeholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-time-placeholder { color: var(--color-warm-gray); }
+.date-time-picker svg { color: var(--color-film-yellow); flex: 0 0 auto; height: 18px; margin-left: auto; width: 18px; }
+.date-time-picker input[type="datetime-local"] { cursor: pointer; height: 100%; inset: 0; opacity: 0; position: absolute; width: 100%; }
+.date-time-picker:focus-within { border-color: var(--color-film-yellow); }
 .event-creation .form-group input:focus { border-color: var(--color-film-yellow); }
 .event-limits { border-color: var(--color-border); color: var(--color-off-white); }
 .event-limits label { display: grid; gap: 6px; color: var(--color-off-white); }
@@ -330,8 +335,7 @@
 .filter-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .filter-preview { border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; display: grid; gap: 6px; overflow: hidden; padding: 6px; }
 .filter-preview.selected { border-color: var(--color-film-yellow); box-shadow: inset 0 0 0 1px var(--color-film-yellow); }
-.filter-preview input { accent-color: var(--color-film-yellow); }
-.filter-preview input:disabled { cursor: default; }
+.filter-preview input { appearance: none; -webkit-appearance: none; height: 0; margin: 0; position: absolute; width: 0; }
 .filter-preview img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
 .filter-preview span { font-size: 0.82rem; }
 .background-photo-step { color: var(--color-off-white); display: grid; gap: 12px; }

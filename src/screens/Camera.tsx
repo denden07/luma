@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { savePhoto, getEventPhotos, generateUUID } from '../utils/indexedDBStorage';
 import { getParticipant } from '../utils/participant';
+import { getFilter, type FilterId } from '../utils/filters';
 import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
 
 interface CameraProps {
   shotsLeft: number;
   onCapture: (blob: Blob) => void;
+  filterId?: FilterId;
 }
 
 // Device and browser detection
@@ -22,7 +24,7 @@ const getUserAgent = () => {
   };
 };
 
-const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
+const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
   const { eventToken } = useParams<{ eventToken: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -45,6 +47,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
   const navigate = useNavigate();
   
   const device = getUserAgent();
+  const activeFilter = getFilter(filterId);
   const isHTTPS = window.location.protocol === 'https:';
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -944,6 +947,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture }) => {
                 playsInline 
                 muted
                 className="camera-preview"
+                style={{ filter: activeFilter?.previewFilter }}
               />
             </div>
         </div>

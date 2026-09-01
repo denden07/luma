@@ -41,6 +41,20 @@ const EventCreation: React.FC = () => {
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
+  const eventStartAsIso = () => {
+    const date = new Date(eventStart);
+    if (Number.isNaN(date.getTime())) throw new Error('Choose a valid event date and time.');
+    return date.toISOString();
+  };
+
+  const formatEventStart = () => {
+    if (!eventStart) return 'Select date and time';
+    const date = new Date(eventStart);
+    return Number.isNaN(date.getTime()) ? 'Select date and time' : date.toLocaleString([], {
+      month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -52,7 +66,8 @@ const EventCreation: React.FC = () => {
         throw new Error('No host code found. Please log in again.');
       }
 
-      let event = await createEvent(eventName, eventStart, guestLimit, hostCode, eventStart, undefined, photoLimit, enabledFilters);
+      const startTime = eventStartAsIso();
+      let event = await createEvent(eventName, startTime, guestLimit, hostCode, startTime, undefined, photoLimit, enabledFilters);
       if (backgroundPhoto) {
         setIsUploadingBackground(true);
         try {
@@ -82,7 +97,7 @@ const EventCreation: React.FC = () => {
   const handleFiltersSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (enabledFilters.length === 0) {
-      setError('Choose Original or at least one creative filter to continue.');
+      setError('Choose one filter to continue.');
       return;
     }
     setError(null);
@@ -209,14 +224,21 @@ const EventCreation: React.FC = () => {
 
           <div className="form-group">
             <label htmlFor="eventStart">Event Date & Time *</label>
-            <input
-              type="datetime-local"
-              id="eventStart"
-              value={eventStart}
-              onChange={(e) => setEventStart(e.target.value)}
-              required
-              disabled={isCreating}
-            />
+            <div className="date-time-picker">
+              <span className={eventStart ? 'date-time-value' : 'date-time-placeholder'}>{formatEventStart()}</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>
+              </svg>
+              <input
+                type="datetime-local"
+                id="eventStart"
+                value={eventStart}
+                onChange={(e) => setEventStart(e.target.value)}
+                required
+                disabled={isCreating}
+                aria-label="Event date and time"
+              />
+            </div>
           </div>
 
           <div className="event-limits" aria-label="Event limits">
@@ -249,19 +271,13 @@ const EventCreation: React.FC = () => {
           </> : creationStep === 2 ? <>
           <fieldset className="filter-picker" disabled={isCreating}>
             <legend>Filters</legend>
-            <p>Choose Original for unfiltered downloads, or choose creative filters for filtered downloads. This cannot be changed after event creation.</p>
+            <p>Choose the one look guests will use. The preview changes in the camera, while every saved photo remains unfiltered.</p>
             <div className="filter-preview-grid">
               {FILTERS.map(filter => {
                 const isSelected = enabledFilters.includes(filter.id);
                 return (
                   <label className={`filter-preview ${isSelected ? 'selected' : ''}`} key={filter.id}>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => setEnabledFilters(current => isSelected
-                        ? current.filter(id => id !== filter.id)
-                        : [...current, filter.id])}
-                    />
+                    <input type="radio" name="event-filter" checked={isSelected} onChange={() => setEnabledFilters([filter.id])} />
                     <img src={filterPreviewImage} alt={`${filter.label} filter preview`} style={{ filter: filter.previewFilter }} />
                     <span>{filter.label}</span>
                   </label>

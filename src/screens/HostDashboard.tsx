@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/dataService';
 import type { Event, PhotoMetadata } from '../services/dataService';
+import { getFilter } from '../utils/filters';
 import Modal from '../components/Modal';
 import './HostDashboard.css';
 
@@ -23,6 +24,7 @@ const HostDashboard: React.FC = () => {
   const [showDownloadInfo, setShowDownloadInfo] = useState(false);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [usedShareSheet, setUsedShareSheet] = useState(false);
+  const [isFilteredView, setIsFilteredView] = useState(true);
   const [hasSeenSwipeTutorial, setHasSeenSwipeTutorial] = useState(() => {
     return localStorage.getItem('luma-host-swipe-tutorial') === 'seen';
   });
@@ -90,6 +92,10 @@ const HostDashboard: React.FC = () => {
     const direction = sortOrder === 'newest' ? -1 : 1;
     return direction * (new Date(first.created_at).getTime() - new Date(second.created_at).getTime());
   });
+  const eventFilterId = eventDetails?.enabled_filters[0];
+  const selectedFilter = getFilter(eventFilterId);
+  const canShowFilteredView = eventFilterId !== undefined && eventFilterId !== 'original';
+  const displayFilter = isFilteredView && canShowFilteredView ? selectedFilter?.previewFilter : 'none';
   const selectedPhotoIndex = selectedPhoto ? displayedPhotos.findIndex(photo => photo.id === selectedPhoto.id) : -1;
 
   const guestLink = eventId ? `${window.location.origin}/e/${eventId}` : '';
@@ -295,7 +301,14 @@ const HostDashboard: React.FC = () => {
         {!error && !isLoading && (
           <>
             <div className="dashboard-controls">
-              <button className="dashboard-icon-button" onClick={() => setShowFilter(!showFilter)} aria-label="Filter photos" title="Filter photos">
+              {canShowFilteredView && (
+                <button className={`host-gallery-filter-indicator ${isFilteredView ? 'active' : ''}`} type="button" onClick={() => setIsFilteredView(current => !current)} aria-label={isFilteredView ? `Show original instead of ${selectedFilter?.label}` : `Show ${selectedFilter?.label}`} title={isFilteredView ? `Showing ${selectedFilter?.label}` : 'Showing Original'}>
+                  <span className="gallery-filter-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="8" cy="10" r="1.3"/><path d="m4 18 5-5 3.5 3.5 2.5-2.5 4.5 4.5M18 2v4m-2-2h4"/></svg>
+                  </span>
+                </button>
+              )}
+              <button className={`dashboard-icon-button ${showFilter ? 'active' : ''}`} onClick={() => setShowFilter(!showFilter)} aria-label="Filter photos" title="Filter photos">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M7 12h10m-7 6h4"/></svg>
               </button>
               <button className="dashboard-icon-button" onClick={() => setGridColumns(gridColumns === 1 ? 2 : 1)} aria-label={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`} title={`Show ${gridColumns === 1 ? 'two' : 'one'} photo per row`}>
@@ -390,6 +403,7 @@ const HostDashboard: React.FC = () => {
                   <img 
                     src={getPhotoUrl(photo.storage_path)} 
                     alt={`By ${photo.participant_name || 'Unknown'}`} 
+                    style={{ filter: displayFilter }}
                   />
                 </div>
                 <div className="photo-info">
@@ -423,6 +437,7 @@ const HostDashboard: React.FC = () => {
               src={getPhotoUrl(selectedPhoto.storage_path)} 
               alt={`By ${selectedPhoto.participant_name || 'Unknown'}`}
               className="preview-image"
+              style={{ filter: displayFilter }}
             />
             <button className="preview-navigation next" onClick={() => showAdjacentPhoto(1)} disabled={selectedPhotoIndex < 0 || selectedPhotoIndex >= displayedPhotos.length - 1} aria-label="Next photo">
               &#10095;
