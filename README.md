@@ -1,5 +1,9 @@
 # Luma Event Camera PWA
 
+Luma is a single application containing the Vite PWA and its local Express API. The
+`server/` directory in this project is the API source; the outer `server/` directory
+is legacy local-development material and is not part of the deployed application.
+
 ## Environment Variables
 
 Create a `.env` file in the root of the `/luma` directory:
@@ -8,8 +12,15 @@ Create a `.env` file in the root of the `/luma` directory:
 # App mode: 'local' or 'production'
 VITE_APP_MODE=local
 
-# API base URL (for future backend integration)
-VITE_API_BASE_URL=http://localhost:3000
+# Leave empty to use Vite's same-origin API proxy locally and the same Vercel domain
+# in production.
+VITE_API_BASE_URL=
+
+# Local Express API
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/madetogether
+PORT=3000
+UPLOAD_DIR=./uploads
+USE_HTTPS=false
 ```
 
 ## Local Development
@@ -18,10 +29,23 @@ VITE_API_BASE_URL=http://localhost:3000
 
 ```bash
 npm install
-npm run dev
+npm run dev:all
 ```
 
-The app will be available at `http://localhost:5173`
+The PWA is available at `https://localhost:5173` and the API at
+`http://localhost:3000`. Vite proxies `/api` and `/uploads` to the local API.
+
+Run `npm run db:migrate` before the API for a new database. Use `npm run dev` or
+`npm run dev:server` when only one process is needed.
+
+## Vercel Deployment
+
+Create one Vercel project with `luma` as its Root Directory. Vercel builds the PWA,
+serves it from `dist`, and routes `/api/*` to `api/index.ts`, which exports the same
+Express app used locally. Configure `DATABASE_URL` in Vercel environment variables.
+
+The current filesystem upload adapter is for local development only. Move uploads to
+private object storage before production; Vercel function storage is not durable.
 
 ### Mobile Testing via LAN
 
@@ -65,6 +89,13 @@ Browser camera APIs require HTTPS in production. For local development:
 
 ```
 luma/
+├── api/
+│   └── index.ts              # Vercel entry point for the Express app
+├── server/                   # Local Express API and database migrations
+│   ├── app.ts                # Shared Express app configuration
+│   ├── index.ts              # Local server listener
+│   ├── db/
+│   └── routes/
 ├── public/
 │   └── manifest.json          # PWA manifest
 ├── src/
@@ -85,8 +116,9 @@ luma/
 │   ├── App.tsx                # Main app with routing
 │   ├── globals.css            # Design tokens
 │   └── main.tsx               # Entry point
-├── .env                       # Environment variables
+├── .env                       # PWA and local API environment variables
 ├── package.json
+├── vercel.json
 └── vite.config.ts
 ```
 
@@ -167,8 +199,12 @@ To complete the MVP, you'll need to:
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
+- `npm run dev` - Start the Vite PWA
+- `npm run dev:server` - Start the local Express API
+- `npm run dev:all` - Start the PWA and API together
 - `npm run build` - Build for production
+- `npm run build:server` - Type-check and compile the local API
+- `npm run db:migrate` - Apply the database schema
 - `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
 
