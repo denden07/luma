@@ -4,8 +4,8 @@
   "description": "Digital disposable camera for weddings and events",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F3E9D3",
-  "theme_color": "#E88F99",
+  "background_color": "#181817",
+  "theme_color": "#E7B93C",
   "orientation": "portrait",
   "icons": [
     {

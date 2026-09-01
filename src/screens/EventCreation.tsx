@@ -148,14 +148,6 @@ const EventCreation: React.FC = () => {
       <div className="creation-container">
         <div className="header-with-logout">
           <h1 className="handwritten">Create New Event</h1>
-          <button 
-            type="button"
-            className="logout-link"
-            onClick={handleLogout}
-            title="Logout"
-          >
-            Logout
-          </button>
         </div>
         <p className="subtitle">Set up your event and get a shareable link for guests</p>
 
