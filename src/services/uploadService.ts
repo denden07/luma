@@ -85,6 +85,13 @@ export async function uploadPendingPhotos(
       continue;
     }
 
+    if (!photo.filteredBlob) {
+      console.error('[UploadService] Photo has no prepared filtered blob, skipping:', photo.id);
+      failed.push({ photo, error: 'Photo processing did not finish. Capture it again.' });
+      await updatePhotoStatus(photo.id, 'failed', 'Photo processing did not finish. Capture it again.');
+      continue;
+    }
+
     try {
       // Mark as uploading
       await updatePhotoStatus(photo.id, 'uploading');
@@ -121,9 +128,9 @@ export async function uploadPendingPhotos(
             photo.participantId,
             photo.blob,
             photo.id,
-            photo.fullImageUrl
+            photo.fullImageUrl,
+            photo.filteredBlob
           );
-          
           uploadSuccess = true;
           console.log(`[UploadService] ✅ Upload succeeded on attempt ${attempt + 1}`);
           break; // Success, exit retry loop
@@ -146,12 +153,12 @@ export async function uploadPendingPhotos(
       }
 
       if (uploadSuccess) {
-        // Do not retry a photo that the server already confirmed as saved.
         try {
           await updatePhotoStatus(photo.id, 'uploaded');
         } catch (statusError) {
-          console.error('[UploadService] Photo uploaded, but local status could not be updated:', statusError);
+          console.error('[UploadService] Original uploaded, but local status could not be updated:', statusError);
         }
+
         succeeded.push(photo);
         console.log('[UploadService] Photo uploaded successfully:', photo.id);
       } else {

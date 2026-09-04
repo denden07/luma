@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import type { Event } from '../services/dataService';
+import type { FilterId } from './filters';
 
 /**
  * IndexedDB Storage Utility
@@ -18,6 +19,8 @@ export interface Photo {
   fullImageUrl: string; // Full resolution image data URL (base64)
   thumbnailUrl: string; // Smaller thumbnail for gallery
   blob: Blob; // Keep original blob for uploading
+  filteredBlob: Blob; // Client-rendered filter version for uploading
+  filterId?: FilterId; // Event filter selected when this photo was captured
   status: PhotoStatus; // Track upload status
   uploadedAt?: number; // Timestamp of successful upload
   failureReason?: string; // Reason for upload failure
@@ -173,7 +176,9 @@ export async function savePhoto(
   participantId: string,
   participantName: string,
   blob: Blob,
-  photoId?: string // Optional: provide existing ID for updates
+  filteredBlob: Blob,
+  photoId?: string, // Optional: provide existing ID for updates
+  filterId?: FilterId
 ): Promise<Photo> {
   try {
     const db = await openDB();
@@ -200,6 +205,8 @@ export async function savePhoto(
       fullImageUrl,
       thumbnailUrl,
       blob,
+      filteredBlob,
+      filterId,
       status: 'local',
       created_at: now,
     };

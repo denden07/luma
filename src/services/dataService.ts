@@ -15,6 +15,7 @@ export const getEventsByHostCode = provider.getEventsByHostCode;
 export const createParticipant = provider.createParticipant;
 export const getEventParticipants = provider.getEventParticipants;
 export const uploadPhoto = provider.uploadPhoto;
+export const uploadFilteredPhoto = provider.uploadFilteredPhoto;
 export const getEventPhotos = provider.getEventPhotos;
 export const getPhoto = provider.getPhoto;
 export const deletePhoto = provider.deletePhoto;

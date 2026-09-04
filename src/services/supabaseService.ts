@@ -75,7 +75,7 @@ export async function getEventParticipants(eventId: string): Promise<Participant
   return (data ?? []) as Participant[];
 }
 
-export async function uploadPhoto(eventId: string, participantId: string, photoBlob: Blob, photoId: string, _photoDataUrl?: string): Promise<PhotoMetadata> {
+export async function uploadPhoto(eventId: string, participantId: string, photoBlob: Blob, photoId: string, _photoDataUrl?: string, _filteredBlob?: Blob): Promise<PhotoMetadata> {
   const path = photoPath(eventId, photoId);
   const { error: uploadError } = await getClient().storage.from(photoBucket).upload(path, photoBlob, {
     contentType: photoBlob.type || 'image/jpeg', upsert: true,
@@ -85,6 +85,17 @@ export async function uploadPhoto(eventId: string, participantId: string, photoB
   const { data, error } = await getClient().from('photos').upsert({
     id: photoId, event_id: eventId, participant_id: participantId, storage_path: path,
   }).select().single();
+  throwOnError(error);
+  return data as PhotoMetadata;
+}
+
+export async function uploadFilteredPhoto(eventId: string, photoId: string, filteredBlob: Blob): Promise<PhotoMetadata> {
+  const path = `events/${eventId}/photos/${photoId}-filtered.jpg`;
+  const { error: uploadError } = await getClient().storage.from(photoBucket).upload(path, filteredBlob, {
+    contentType: filteredBlob.type || 'image/jpeg', upsert: true,
+  });
+  throwOnError(uploadError);
+  const { data, error } = await getClient().from('photos').update({ filtered_storage_path: path }).eq('id', photoId).eq('event_id', eventId).select().single();
   throwOnError(error);
   return data as PhotoMetadata;
 }

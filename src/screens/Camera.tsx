@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { savePhoto, getEventPhotos, generateUUID } from '../utils/indexedDBStorage';
 import { getParticipant } from '../utils/participant';
-import { getFilter, type FilterId } from '../utils/filters';
+import { createFilteredPhotoBlob, getFilter, type FilterId } from '../utils/filters';
 import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
 
@@ -814,8 +814,9 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
           // Generate a unique UUID for this photo
           const photoId = generateUUID();
           console.log('[capturePhoto] Generated photo ID:', photoId);
-          
-          await savePhoto(eventToken, participantId, participantName, blob, photoId);
+
+          const filteredBlob = await createFilteredPhotoBlob(blob, filterId ?? 'original');
+          await savePhoto(eventToken, participantId, participantName, blob, filteredBlob, photoId, filterId);
           await updatePhotoCount();
           
           // Still call onCapture for backward compatibility (decrements shots)
@@ -1066,7 +1067,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
           >
             {latestPhotoUrl ? (
               <>
-                <img src={latestPhotoUrl} alt="Latest" className="gallery-preview" />
+                <img src={latestPhotoUrl} alt="Latest" className="gallery-preview" style={{ filter: activeFilter?.previewFilter }} />
                 {photoCount > 0 && (
                   <span className="gallery-badge">{photoCount}</span>
                 )}

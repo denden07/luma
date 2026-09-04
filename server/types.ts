@@ -27,6 +27,7 @@ export interface Photo {
   event_id: string;
   participant_id: string;
   storage_path: string;
+  filtered_storage_path?: string | null;
   thumbnail_path?: string;
   created_at: Date;
 }

@@ -38,9 +38,12 @@ CREATE TABLE IF NOT EXISTS photos (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   participant_id UUID NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
   storage_path VARCHAR(500) NOT NULL,
+  filtered_storage_path VARCHAR(500),
   thumbnail_path VARCHAR(500),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS filtered_storage_path VARCHAR(500);
 
 -- Messages table (if needed)
 CREATE TABLE IF NOT EXISTS messages (

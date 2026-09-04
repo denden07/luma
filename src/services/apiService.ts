@@ -34,6 +34,7 @@ export interface PhotoMetadata {
   participant_id: string;
   participant_name?: string; // From JOIN with participants table
   storage_path: string;
+  filtered_storage_path?: string | null;
   thumbnail_path?: string;
   created_at: string;
 }
@@ -163,7 +164,8 @@ export async function uploadPhoto(
   participantId: string,
   photoBlob: Blob,
   photoId?: string,
-  photoDataUrl?: string
+  photoDataUrl?: string,
+  filteredBlob?: Blob
 ): Promise<PhotoMetadata> {
   try {
     const finalPhotoId = photoId || generateUUID();
@@ -186,10 +188,29 @@ export async function uploadPhoto(
         throw new Error('Photo data is unavailable for iOS upload');
       }
 
+      let filteredImageData: string | undefined;
+      if (filteredBlob) {
+        try {
+          filteredImageData = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Filtered photo data is unavailable for iOS upload'));
+            reader.readAsDataURL(filteredBlob);
+          });
+        } catch (error) {
+          console.warn('[API Service] Could not read filtered photo; uploading original only:', error);
+        }
+      }
+
       const response = await fetch(`${uploadUrl}-json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: finalPhotoId, participant_id: participantId, image_data: photoDataUrl }),
+        body: JSON.stringify({
+          id: finalPhotoId,
+          participant_id: participantId,
+          image_data: photoDataUrl,
+          ...(filteredImageData ? { filtered_image_data: filteredImageData } : {}),
+        }),
       });
 
       const result = await response.json() as PhotoMetadata & { error?: string };
@@ -208,6 +229,7 @@ export async function uploadPhoto(
     
     const formData = new FormData();
     formData.append('photo', blob, 'photo.jpg');
+    if (filteredBlob) formData.append('filtered_photo', filteredBlob, 'filtered.jpg');
     formData.append('id', finalPhotoId);
     formData.append('participant_id', participantId);
     
@@ -251,6 +273,37 @@ export async function uploadPhoto(
     }
     throw error;
   }
+}
+
+export async function uploadFilteredPhoto(eventId: string, photoId: string, filteredBlob: Blob): Promise<PhotoMetadata> {
+  const uploadUrl = `${API_BASE_URL}/api/events/${eventId}/photos/${photoId}/filtered`;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  console.log('[API Service] uploadFilteredPhoto called:', { eventId, photoId, size: filteredBlob.size, isIOS });
+
+  if (isIOS) {
+    const imageData = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Filtered photo data is unavailable for iOS upload'));
+      reader.readAsDataURL(filteredBlob);
+    });
+    const response = await fetch(`${uploadUrl}-json`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_data: imageData }),
+    });
+    console.log('[API Service] Filtered iOS response:', response.status);
+    const result = await response.json() as PhotoMetadata & { error?: string };
+    if (!response.ok) throw new Error(result.error || 'Failed to upload filtered photo');
+    return result;
+  }
+
+  const formData = new FormData();
+  formData.append('photo', filteredBlob, 'filtered.jpg');
+  const response = await fetch(uploadUrl, { method: 'POST', body: formData });
+  const result = await response.json() as PhotoMetadata & { error?: string };
+  if (!response.ok) throw new Error(result.error || 'Failed to upload filtered photo');
+  return result;
 }
 
 export async function getEventPhotos(eventId: string): Promise<PhotoMetadata[]> {
