@@ -835,7 +835,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
         // Re-enable capture button if blob creation failed
         setIsCapturing(false);
       }
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', 1.0);
   };
 
   const handleExit = () => {
@@ -1067,7 +1067,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
           >
             {latestPhotoUrl ? (
               <>
-                <img src={latestPhotoUrl} alt="Latest" className="gallery-preview" style={{ filter: activeFilter?.previewFilter }} />
+                <img src={latestPhotoUrl} alt="Latest" className="gallery-preview" />
                 {photoCount > 0 && (
                   <span className="gallery-badge">{photoCount}</span>
                 )}
