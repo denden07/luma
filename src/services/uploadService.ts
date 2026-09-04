@@ -20,6 +20,22 @@ export interface UploadProgress {
 
 export type UploadProgressCallback = (progress: UploadProgress) => void;
 
+async function markUploadedWithRetry(photoId: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await updatePhotoStatus(photoId, 'uploaded');
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) {
+        await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Upload all pending photos for an event
  * This is the MANUAL upload function - only called when user explicitly requests it
@@ -154,7 +170,7 @@ export async function uploadPendingPhotos(
 
       if (uploadSuccess) {
         try {
-          await updatePhotoStatus(photo.id, 'uploaded');
+          await markUploadedWithRetry(photo.id);
         } catch (statusError) {
           console.error('[UploadService] Original uploaded, but local status could not be updated:', statusError);
         }
@@ -176,6 +192,24 @@ export async function uploadPendingPhotos(
       // Mark as failed
       await updatePhotoStatus(photo.id, 'failed', errorMessage);
       failed.push({ photo, error: errorMessage });
+    }
+
+    if (onProgress) {
+      onProgress({
+        total: photosToUpload.length,
+        completed: succeeded.length,
+        failed: failed.length,
+        current: i < photosToUpload.length - 1 ? photosToUpload[i + 1].id : undefined,
+      });
+    }
+  }
+
+  // Reconcile all server-confirmed uploads before returning UI results.
+  for (const photo of succeeded) {
+    try {
+      await markUploadedWithRetry(photo.id);
+    } catch (statusError) {
+      console.error('[UploadService] Could not reconcile uploaded photo status:', { photoId: photo.id, statusError });
     }
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { getUploadStats, uploadPendingPhotos, type UploadProgress } from '../services/uploadService';
 import Modal from './Modal';
 import './UploadPanel.css';
@@ -109,8 +110,11 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
 
   const percentComplete = progress ? (progress.completed / progress.total) * 100 : 0;
 
+  const uploadTotal = progress?.total ?? stats.totalPending;
+  const uploadCompleted = progress?.completed ?? 0;
+
   return (
-    <div className="upload-panel">
+    <div className={`upload-panel ${isUploading ? 'is-uploading' : ''}`}>
       <div className="upload-stats">
         <div className="upload-count">
           {stats.totalPending > 0 && (
@@ -142,15 +146,21 @@ const UploadPanel: React.FC<UploadPanelProps> = ({ eventId, onUploadComplete }) 
         </button>
       )}
 
-      {isUploading && progress && (
-        <div className="upload-progress">
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${percentComplete}%` }}></div>
-          </div>
-          <div className="progress-text">
-            Uploading... {progress.completed} / {progress.total}
-          </div>
-        </div>
+      {isUploading && (
+        createPortal(
+          <div className="upload-blocking-screen" role="status" aria-live="assertive" aria-label="Uploading photos">
+            <div className="upload-blocking-content">
+              <div className="upload-spinner" aria-hidden="true"></div>
+              <p className="upload-blocking-label">Saving your photos</p>
+              <p className="upload-blocking-message">Please wait while each photo is safely added to the album.</p>
+              <p className="upload-blocking-count">{uploadCompleted} of {uploadTotal}</p>
+              <div className="upload-blocking-track" aria-hidden="true">
+                <div style={{ width: `${percentComplete}%` }}></div>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
       )}
 
       {uploadResult === 'success' && (
