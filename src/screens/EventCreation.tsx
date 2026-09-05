@@ -278,12 +278,12 @@ const EventCreation: React.FC = () => {
           </> : creationStep === 2 ? <>
           <fieldset className="filter-picker" disabled={isCreating}>
             <legend>Filters</legend>
-            <p>Choose the one look guests will use. The preview changes in the camera, while every saved photo remains unfiltered.</p>
+            <p>Choose the one look guests will use. Every shot keeps its original, plus a stamped filtered version with this look.</p>
             <div className="filter-preview-grid">
               {FILTERS.map(filter => {
                 const isSelected = enabledFilters.includes(filter.id);
                 return (
-                  <label className={`filter-preview ${isSelected ? 'selected' : ''}`} key={filter.id}>
+                  <label className={`filter-preview ${filter.hasFlare ? 'flare-preview' : ''} ${isSelected ? 'selected' : ''}`} key={filter.id}>
                     <input type="radio" name="event-filter" checked={isSelected} onChange={() => setEnabledFilters([filter.id])} />
                     <img src={filterPreviewImage} alt={`${filter.label} filter preview`} style={{ filter: filter.previewFilter }} />
                     <span>{filter.label}</span>

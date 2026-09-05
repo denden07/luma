@@ -1,13 +1,41 @@
 export const FILTERS = [
-  { id: 'original', label: 'Original (No Filter)', previewFilter: 'none' },
-  { id: 'mono', label: 'Mono', previewFilter: 'grayscale(1) contrast(1.1)' },
-  { id: 'warm-film', label: 'Warm Film', previewFilter: 'sepia(.32) saturate(1.12) contrast(.96)' },
-  { id: 'cool-film', label: 'Cool Film', previewFilter: 'saturate(.9) hue-rotate(12deg) brightness(1.04)' },
-  { id: 'high-contrast', label: 'High Contrast', previewFilter: 'contrast(1.3) saturate(1.08)' },
-  { id: 'soft-fade', label: 'Soft Fade', previewFilter: 'contrast(.82) brightness(1.08) saturate(.82)' },
+  { id: 'original', label: 'Original (No Filter)', previewFilter: 'none', hasFlare: false },
+  { id: 'warm-film', label: 'Kodak Gold 200', previewFilter: 'sepia(.3) saturate(1.2) contrast(.96) brightness(1.05)', hasFlare: true },
+  { id: 'soft-fade', label: 'Kodak Portra 400', previewFilter: 'sepia(.1) saturate(.86) contrast(.88) brightness(1.08)', hasFlare: false },
+  { id: 'cool-film', label: 'Fujifilm Superia', previewFilter: 'saturate(1.1) hue-rotate(-8deg) contrast(1.05) brightness(1.02)', hasFlare: false },
+  { id: 'high-contrast', label: 'CineStill 800T', previewFilter: 'saturate(.96) hue-rotate(5deg) contrast(1.18) brightness(1.03)', hasFlare: true },
 ] as const;
 
 export type FilterId = typeof FILTERS[number]['id'];
+function drawDateStamp(context: CanvasRenderingContext2D, width: number, height: number): void {
+  const date = new Date();
+  const stamp = `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}.${String(date.getFullYear()).slice(-2)}`;
+  const fontSize = Math.max(22, Math.round(Math.min(width, height) * 0.04));
+  const padding = Math.max(18, Math.round(fontSize * 0.65));
+  context.font = `700 ${fontSize}px monospace`;
+  context.textAlign = 'right';
+  context.textBaseline = 'bottom';
+  context.lineWidth = Math.max(3, Math.round(fontSize * 0.13));
+  context.strokeStyle = 'rgba(65, 35, 22, 0.86)';
+  context.strokeText(stamp, width - padding, height - padding);
+  context.fillStyle = '#b85f32';
+  context.fillText(stamp, width - padding, height - padding);
+}
+
+function drawLensFlare(context: CanvasRenderingContext2D, width: number, height: number, filterId: FilterId | 'mono'): void {
+  if (filterId !== 'warm-film' && filterId !== 'high-contrast') return;
+  const radius = Math.max(width, height) * 0.46;
+  const flare = context.createRadialGradient(width * 0.92, height * 0.1, 0, width * 0.92, height * 0.1, radius);
+  flare.addColorStop(0, filterId === 'warm-film' ? 'rgba(255, 214, 125, 0.45)' : 'rgba(255, 111, 75, 0.34)');
+  flare.addColorStop(0.22, filterId === 'warm-film' ? 'rgba(244, 135, 71, 0.18)' : 'rgba(236, 49, 35, 0.14)');
+  flare.addColorStop(0.65, 'rgba(255, 112, 64, 0.03)');
+  flare.addColorStop(1, 'rgba(255, 112, 64, 0)');
+  context.save();
+  context.globalCompositeOperation = 'screen';
+  context.fillStyle = flare;
+  context.fillRect(0, 0, width, height);
+  context.restore();
+}
 
 export function isFilterId(value: string): value is FilterId {
   return FILTERS.some(filter => filter.id === value);
@@ -45,7 +73,7 @@ function applyHueRotation(red: number, green: number, blue: number, degrees: num
   ];
 }
 
-function applyPixelFilter(context: CanvasRenderingContext2D, width: number, height: number, filterId: FilterId): void {
+function applyPixelFilter(context: CanvasRenderingContext2D, width: number, height: number, filterId: FilterId | 'mono'): void {
   const stripHeight = 128;
   for (let top = 0; top < height; top += stripHeight) {
     const currentStripHeight = Math.min(stripHeight, height - top);
@@ -73,21 +101,21 @@ function applyPixelFilter(context: CanvasRenderingContext2D, width: number, heig
         green = applyContrast(green, 0.96);
         blue = applyContrast(blue, 0.96);
       } else if (filterId === 'cool-film') {
-        [red, green, blue] = applySaturation(red, green, blue, 0.9);
-        [red, green, blue] = applyHueRotation(red, green, blue, 12);
-        red = clampColor(red * 1.04);
-        green = clampColor(green * 1.04);
-        blue = clampColor(blue * 1.04);
-      } else if (filterId === 'high-contrast') {
-        red = applyContrast(red, 1.3);
-        green = applyContrast(green, 1.3);
-        blue = applyContrast(blue, 1.3);
         [red, green, blue] = applySaturation(red, green, blue, 1.08);
+        [red, green, blue] = applyHueRotation(red, green, blue, -8);
+        red = clampColor(red * 1.03);
+        green = clampColor(green * 1.03);
+        blue = clampColor(blue * 1.03);
+      } else if (filterId === 'high-contrast') {
+        red = clampColor(applyContrast(red, 1.18) * 1.04);
+        green = applyContrast(green, 1.18);
+        blue = clampColor(applyContrast(blue, 1.18) * 1.05);
+        [red, green, blue] = applySaturation(red, green, blue, 0.96);
       } else if (filterId === 'soft-fade') {
-        red = clampColor(applyContrast(red, 0.82) * 1.08);
-        green = clampColor(applyContrast(green, 0.82) * 1.08);
-        blue = clampColor(applyContrast(blue, 0.82) * 1.08);
-        [red, green, blue] = applySaturation(red, green, blue, 0.82);
+        red = clampColor(applyContrast(red, 0.82) * 1.12);
+        green = clampColor(applyContrast(green, 0.82) * 1.12);
+        blue = clampColor(applyContrast(blue, 0.82) * 1.12);
+        [red, green, blue] = applySaturation(red, green, blue, 0.78);
       }
 
       pixels[index] = red;
@@ -119,6 +147,8 @@ export async function createFilteredPhotoBlob(originalBlob: Blob, filterId: Filt
 
   context.drawImage(image, 0, 0);
   applyPixelFilter(context, canvas.width, canvas.height, filterId);
+  drawLensFlare(context, canvas.width, canvas.height, filterId);
+  drawDateStamp(context, canvas.width, canvas.height);
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

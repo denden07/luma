@@ -67,12 +67,18 @@ async function createFilteredPhoto(eventId: string, photoId: string, originalBuf
   let image = sharp(originalBuffer).rotate();
 
   if (filterId === 'mono') image = image.grayscale().linear(1.1, -12.8);
-  else if (filterId === 'warm-film') image = image.recomb([[0.81, 0.25, 0.06], [0.11, 0.86, 0.05], [0.08, 0.18, 0.73]]).modulate({ saturation: 1.12, brightness: 0.96 });
-  else if (filterId === 'cool-film') image = image.modulate({ saturation: 0.9, brightness: 1.04, hue: 12 });
-  else if (filterId === 'high-contrast') image = image.linear(1.3, -38.4).modulate({ saturation: 1.08 });
-  else if (filterId === 'soft-fade') image = image.linear(0.82, 23.04).modulate({ saturation: 0.82, brightness: 1.08 });
+  else if (filterId === 'warm-film') image = image.recomb([[0.81, 0.25, 0.06], [0.11, 0.86, 0.05], [0.08, 0.18, 0.73]]).modulate({ saturation: 1.2, brightness: 1.05 });
+  else if (filterId === 'cool-film') image = image.modulate({ saturation: 1.1, brightness: 1.02, hue: -8 });
+  else if (filterId === 'high-contrast') image = image.linear(1.18, -23.04).modulate({ saturation: 0.96, brightness: 1.03 });
+  else if (filterId === 'soft-fade') image = image.linear(0.88, 15.36).modulate({ saturation: 0.86, brightness: 1.08 });
 
-  await image.jpeg({ quality: 92 }).toFile(join(uploadPath, filename));
+  const stamp = new Date().toISOString().slice(2, 10).replace(/-/g, '.');
+  const flareSvg = `<svg width="440" height="440"><defs><radialGradient id="flare"><stop offset="0" stop-color="#ffdc8d" stop-opacity="0.66"/><stop offset="0.28" stop-color="#ed623b" stop-opacity="0.25"/><stop offset="0.7" stop-color="#ed623b" stop-opacity="0"/></radialGradient></defs><circle cx="390" cy="52" r="260" fill="url(#flare)"/></svg>`;
+  const stampSvg = `<svg width="280" height="72"><text x="268" y="54" text-anchor="end" font-family="Courier New, monospace" font-size="42" font-weight="700" fill="#b85f32" fill-opacity="0.86" stroke="#412316" stroke-width="5" paint-order="stroke">${stamp}</text></svg>`;
+  if (filterId === 'warm-film' || filterId === 'high-contrast') {
+    image = image.composite([{ input: Buffer.from(flareSvg), gravity: 'northeast' }]);
+  }
+  await image.composite([{ input: Buffer.from(stampSvg), gravity: 'southeast' }]).jpeg({ quality: 92 }).toFile(join(uploadPath, filename));
   const storagePath = `/events/${eventId}/photos/${filename}`;
   await pool.query('UPDATE photos SET filtered_storage_path = $1 WHERE id = $2 AND event_id = $3', [storagePath, photoId, eventId]);
   console.log('[Filtered Photo Upload] Generated fallback:', storagePath);

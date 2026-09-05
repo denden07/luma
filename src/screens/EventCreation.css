@@ -355,10 +355,11 @@
 .filter-picker legend { color: var(--color-film-yellow); font-weight: 700; padding: 0 5px; }
 .filter-picker p { color: var(--color-warm-gray); font-size: 0.85rem; margin: 0 0 12px; }
 .filter-preview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.filter-preview { border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; display: grid; gap: 6px; overflow: hidden; padding: 6px; }
+.filter-preview { border: 1px solid var(--color-border); border-radius: 4px; cursor: pointer; display: grid; gap: 6px; overflow: hidden; padding: 6px; position: relative; }
 .filter-preview.selected { border-color: var(--color-film-yellow); box-shadow: inset 0 0 0 1px var(--color-film-yellow); }
 .filter-preview input { appearance: none; -webkit-appearance: none; height: 0; margin: 0; position: absolute; width: 0; }
 .filter-preview img { aspect-ratio: 4 / 3; object-fit: cover; width: 100%; }
+.filter-preview.flare-preview::after { background: radial-gradient(circle at top right, rgba(255, 219, 141, .7), rgba(236, 65, 36, .18) 32%, transparent 68%); content: ''; inset: 6px 6px 33px; pointer-events: none; position: absolute; }
 .filter-preview span { font-size: 0.82rem; }
 .background-photo-step { color: var(--color-off-white); display: grid; gap: 12px; }
 .background-photo-step h2, .background-photo-step p { margin: 0; }
