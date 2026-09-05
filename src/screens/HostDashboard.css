@@ -111,6 +111,23 @@
   text-align: center;
 }
 
+.host-code-button {
+  color: var(--color-warm-gray);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: -12px auto 18px;
+  text-decoration: underline;
+  text-decoration-color: var(--color-film-yellow);
+  text-underline-offset: 5px;
+  text-transform: uppercase;
+}
+
+.host-code-button:hover {
+  color: var(--color-off-white);
+}
+
 .dashboard-controls {
   display: flex;
   justify-content: center;

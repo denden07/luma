@@ -11,6 +11,9 @@ export interface Event {
   cover_photo_path: string | null;
   enabled_filters: string[];
   host_code: string;
+  is_active: boolean;
+  price_php: number;
+  payment_status: 'unpaid' | 'partial' | 'paid';
   created_at: Date;
   updated_at: Date;
 }

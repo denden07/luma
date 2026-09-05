@@ -1,0 +1,12 @@
+.modal-content.copy-success-popup {
+  background: var(--color-soft-black);
+  color: var(--color-off-white);
+  max-width: 340px;
+  padding: 24px;
+  text-align: center;
+  width: min(340px, calc(100vw - 40px));
+}
+
+.copy-success-popup h2 { color: var(--color-film-yellow); font-size: 30px; margin-bottom: 10px; }
+.copy-success-popup p { color: var(--color-warm-gray); line-height: 1.5; margin-bottom: 20px; }
+.copy-success-popup button { background: var(--color-film-yellow); color: var(--color-charcoal); font-weight: 700; min-height: 42px; padding: 0 24px; }

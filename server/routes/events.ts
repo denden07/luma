@@ -21,11 +21,11 @@ router.get('/', async (req, res) => {
   try {
     const { host_code } = req.query;
     
-    let query = 'SELECT * FROM events';
+    let query = 'SELECT * FROM events WHERE is_active = TRUE';
     const params: any[] = [];
     
     if (host_code) {
-      query += ' WHERE host_code = $1';
+      query += ' AND host_code = $1';
       params.push(host_code);
     }
     
@@ -44,7 +44,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query<Event>(
-      'SELECT * FROM events WHERE id = $1',
+      'SELECT * FROM events WHERE id = $1 AND is_active = TRUE',
       [id]
     );
     
@@ -128,7 +128,7 @@ router.post('/:id/cover', coverUpload.single('cover'), async (req, res) => {
 
   try {
     const eventResult = await pool.query<Pick<Event, 'cover_photo_path'>>(
-      'SELECT cover_photo_path FROM events WHERE id = $1 AND host_code = $2',
+      'SELECT cover_photo_path FROM events WHERE id = $1 AND host_code = $2 AND is_active = TRUE',
       [eventId, hostCode]
     );
     if (eventResult.rows.length === 0) return res.status(404).json({ error: 'Event not found' });

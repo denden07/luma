@@ -430,6 +430,30 @@
   text-align: center;
 }
 
+.camera-error-panel {
+  background: #242421;
+  border: 1px solid var(--color-border);
+  box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.26);
+  max-width: 500px;
+  padding: 32px;
+}
+
+.camera-error-icon {
+  align-items: center;
+  background: rgba(231, 185, 60, 0.12);
+  border: 1px solid rgba(231, 185, 60, 0.45);
+  color: var(--color-film-yellow);
+  display: flex;
+  height: 52px;
+  justify-content: center;
+  margin: 0 auto 16px;
+  width: 52px;
+}
+
+.camera-error-icon svg { height: 28px; width: 28px; }
+.camera-error-label { color: var(--color-film-yellow) !important; font-size: 11px; font-weight: 800; letter-spacing: 1px; margin-bottom: 8px !important; text-transform: uppercase; }
+.camera-refresh-hint { color: var(--color-warm-gray); font-size: 14px; line-height: 1.5; margin: 0 auto 20px !important; max-width: 400px; }
+
 .camera-error h2 {
   font-size: var(--font-size-heading);
   margin-bottom: 16px;
@@ -439,3 +463,17 @@
   color: var(--color-warm-gray);
   margin-bottom: 32px;
 }
+
+.camera-error .camera-error-primary,
+.camera-error .camera-error-secondary {
+  font-size: var(--font-size-button);
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 20px;
+}
+
+.camera-error .camera-error-primary { background: var(--color-film-yellow); color: var(--color-charcoal); }
+.camera-error-panel > .camera-error-primary { margin-bottom: 22px; }
+.camera-error-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 14px; }
+.camera-error .camera-error-secondary { border: 1px solid var(--color-border); color: var(--color-off-white); }
+.camera-error .camera-error-secondary:hover { background: rgba(255, 255, 255, 0.08); }

@@ -1,0 +1,12 @@
+.modal-content.error-popup-modal {
+  background: var(--color-soft-black);
+  border: 1px solid #a83219;
+  max-width: 360px;
+  padding: 28px;
+  text-align: center;
+  width: 100%;
+}
+
+.error-popup-modal h2 { color: var(--color-off-white); font-size: 30px; margin-bottom: 10px; }
+.error-popup-modal p { color: var(--color-warm-gray); line-height: 1.5; margin-bottom: 22px; }
+.error-popup-modal button { background: var(--color-film-yellow); color: var(--color-charcoal); font-weight: 800; min-height: 42px; padding: 0 20px; }

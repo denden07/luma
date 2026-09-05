@@ -4,6 +4,7 @@ import { getEventPhotos, deletePhoto, downloadAllPhotos, downloadPhoto } from '.
 import { getEvent } from '../services/dataService';
 import type { Photo } from '../utils/indexedDBStorage';
 import { getFilter, type FilterId } from '../utils/filters';
+import { showErrorPopup } from '../components/ErrorPopup';
 import Modal from '../components/Modal';
 import UploadPanel from '../components/UploadPanel';
 import './PhotoGallery.css';
@@ -206,7 +207,7 @@ const PhotoGallery: React.FC<PhotoGalleryProps> = ({ eventToken, onPhotoDeleted 
       exitSelectionMode();
     } catch (error) {
       console.error('[Delete] Failed:', error);
-      alert('Failed to delete photos. Please try again.');
+      showErrorPopup('Failed to delete photos. Please try again.');
     }
   };
 

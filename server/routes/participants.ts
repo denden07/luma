@@ -30,7 +30,7 @@ router.post('/:eventId/participants', async (req, res) => {
     }
 
     const eventResult = await pool.query<{ guest_limit: number }>(
-      'SELECT guest_limit FROM events WHERE id = $1',
+      'SELECT guest_limit FROM events WHERE id = $1 AND is_active = TRUE',
       [eventId]
     );
     if (eventResult.rows.length === 0) {

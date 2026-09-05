@@ -6,6 +6,7 @@ import { getHostCode } from '../utils/hostAuth';
 import { FILTERS, type FilterId } from '../utils/filters';
 import { copyTextToClipboard } from '../utils/clipboard';
 import Modal from '../components/Modal';
+import { showErrorPopup } from '../components/ErrorPopup';
 import filterPreviewImage from '../assets/images/pwa_camera_assets/example-filter-photo.jpg';
 import './EventCreation.css';
 
@@ -37,7 +38,6 @@ const EventCreation: React.FC = () => {
   const [backgroundPreviewUrl, setBackgroundPreviewUrl] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isUploadingBackground, setIsUploadingBackground] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [canCreateAnother, setCanCreateAnother] = useState(true);
   const [isCopySuccessOpen, setIsCopySuccessOpen] = useState(false);
@@ -60,7 +60,6 @@ const EventCreation: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setIsCreating(true);
 
     try {
@@ -86,7 +85,8 @@ const EventCreation: React.FC = () => {
       setIsCreating(false);
     } catch (err) {
       console.error('[EventCreation] Failed to create event:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create event');
+      const message = err instanceof Error ? err.message : 'Failed to create event';
+      showErrorPopup(message);
       setIsCreating(false);
     }
   };
@@ -100,10 +100,9 @@ const EventCreation: React.FC = () => {
   const handleFiltersSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (enabledFilters.length === 0) {
-      setError('Choose one filter to continue.');
+      showErrorPopup('Choose one filter to continue.');
       return;
     }
-    setError(null);
     setCreationStep(3);
   };
 
@@ -312,15 +311,6 @@ const EventCreation: React.FC = () => {
             {backgroundPhoto && <small>{backgroundPhoto.name}</small>}
           </div>
           </>}
-
-          {error && (
-            <div className="error-message">
-              <strong>Error:</strong> {error}
-              <p className="error-help">
-                Make sure the backend server is running at http://localhost:3000
-              </p>
-            </div>
-          )}
 
           <div className="form-actions">
             <button 

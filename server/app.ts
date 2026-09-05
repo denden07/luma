@@ -1,20 +1,32 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { existsSync, mkdirSync } from 'fs';
 import eventsRouter from './routes/events.js';
 import participantsRouter from './routes/participants.js';
 import photosRouter from './routes/photos.js';
 import hostsRouter from './routes/hosts.js';
+import adminRouter from './routes/admin.js';
 
 dotenv.config();
 
 const app = express();
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const allowedOrigins = new Set((process.env.ALLOWED_ORIGINS ?? '').split(',').map(origin => origin.trim()).filter(Boolean));
+
+app.set('trust proxy', 1);
 
 app.use(cors({
-  origin: '*',
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error('Origin not allowed by CORS'));
+  },
   credentials: true,
+}));
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
 
 // Multipart requests are parsed by the upload routes.
@@ -29,22 +41,6 @@ app.use((req, res, next) => {
     if (error) return next(error);
     express.urlencoded({ extended: true, limit: '50mb' })(req, res, next);
   });
-});
-
-app.use((req, res, next) => {
-  const start = Date.now();
-  console.log(`[RAW REQUEST] ${req.method} ${req.url}`, {
-    headers: req.headers,
-    contentLength: req.headers['content-length'],
-    contentType: req.headers['content-type'],
-  });
-
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[REQUEST COMPLETE] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
-  });
-
-  next();
 });
 
 if (!existsSync(UPLOAD_DIR)) {
@@ -63,6 +59,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/hosts', hostsRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/events', participantsRouter);
 app.use('/api/events', photosRouter);

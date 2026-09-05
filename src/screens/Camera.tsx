@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { savePhoto, getEventPhotos, generateUUID } from '../utils/indexedDBStorage';
 import { getParticipant } from '../utils/participant';
 import { createFilteredPhotoBlob, getFilter, type FilterId } from '../utils/filters';
+import { showErrorPopup } from '../components/ErrorPopup';
 import cameraIconSvg from '../assets/images/pwa_camera_assets/youre_in_camera.svg';
 import './Camera.css';
 
@@ -769,7 +770,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
       console.error('[capturePhoto] Video not ready - dimensions are 0');
       console.error('[capturePhoto] videoWidth:', video.videoWidth, 'videoHeight:', video.videoHeight);
       console.error('[capturePhoto] readyState:', video.readyState);
-      alert('Camera not ready yet. Please wait a moment and try again.');
+      showErrorPopup('Camera is not ready yet. Please wait a moment and try again.');
       setIsCapturing(false);
       return;
     }
@@ -803,7 +804,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
         const participant = getParticipant(eventToken);
         if (!participant) {
           console.error('[capturePhoto] No participant found');
-          alert('Session expired. Please restart.');
+          showErrorPopup('Your session has expired. Please restart.');
           return;
         }
         
@@ -828,7 +829,7 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
           console.log('✅ Photo saved locally with ID:', photoId);
         } catch (error: any) {
           console.error('Failed to save photo:', error);
-          alert('Failed to save photo. Please try again.');
+          showErrorPopup('Failed to save photo. Please try again.');
         } finally {
           // Re-enable capture button
           setIsCapturing(false);
@@ -876,7 +877,13 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
     
     return (
       <div className="camera-error">
-        <h2>Camera Access Issue</h2>
+        <div className="camera-error-panel">
+        <div className="camera-error-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13.5" r="3.5"/><path d="M4 4 20 20"/></svg>
+        </div>
+        <p className="camera-error-label">Camera access</p>
+        <h2>We need your camera</h2>
+        <p className="camera-refresh-hint">After allowing camera access in your browser settings, refresh this page or tap Refresh Page to show the permission prompt again.</p>
         
         {isHTTPSError ? (
           <>
@@ -901,9 +908,6 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
               <li>Select <strong>Allow</strong></li>
               <li>Return and tap Refresh</li>
             </ol>
-            <button className="primary-button" onClick={() => window.location.reload()}>
-              Refresh Page
-            </button>
           </>
         ) : device.isAndroid ? (
           <>
@@ -915,26 +919,23 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
               <li>Set <strong>Camera</strong> to <strong>Allow</strong></li>
               <li>Refresh the page</li>
             </ol>
-            <button className="primary-button" onClick={() => window.location.reload()}>
-              Refresh Page
-            </button>
           </>
         ) : (
           <>
             <p>{errorMessage}</p>
-            <button className="primary-button" onClick={() => startCamera()}>
-              Try Again
-            </button>
           </>
         )}
         
-        <button 
-          className="secondary-button" 
-          onClick={handleExit}
-          style={{ marginTop: '20px' }}
-        >
-          Go Back
-        </button>
+        <div className="camera-error-actions">
+          <button className="camera-error-primary" onClick={() => window.location.reload()}>Refresh Page</button>
+          <button
+            className="camera-error-secondary"
+            onClick={handleExit}
+          >
+            Go Back
+          </button>
+        </div>
+        </div>
       </div>
     );
   }

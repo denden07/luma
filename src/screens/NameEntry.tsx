@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { showErrorPopup } from '../components/ErrorPopup';
 import './NameEntry.css';
 
 interface NameEntryProps {
@@ -9,7 +10,6 @@ interface NameEntryProps {
 const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -17,13 +17,12 @@ const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
     if (!name.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
-    setError(null);
     try {
       await onNameSubmit(name.trim());
       navigate('../camera');
     } catch (submitError) {
       console.error('Could not start participant session:', submitError);
-      setError('We could not save your name. Please try again.');
+      showErrorPopup('We could not save your name. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -54,8 +53,6 @@ const NameEntry: React.FC<NameEntryProps> = ({ onNameSubmit }) => {
             {isSubmitting ? 'STARTING...' : 'START CAMERA'}
           </button>
         </form>
-
-        {error && <p className="name-entry-error">{error}</p>}
 
         <p className="name-help-text">
           your name helps us identify<br />

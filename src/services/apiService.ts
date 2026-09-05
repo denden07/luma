@@ -17,6 +17,9 @@ export interface Event {
   cover_photo_path: string | null;
   enabled_filters: FilterId[];
   host_code: string;
+  is_active: boolean;
+  price_php: number;
+  payment_status: 'unpaid' | 'partial' | 'paid';
   created_at: string;
   updated_at: string;
 }
@@ -369,8 +372,7 @@ export async function loginHost(code: string): Promise<Host> {
   });
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to verify host code');
+    throw new Error('Unable to sign in with that host code.');
   }
 
   return response.json();

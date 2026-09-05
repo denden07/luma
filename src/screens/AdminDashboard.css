@@ -1,0 +1,111 @@
+.admin-dashboard { background: #edf0e8; color: #20251e; display: grid; grid-template-columns: 230px minmax(760px, 1fr) 320px; min-height: 100vh; }
+.admin-sidebar { background: #20251e; color: #edf0e8; display: flex; flex-direction: column; justify-content: space-between; padding: 30px 22px; }
+.admin-brand, .admin-eyebrow { color: #a64427; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.admin-sidebar h1, .admin-workspace h2, .admin-inspector h2, .admin-modal h2 { font-family: var(--font-editorial); letter-spacing: 0; }
+.admin-sidebar h1 { font-size: 34px; line-height: .9; margin-top: 8px; }
+.admin-generate-code, .admin-modal button { background: #e4b847; color: #20251e; font-weight: 800; min-height: 44px; padding: 10px 12px; }
+.admin-sidebar-note { border-top: 1px solid #566051; color: #bec5b8; display: grid; font-size: 13px; gap: 6px; line-height: 1.4; padding-top: 18px; }
+.admin-sidebar-note strong { color: #fff; }.admin-logout { color: #bec5b8; padding: 8px 0; text-align: left; text-decoration: underline; }
+.admin-workspace { min-width: 0; padding: 28px; }.admin-toolbar { align-items: center; display: flex; justify-content: space-between; margin-bottom: 22px; }.admin-toolbar h2, .admin-inspector h2 { font-size: 30px; margin-top: 4px; }
+.admin-month-controls { display: flex; gap: 6px; }.admin-month-controls button { border: 1px solid #b8c0b3; min-height: 36px; min-width: 36px; padding: 0 10px; }.admin-month-controls button:hover { background: #d7ddd1; }
+.admin-metrics { display: grid; gap: 10px; grid-template-columns: repeat(4, 1fr); margin-bottom: 18px; }.admin-metrics div { background: #fcfcf8; border: 1px solid #cbd1c5; display: grid; gap: 6px; min-height: 84px; padding: 14px; }.admin-metrics span { color: #6b7566; font-size: 11px; font-weight: 700; text-transform: uppercase; }.admin-metrics strong { font-size: 20px; }
+.admin-calendar { background: #fcfcf8; border: 1px solid #bec5b8; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }.admin-weekday { border-bottom: 1px solid #bec5b8; color: #65705f; font-size: 11px; font-weight: 800; padding: 11px; text-transform: uppercase; }.admin-calendar-day { border-bottom: 1px solid #d9ded4; border-right: 1px solid #d9ded4; display: flex; flex-direction: column; gap: 4px; height: 132px; overflow: hidden; padding: 8px; text-align: left; }.admin-calendar-day:hover, .admin-calendar-day.selected { background: #e7eee0; }.admin-calendar-day.outside-month { background: #f3f5ef; color: #9aa296; }.admin-day-number { font-size: 12px; font-weight: 800; }.admin-event-chip { background: #d8e2ce; border-left: 3px solid #4b713c; color: #263720; font-size: 11px; line-height: 1.2; overflow: hidden; padding: 3px 4px; text-overflow: ellipsis; white-space: nowrap; }.admin-event-chip small { color: #607457; margin-left: 4px; }.admin-event-chip.inactive { background: #ebd7d0; border-color: #9b452f; color: #703020; }.admin-more-events { color: #65705f; font-size: 11px; }
+.admin-inspector { background: #fcfcf8; border-left: 1px solid #cbd1c5; padding: 28px 20px; }.admin-event-list { display: grid; gap: 8px; margin: 18px 0; }.admin-event-row { border: 1px solid #d1d7ca; display: grid; gap: 4px; padding: 11px; text-align: left; }.admin-event-row:hover, .admin-event-row.selected { background: #e6eddf; border-color: #7a9270; }.admin-event-row span { color: #63705d; font-size: 12px; }.admin-event-row em { font-size: 11px; font-style: normal; font-weight: 800; text-transform: uppercase; }.admin-event-row em.paid { color: #3b6a38; }.admin-event-row em.partial { color: #a36b16; }.admin-event-row em.unpaid { color: #a13928; }.admin-empty { color: #6d7668; font-size: 14px; }
+.admin-event-details { border-top: 1px solid #cbd1c5; display: grid; gap: 14px; padding-top: 18px; }.admin-detail-heading { align-items: start; display: flex; justify-content: space-between; }.admin-detail-heading span { display: grid; gap: 3px; }.admin-detail-heading small { color: #6b7566; }.admin-detail-heading button { font-size: 25px; line-height: 1; }.admin-event-details dl { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }.admin-event-details dl div { border: 1px solid #d3d8cf; padding: 8px; }.admin-event-details dt { color: #6b7566; font-size: 11px; text-transform: uppercase; }.admin-event-details dd { font-weight: 700; margin: 3px 0 0; }.admin-event-details label { color: #4d5748; display: grid; font-size: 12px; font-weight: 700; gap: 6px; }.admin-event-details input, .admin-event-details select { background: #fff; border: 1px solid #aeb8a8; min-height: 38px; padding: 8px; }.admin-deactivate, .admin-reactivate { color: #fff; font-weight: 800; min-height: 42px; }.admin-deactivate { background: #963c27; }.admin-reactivate { background: #3c6c37; }.admin-error { background: #f4d9d2; color: #7a2c1c; display: flex; justify-content: space-between; margin-bottom: 12px; padding: 10px; }.admin-error button { text-decoration: underline; }
+.modal-content.admin-modal { background: #fcfcf8; border: 1px solid #cbd1c5; max-width: 390px; padding: 28px; text-align: center; width: 100%; }.admin-modal h2 { color: #20251e; font-size: 32px; margin: 8px 0; }.admin-modal p { color: #5d6858; line-height: 1.5; margin-bottom: 20px; }.admin-modal-actions { display: flex; gap: 8px; }.admin-modal-actions button { flex: 1; }.admin-modal .admin-modal-secondary { background: #e4e8df; }
+@media (max-width: 1100px) { .admin-dashboard { grid-template-columns: 180px minmax(620px, 1fr) 280px; }.admin-workspace { padding: 20px; }.admin-calendar-day { height: 118px; }.admin-metrics { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 860px) { .admin-dashboard { display: block; }.admin-sidebar { align-items: center; flex-direction: row; min-height: 74px; padding: 16px; }.admin-sidebar h1, .admin-sidebar-note { display: none; }.admin-generate-code { margin-left: auto; margin-right: 14px; }.admin-workspace { overflow-x: auto; }.admin-workspace > * { min-width: 700px; }.admin-inspector { border-left: 0; border-top: 1px solid #cbd1c5; }.admin-inspector h2 { font-size: 24px; } }
+
+/* Admin view navigation and operational tables */
+.admin-nav { display: grid; gap: 4px; margin-top: 42px; }
+.admin-nav button { color: #c7cec1; font-size: 14px; font-weight: 700; min-height: 44px; padding: 0 12px; text-align: left; }
+.admin-nav button:hover, .admin-nav button.active { background: #384133; color: #fff; }
+.admin-nav button.active { border-left: 3px solid #e4b847; }
+.admin-selected-date { border-top: 1px solid #cbd1c5; margin-top: 22px; padding-top: 18px; }
+.admin-selected-date h3 { font-family: var(--font-editorial); font-size: 28px; margin-top: 4px; }
+.admin-day-events { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 12px; }
+.admin-day-events button { background: #fcfcf8; border: 1px solid #cbd1c5; display: grid; gap: 5px; padding: 12px; text-align: left; }
+.admin-day-events button:hover { background: #e6eddf; }
+.admin-day-events span { color: #65705f; font-size: 12px; }
+.admin-table-filters { display: flex; gap: 12px; margin-bottom: 18px; }
+.admin-table-filters label { color: #586250; display: grid; font-size: 11px; font-weight: 800; gap: 5px; text-transform: uppercase; }
+.admin-table-filters select { background: #fcfcf8; border: 1px solid #b9c1b4; min-height: 38px; min-width: 145px; padding: 7px; }
+.admin-table-wrap { background: #fcfcf8; border: 1px solid #cbd1c5; overflow-x: auto; }
+.admin-events-table { border-collapse: collapse; min-width: 900px; width: 100%; }
+.admin-events-table th { background: #e2e8dc; color: #4b5545; font-size: 11px; padding: 12px; text-align: left; text-transform: uppercase; }
+.admin-events-table th button { font-weight: 800; text-transform: uppercase; }
+.admin-events-table th button:hover { color: #8f3e20; }
+.admin-events-table td { border-top: 1px solid #d9ded4; font-size: 13px; padding: 13px 12px; }
+.admin-events-table tbody tr { cursor: pointer; }.admin-events-table tbody tr:hover { background: #edf2e8; }
+.admin-status, .admin-payment { font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.admin-status.active, .admin-payment.paid { color: #3b6a38; }.admin-status.inactive, .admin-payment.unpaid { color: #a13928; }.admin-payment.partial { color: #a36b16; }
+.admin-table-action { color: #315d30; font-size: 12px; font-weight: 800; text-decoration: underline; }
+.admin-primary-action { background: #e4b847; color: #20251e; font-weight: 800; min-height: 44px; padding: 10px 12px; }
+.admin-generate-view { background: #fcfcf8; border: 1px solid #cbd1c5; max-width: 600px; padding: 34px; }
+.admin-generate-view h2 { font-family: var(--font-editorial); font-size: 36px; margin: 8px 0 16px; }.admin-generate-view p:not(.admin-eyebrow) { color: #5d6858; line-height: 1.5; margin-bottom: 24px; }
+@media (max-width: 860px) { .admin-nav { display: flex; margin: 0 0 0 18px; overflow-x: auto; }.admin-nav button { min-width: max-content; }.admin-table-filters { flex-wrap: wrap; } }
+
+/* Desktop shell: the workspace uses the full width unless an event inspector is open. */
+.admin-dashboard { grid-template-columns: 230px minmax(0, 1fr); }
+.admin-dashboard:has(.admin-inspector) { grid-template-columns: 230px minmax(0, 1fr) 320px; }
+.admin-dashboard.sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
+.admin-dashboard.sidebar-collapsed:has(.admin-inspector) { grid-template-columns: 72px minmax(0, 1fr) 320px; }
+.admin-sidebar-heading { align-items: flex-start; display: flex; justify-content: space-between; }
+.admin-sidebar-toggle { border: 1px solid #566051; color: #edf0e8; height: 32px; width: 32px; }
+.admin-sidebar-toggle:hover { background: #384133; }
+.sidebar-collapsed .admin-sidebar { align-items: center; padding-left: 12px; padding-right: 12px; }
+.sidebar-collapsed .admin-sidebar-heading > span, .sidebar-collapsed .admin-nav span, .sidebar-collapsed .admin-sidebar-note { display: none; }
+.sidebar-collapsed .admin-sidebar-heading { width: 100%; }.sidebar-collapsed .admin-sidebar-toggle { margin: 0 auto; }
+.sidebar-collapsed .admin-nav { margin-top: 32px; width: 100%; }.sidebar-collapsed .admin-nav button { font-size: 0; padding: 0; text-align: center; }
+.sidebar-collapsed .admin-nav button::first-letter { font-size: 16px; }.sidebar-collapsed .admin-logout { font-size: 0; }.sidebar-collapsed .admin-logout::after { content: 'Out'; font-size: 11px; }
+.admin-pagination { align-items: center; display: flex; justify-content: space-between; margin-top: 16px; }.admin-pagination span { color: #64705e; font-size: 13px; }.admin-pagination div { display: flex; gap: 8px; }.admin-pagination button { background: #fcfcf8; border: 1px solid #b8c0b3; min-height: 36px; padding: 0 12px; }.admin-pagination button:disabled { cursor: not-allowed; opacity: .45; }
+@media (max-width: 1100px) { .admin-dashboard:has(.admin-inspector), .admin-dashboard.sidebar-collapsed:has(.admin-inspector) { grid-template-columns: 180px minmax(0, 1fr); }.admin-dashboard.sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr); }.admin-inspector { grid-column: 1 / -1; grid-row: auto; width: auto; } }
+
+/* Month selection, compact navigation, and modal event details. */
+.admin-calendar-filters { align-items: end; display: flex; gap: 8px; }
+.admin-calendar-filters label { color: #586250; display: grid; font-size: 10px; font-weight: 800; gap: 4px; text-transform: uppercase; }
+.admin-calendar-filters select, .admin-calendar-filters > button { background: #fcfcf8; border: 1px solid #b8c0b3; height: 36px; min-width: 82px; padding: 0 9px; }
+.admin-calendar-filters > button { font-size: 13px; font-weight: 700; }
+.admin-sidebar-toggle svg, .admin-nav svg { height: 18px; width: 18px; }
+.admin-nav button { align-items: center; display: flex; gap: 11px; }
+.sidebar-collapsed .admin-nav button { align-items: center; justify-content: center; }
+.sidebar-collapsed .admin-nav button svg { display: block; }
+.sidebar-collapsed .admin-logout { font-size: 11px; }
+.sidebar-collapsed .admin-logout::after { content: none; }
+.admin-pagination { border-top: 1px solid #cbd1c5; margin-top: 0; padding-top: 16px; }
+.admin-pagination div { align-items: center; }.admin-pagination div > span { display: contents; }
+.admin-pagination i { color: #65705f; font-style: normal; padding: 0 3px; }
+.admin-pagination button { min-width: 36px; padding: 0 8px; }.admin-pagination button.active { background: #20251e; border-color: #20251e; color: #fff; }
+.modal-content.admin-day-modal { max-width: 560px; }.admin-day-modal h2 { font-size: 30px; }
+.admin-modal-event-list { display: grid; gap: 8px; margin-top: 16px; }.admin-modal-event-list button { background: #e9eee5; color: #20251e; display: grid; gap: 4px; padding: 12px; text-align: left; }.admin-modal-event-list button:hover { background: #dbe5d5; }.admin-modal-event-list span { color: #5f6a59; font-size: 12px; }
+.modal-content.admin-event-modal { max-width: 560px; padding: 30px; text-align: left; }.admin-event-modal .admin-detail-heading { border-bottom: 1px solid #d4dbcf; margin-bottom: 18px; padding-bottom: 16px; }.admin-event-modal .admin-detail-heading h2 { font-size: 34px; margin: 5px 0; }.admin-event-modal .admin-detail-heading span { color: #64705e; font-size: 13px; }.admin-event-modal .admin-detail-heading > button { font-size: 28px; }
+.admin-detail-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin-bottom: 18px; }.admin-detail-grid div { background: #edf1e9; border: 1px solid #d5ddd0; display: grid; gap: 5px; min-height: 76px; padding: 10px; }.admin-detail-grid span { color: #667060; font-size: 10px; font-weight: 800; text-transform: uppercase; }.admin-detail-grid strong { font-size: 13px; line-height: 1.3; }
+.admin-event-modal label { color: #4d5748; display: grid; font-size: 12px; font-weight: 700; gap: 6px; margin-top: 13px; }.admin-event-modal input, .admin-event-modal select { background: #fff; border: 1px solid #aeb8a8; min-height: 40px; padding: 8px; }.admin-event-modal .admin-deactivate, .admin-event-modal .admin-reactivate { margin-top: 20px; width: 100%; }
+.admin-event-modal .admin-save-event { background: #315d30; color: #fff; font-weight: 800; margin-top: 18px; min-height: 42px; width: 100%; }
+.modal-content.admin-host-modal { max-width: 460px; text-align: left; }
+.admin-host-modal h2 { margin-bottom: 18px; }.admin-host-modal .admin-deactivate, .admin-host-modal .admin-reactivate { margin-top: 18px; width: 100%; }
+.admin-host-modal .admin-copy-code { color: #20251e; font-family: var(--font-editorial); font-size: 32px; font-weight: 700; margin-bottom: 18px; pointer-events: none; }
+.admin-toast { background: #315d30; bottom: 24px; box-shadow: 0 8px 20px rgba(32, 37, 30, .24); color: #fff; font-size: 14px; font-weight: 700; padding: 13px 18px; position: fixed; right: 24px; z-index: 1100; }
+@media (max-width: 860px) { .admin-calendar-filters { flex-wrap: wrap; }.admin-calendar-filters > button { min-width: 62px; }.admin-detail-grid { grid-template-columns: 1fr; } }
+
+.admin-month-picker { color: #586250; display: grid; font-size: 10px; font-weight: 800; gap: 4px; text-transform: uppercase; }
+.admin-month-picker input, .admin-table-filters input { background: #fcfcf8; border: 1px solid #b9c1b4; min-height: 38px; padding: 7px; }
+.admin-month-picker input { min-width: 160px; }
+
+.admin-month-picker { display: none; }
+.admin-calendar-controls { align-items: end; display: flex; gap: 10px; justify-content: flex-end; margin-bottom: -58px; position: relative; z-index: 1; }
+.admin-calendar-controls label { color: #586250; display: grid; font-size: 10px; font-weight: 800; gap: 4px; text-transform: uppercase; }
+.admin-calendar-controls input, .admin-calendar-controls select { background: #fcfcf8; border: 1px solid #b9c1b4; height: 38px; min-width: 110px; padding: 7px; }
+@media (max-width: 860px) { .admin-calendar-controls { margin-bottom: 10px; justify-content: flex-start; } }
+
+/* Keep the compact desktop rail independent from the original text-only sidebar rules. */
+.sidebar-collapsed .admin-sidebar { align-items: stretch; padding: 20px 10px; }
+.sidebar-collapsed .admin-sidebar-brand, .sidebar-collapsed .admin-nav span, .sidebar-collapsed .admin-sidebar-note { display: none; }
+.sidebar-collapsed .admin-sidebar-heading { display: flex; justify-content: center; width: 100%; }
+.sidebar-collapsed .admin-sidebar-toggle { margin: 0; }
+.sidebar-collapsed .admin-nav { gap: 8px; margin-top: 30px; width: 100%; }
+.sidebar-collapsed .admin-nav button { align-items: center; border-left: 0; display: flex; font-size: inherit; height: 46px; justify-content: center; padding: 0; text-align: center; width: 100%; }
+.sidebar-collapsed .admin-nav button.active { border-left: 0; box-shadow: inset 3px 0 0 #e4b847; }
+.sidebar-collapsed .admin-nav button::first-letter, .sidebar-collapsed .admin-logout::after { content: none; font-size: inherit; }
+.sidebar-collapsed .admin-logout { font-size: 0; margin: 0 auto; min-height: 36px; width: 100%; }
+.sidebar-collapsed .admin-logout::before { content: 'Sign out'; font-size: 10px; }

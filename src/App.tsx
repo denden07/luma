@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import Landing from './screens/Landing';
 import NameEntry from './screens/NameEntry';
 import Camera from './screens/Camera';
@@ -12,13 +12,18 @@ import HostDashboard from './screens/HostDashboard';
 import EventCreation from './screens/EventCreation';
 import HostEventsList from './screens/HostEventsList';
 import HostLogin from './screens/HostLogin';
+import AdminLogin from './screens/AdminLogin';
+import AdminDashboard from './screens/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
+import ErrorPopup from './components/ErrorPopup';
+import CopySuccessPopup from './components/CopySuccessPopup';
 import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipant } from './utils/participant';
 import { createParticipant as createParticipantAPI, getEvent, getPhotoUrl } from './services/dataService';
 import type { Event } from './services/dataService';
 import { cacheEvent, getCachedEvent, migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
 import { isLocalMode } from './utils/env';
 import { isHostLoggedIn } from './utils/hostAuth';
+import { getAdminSession } from './services/adminService';
 import './App.css';
 
 function EventRoute() {
@@ -207,7 +212,39 @@ function ProtectedHostRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function App() {
+function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
+  const [isChecking, setIsChecking] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    getAdminSession().then(() => setIsAuthenticated(true)).catch(() => setIsAuthenticated(false)).finally(() => setIsChecking(false));
+  }, []);
+
+  if (isChecking) return <div className="event-state"><p>Checking administrator session...</p></div>;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/admin/login" replace state={{ from: location }} />;
+}
+
+function AppContent() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  return (
+    <div
+      className={`app ${isAdminRoute ? 'admin-app' : ''}`}
+      onContextMenu={isAdminRoute ? undefined : (event) => event.preventDefault()}
+      onCopy={isAdminRoute ? undefined : (event) => {
+        if (event.isTrusted) event.preventDefault();
+      }}
+    >
+      <AppRoutes />
+      <ErrorPopup />
+      <CopySuccessPopup />
+    </div>
+  );
+}
+
+function AppRoutes() {
   const [serviceWorkerStatus, setServiceWorkerStatus] = useState<'checking' | 'active' | 'ready' | 'unsupported'>('checking');
 
   // Run migration on app startup to fix photos with invalid UUIDs
@@ -252,14 +289,7 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <div
-        className="app"
-        onContextMenu={(event) => event.preventDefault()}
-        onCopy={(event) => {
-          if (event.isTrusted) event.preventDefault();
-        }}
-      >
+    <>
         {isLocalMode() && (
           <div className="local-mode-indicator">LOCAL · CACHE {serviceWorkerStatus.toUpperCase()}</div>
         )}
@@ -267,6 +297,8 @@ function App() {
         <Routes>
           <Route path="/e/:eventToken/*" element={<EventRoute />} />
           <Route path="/host/login" element={<HostLogin />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
           <Route path="/host" element={
             <ProtectedHostRoute>
               <HostEventsList />
@@ -286,7 +318,14 @@ function App() {
           } />
           <Route path="/" element={<Navigate to="/host/login" replace />} />
         </Routes>
-      </div>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }

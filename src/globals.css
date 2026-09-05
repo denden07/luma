@@ -72,6 +72,11 @@ body {
   user-select: text;
 }
 
+.app.admin-app {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Safe Area Support */
 @supports (padding: max(0px)) {
   body {

@@ -35,6 +35,7 @@
 
 .host-code-badge {
   background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   color: white;
   padding: 0.5rem 1rem;
   border-radius: 8px;
@@ -42,6 +43,10 @@
   font-weight: 600;
   font-family: 'Courier New', monospace;
   letter-spacing: 0.1em;
+}
+
+.host-code-badge:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .create-new-button,

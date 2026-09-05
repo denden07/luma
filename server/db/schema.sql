@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS events (
   end_time TIMESTAMP WITH TIME ZONE,
   cover_photo_path VARCHAR(500),
   enabled_filters JSONB NOT NULL DEFAULT '[]'::jsonb,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  price_php INTEGER NOT NULL DEFAULT 0 CHECK (price_php >= 0),
+  payment_status VARCHAR(10) NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -22,7 +25,48 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS start_time TIMESTAMP WITH TIME ZONE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS end_time TIMESTAMP WITH TIME ZONE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS cover_photo_path VARCHAR(500);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS enabled_filters JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS price_php INTEGER NOT NULL DEFAULT 0 CHECK (price_php >= 0);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_status VARCHAR(10) NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid'));
 ALTER TABLE events ALTER COLUMN guest_limit SET DEFAULT 30;
+
+-- Host login codes
+CREATE TABLE IF NOT EXISTS hosts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code VARCHAR(6) NOT NULL UNIQUE,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE hosts ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- Privileged administrator accounts and revocable sessions.
+CREATE TABLE IF NOT EXISTS admin_accounts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id UUID NOT NULL REFERENCES admin_accounts(id) ON DELETE CASCADE,
+  token_hash CHAR(64) NOT NULL UNIQUE,
+  csrf_token_hash CHAR(64) NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS admin_login_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip_hash CHAR(64) NOT NULL,
+  attempted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Participants table
 CREATE TABLE IF NOT EXISTS participants (
@@ -59,6 +103,11 @@ CREATE INDEX IF NOT EXISTS idx_participants_event_id ON participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_photos_event_id ON photos(event_id);
 CREATE INDEX IF NOT EXISTS idx_photos_participant_id ON photos(participant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_event_id ON messages(event_id);
+CREATE INDEX IF NOT EXISTS idx_events_date_active ON events(date, is_active);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_token_hash ON admin_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_ip_time ON admin_login_attempts(ip_hash, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_hosts_active ON hosts(is_active);
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -72,4 +121,8 @@ $$ language 'plpgsql';
 -- Trigger for events table
 DROP TRIGGER IF EXISTS update_events_updated_at ON events;
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_admin_accounts_updated_at ON admin_accounts;
+CREATE TRIGGER update_admin_accounts_updated_at BEFORE UPDATE ON admin_accounts
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

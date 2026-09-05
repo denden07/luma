@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEventsByHostCode } from '../services/dataService';
 import { getHostCode, clearHostCode } from '../utils/hostAuth';
+import { copyTextToClipboard } from '../utils/clipboard';
 import type { Event } from '../services/dataService';
+import { showErrorPopup } from '../components/ErrorPopup';
+import { showCopySuccessPopup } from '../components/CopySuccessPopup';
 import './HostEventsList.css';
 
 const HostEventsList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -17,7 +19,6 @@ const HostEventsList: React.FC = () => {
 
   const loadEvents = async () => {
     setIsLoading(true);
-    setError(null);
 
     try {
       const hostCode = getHostCode();
@@ -35,7 +36,7 @@ const HostEventsList: React.FC = () => {
       console.log('[HostEventsList] Loaded', sortedEvents.length, 'events');
     } catch (err) {
       console.error('[HostEventsList] Failed to load events:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load events');
+      showErrorPopup('We could not load your events. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -58,6 +59,18 @@ const HostEventsList: React.FC = () => {
     }
   };
 
+  const copyHostCode = async () => {
+    const hostCode = getHostCode();
+    if (!hostCode) return;
+    try {
+      await copyTextToClipboard(hostCode);
+      showCopySuccessPopup('Your host code is ready to paste.');
+    } catch (copyError) {
+      console.error('[HostEventsList] Could not copy host code:', copyError);
+      showErrorPopup('Could not copy host code. Please try again.');
+    }
+  };
+
   const hasReachedEventLimit = events.length >= 2;
 
   return (
@@ -65,7 +78,9 @@ const HostEventsList: React.FC = () => {
       <div className="events-header">
         <div className="header-left">
           <h1 className="handwritten">My Events</h1>
-          <span className="host-code-badge">Code: {getHostCode()}</span>
+          <button className="host-code-badge" type="button" onClick={copyHostCode} title="Copy host code">
+            Code: {getHostCode()}
+          </button>
         </div>
         <div className="header-right">
           <button 
@@ -91,15 +106,6 @@ const HostEventsList: React.FC = () => {
           <div className="loading-state">
             <div className="spinner"></div>
             <p>Loading events...</p>
-          </div>
-        ) : error ? (
-          <div className="error-state">
-            <div className="error-icon">⚠️</div>
-            <h2>Unable to load events</h2>
-            <p>{error}</p>
-            <button className="retry-button" onClick={loadEvents}>
-              Try Again
-            </button>
           </div>
         ) : events.length === 0 ? (
           <div className="empty-state">

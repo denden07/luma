@@ -18,7 +18,7 @@ interface EventUploadPolicy {
 
 async function getPhotoUploadError(eventId: string, participantId: string, photoId: string): Promise<string | null> {
   const eventResult = await pool.query<EventUploadPolicy>(
-    'SELECT photo_limit, start_time, end_time FROM events WHERE id = $1',
+    'SELECT photo_limit, start_time, end_time FROM events WHERE id = $1 AND is_active = TRUE',
     [eventId]
   );
   const event = eventResult.rows[0];
@@ -193,7 +193,8 @@ router.get('/:eventId/photos', async (req, res) => {
       `SELECT p.*, pt.name as participant_name 
        FROM photos p 
        JOIN participants pt ON p.participant_id = pt.id 
-       WHERE p.event_id = $1 
+      JOIN events e ON e.id = p.event_id
+      WHERE p.event_id = $1 AND e.is_active = TRUE
        ORDER BY p.created_at DESC`,
       [eventId]
     );
@@ -213,7 +214,8 @@ router.get('/:eventId/photos/download', async (req, res) => {
       `SELECT p.*, pt.name AS participant_name
        FROM photos p
        JOIN participants pt ON p.participant_id = pt.id
-       WHERE p.event_id = $1
+      JOIN events e ON e.id = p.event_id
+      WHERE p.event_id = $1 AND e.is_active = TRUE
        ORDER BY p.created_at ASC`,
       [eventId]
     );
@@ -653,7 +655,9 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await pool.query<Photo>(
-      'SELECT * FROM photos WHERE id = $1',
+      `SELECT p.* FROM photos p
+       JOIN events e ON e.id = p.event_id
+       WHERE p.id = $1 AND e.is_active = TRUE`,
       [id]
     );
     

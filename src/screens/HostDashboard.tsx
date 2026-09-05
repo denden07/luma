@@ -5,7 +5,9 @@ import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '.
 import type { Event, PhotoMetadata } from '../services/dataService';
 import { getFilter } from '../utils/filters';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { getHostCode } from '../utils/hostAuth';
 import Modal from '../components/Modal';
+import { showErrorPopup } from '../components/ErrorPopup';
 import './HostDashboard.css';
 
 const HostDashboard: React.FC = () => {
@@ -79,9 +81,8 @@ const HostDashboard: React.FC = () => {
       console.log('[HostDashboard] Successfully loaded', serverPhotos.length, 'photos from server for event:', eventId);
     } catch (err) {
       console.error('[HostDashboard] Failed to load event data:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load event';
-      setError(errorMessage);
-      console.error('[HostDashboard] Error details:', errorMessage);
+      setError('Unable to load event');
+      showErrorPopup('We could not load this event. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +121,19 @@ const HostDashboard: React.FC = () => {
       setIsCopySuccessOpen(true);
     } catch (copyError) {
       console.error('Could not copy guest link:', copyError);
-      setError('Could not copy guest link. Please try again.');
+      showErrorPopup('Could not copy the guest link. Please try again.');
+    }
+  };
+
+  const copyHostCode = async () => {
+    const hostCode = getHostCode();
+    if (!hostCode) return;
+    try {
+      await copyTextToClipboard(hostCode);
+      setIsCopySuccessOpen(true);
+    } catch (copyError) {
+      console.error('Could not copy host code:', copyError);
+      showErrorPopup('Could not copy the host code. Please try again.');
     }
   };
 
@@ -188,7 +201,8 @@ const HostDashboard: React.FC = () => {
       setUsedShareSheet(false);
       setShowDownloadInfo(true);
     } catch (downloadError) {
-      setError(downloadError instanceof Error ? downloadError.message : 'Could not prepare photo download');
+      console.error('Could not prepare photo download:', downloadError);
+      showErrorPopup('Could not prepare the photo download. Please try again.');
     } finally {
       setIsPreparingDownload(false);
     }
@@ -294,6 +308,7 @@ const HostDashboard: React.FC = () => {
           </button>
         </div>
         <p className="event-name editorial">{eventName || 'Loading...'}</p>
+        {getHostCode() && <button className="host-code-button" type="button" onClick={copyHostCode} title="Copy host code">Host code: {getHostCode()}</button>}
         
         {error && (
           <div className="error-banner">
