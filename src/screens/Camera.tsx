@@ -265,8 +265,9 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
         constraints = {
           video: { 
             deviceId: { exact: deviceId },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 1440 },
+            height: { ideal: 1080 },
+            aspectRatio: { ideal: 4 / 3 }
           },
           audio: false,
         };
@@ -276,8 +277,9 @@ const Camera: React.FC<CameraProps> = ({ shotsLeft, onCapture, filterId }) => {
         constraints = {
           video: { 
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            width: { ideal: 1440 },
+            height: { ideal: 1080 },
+            aspectRatio: { ideal: 4 / 3 }
           },
           audio: false,
         };

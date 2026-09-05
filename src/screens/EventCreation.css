@@ -285,6 +285,28 @@
   width: 100%;
 }
 
+.modal-content.copy-success-modal {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 340px;
+  padding: 28px;
+  text-align: center;
+}
+
+.copy-success-modal h2 {
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.copy-success-modal p {
+  color: #666;
+}
+
+.copy-success-modal .copy-button {
+  margin-bottom: 0;
+}
+
 /* Mobile Responsive */
 @media (max-width: 600px) {
   .creation-container,

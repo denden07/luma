@@ -253,7 +253,13 @@ function App() {
 
   return (
     <Router>
-      <div className="app">
+      <div
+        className="app"
+        onContextMenu={(event) => event.preventDefault()}
+        onCopy={(event) => {
+          if (event.isTrusted) event.preventDefault();
+        }}
+      >
         {isLocalMode() && (
           <div className="local-mode-indicator">LOCAL · CACHE {serviceWorkerStatus.toUpperCase()}</div>
         )}

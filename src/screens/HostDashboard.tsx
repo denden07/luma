@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/dataService';
 import type { Event, PhotoMetadata } from '../services/dataService';
 import { getFilter } from '../utils/filters';
+import { copyTextToClipboard } from '../utils/clipboard';
 import Modal from '../components/Modal';
 import './HostDashboard.css';
 
@@ -22,6 +23,7 @@ const HostDashboard: React.FC = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [showDownloadInfo, setShowDownloadInfo] = useState(false);
+  const [isCopySuccessOpen, setIsCopySuccessOpen] = useState(false);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   const [usedShareSheet, setUsedShareSheet] = useState(false);
   const [isFilteredView, setIsFilteredView] = useState(true);
@@ -114,9 +116,11 @@ const HostDashboard: React.FC = () => {
 
   const copyGuestLink = async () => {
     try {
-      await navigator.clipboard.writeText(guestLink);
+      await copyTextToClipboard(guestLink);
+      setIsCopySuccessOpen(true);
     } catch (copyError) {
       console.error('Could not copy guest link:', copyError);
+      setError('Could not copy guest link. Please try again.');
     }
   };
 
@@ -495,6 +499,12 @@ const HostDashboard: React.FC = () => {
           : 'Find it in your browser Downloads or the Files app.'}
         </p>
         <button className="preview-download-button" onClick={() => setShowDownloadInfo(false)}>Done</button>
+      </Modal>
+
+      <Modal isOpen={isCopySuccessOpen} onClose={() => setIsCopySuccessOpen(false)} className="download-info-modal">
+        <h2 className="handwritten">Link copied</h2>
+        <p>The guest link is ready to share.</p>
+        <button className="preview-download-button" onClick={() => setIsCopySuccessOpen(false)}>Done</button>
       </Modal>
     </div>
   );

@@ -4,6 +4,8 @@ import QRCode from 'qrcode';
 import { createEvent, getEventsByHostCode, uploadEventCover } from '../services/dataService';
 import { getHostCode } from '../utils/hostAuth';
 import { FILTERS, type FilterId } from '../utils/filters';
+import { copyTextToClipboard } from '../utils/clipboard';
+import Modal from '../components/Modal';
 import filterPreviewImage from '../assets/images/pwa_camera_assets/example-filter-photo.jpg';
 import './EventCreation.css';
 
@@ -38,6 +40,7 @@ const EventCreation: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [canCreateAnother, setCanCreateAnother] = useState(true);
+  const [isCopySuccessOpen, setIsCopySuccessOpen] = useState(false);
   const qrCanvasRef = useRef<HTMLCanvasElement>(null);
   const navigate = useNavigate();
 
@@ -124,8 +127,8 @@ const EventCreation: React.FC = () => {
 
   const copyToClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(getShareableLink());
-      alert('Link copied to clipboard!');
+      await copyTextToClipboard(getShareableLink());
+      setIsCopySuccessOpen(true);
     } catch (err) {
       console.error('Failed to copy:', err);
     }
@@ -193,6 +196,11 @@ const EventCreation: React.FC = () => {
               </button>
             )}
           </div>
+          <Modal isOpen={isCopySuccessOpen} onClose={() => setIsCopySuccessOpen(false)} className="copy-success-modal">
+            <h2 className="handwritten">Link copied</h2>
+            <p>The guest link is ready to share.</p>
+            <button className="copy-button" onClick={() => setIsCopySuccessOpen(false)}>Done</button>
+          </Modal>
         </div>
       </div>
     );

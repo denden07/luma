@@ -60,6 +60,18 @@ body {
   width: 100%;
 }
 
+.app {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app input,
+.app textarea,
+.app select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Safe Area Support */
 @supports (padding: max(0px)) {
   body {
