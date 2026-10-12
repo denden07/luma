@@ -14,6 +14,8 @@ import HostEventsList from './screens/HostEventsList';
 import HostLogin from './screens/HostLogin';
 import AdminLogin from './screens/AdminLogin';
 import AdminDashboard from './screens/AdminDashboard';
+import WebsiteBuilder from './screens/websiteBuilder/WebsiteBuilder';
+import PublicInvitation from './screens/websiteBuilder/PublicInvitation';
 import ErrorBoundary from './components/ErrorBoundary';
 import ErrorPopup from './components/ErrorPopup';
 import CopySuccessPopup from './components/CopySuccessPopup';
@@ -21,7 +23,6 @@ import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipa
 import { createParticipant as createParticipantAPI, getEvent, getPhotoUrl } from './services/dataService';
 import type { Event } from './services/dataService';
 import { cacheEvent, getCachedEvent, migrateInvalidPhotoUUIDs } from './utils/indexedDBStorage';
-import { isLocalMode } from './utils/env';
 import { isHostLoggedIn } from './utils/hostAuth';
 import { getAdminSession } from './services/adminService';
 import './App.css';
@@ -245,8 +246,6 @@ function AppContent() {
 }
 
 function AppRoutes() {
-  const [serviceWorkerStatus, setServiceWorkerStatus] = useState<'checking' | 'active' | 'ready' | 'unsupported'>('checking');
-
   // Run migration on app startup to fix photos with invalid UUIDs
   useEffect(() => {
     migrateInvalidPhotoUUIDs().catch(error => {
@@ -255,25 +254,16 @@ function AppRoutes() {
   }, []);
 
   useEffect(() => {
-    if (!('serviceWorker' in navigator)) {
-      setServiceWorkerStatus('unsupported');
-      return;
-    }
+    if (!('serviceWorker' in navigator)) return;
 
-    const updateStatus = () => {
-      setServiceWorkerStatus(navigator.serviceWorker.controller ? 'active' : 'ready');
-    };
     const handleControllerChange = () => {
-      setServiceWorkerStatus('active');
       const reloadKey = 'luma-service-worker-reloaded';
       if (!sessionStorage.getItem(reloadKey)) {
         sessionStorage.setItem(reloadKey, 'true');
         window.location.reload();
       }
     };
-    navigator.serviceWorker.ready.then(updateStatus).catch(() => setServiceWorkerStatus('unsupported'));
     navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
-    updateStatus();
 
     return () => navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
   }, []);
@@ -316,7 +306,13 @@ function AppRoutes() {
               </ErrorBoundary>
             </ProtectedHostRoute>
           } />
+          <Route path="/host/events/:eventId/website" element={
+            <ProtectedHostRoute>
+              <WebsiteBuilder />
+            </ProtectedHostRoute>
+          } />
           <Route path="/" element={<Navigate to="/host/login" replace />} />
+          <Route path="/:slug" element={<PublicInvitation />} />
         </Routes>
     </>
   );

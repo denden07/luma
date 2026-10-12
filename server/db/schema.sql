@@ -30,6 +30,28 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS price_php INTEGER NOT NULL DEFAULT 0
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_status VARCHAR(10) NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid'));
 ALTER TABLE events ALTER COLUMN guest_limit SET DEFAULT 30;
 
+-- Invitation website content is separate from camera event data. Draft and published
+-- documents remain independent so unpublished host edits never reach guests.
+CREATE TABLE IF NOT EXISTS event_websites (
+  event_id UUID PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  draft_document JSONB NOT NULL,
+  published_document JSONB,
+  public_slug VARCHAR(120) UNIQUE,
+  draft_version INTEGER NOT NULL DEFAULT 1 CHECK (draft_version >= 1),
+  published_version INTEGER CHECK (published_version IS NULL OR published_version >= 1),
+  published_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS draft_document JSONB;
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS published_document JSONB;
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS public_slug VARCHAR(120);
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS draft_version INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS published_version INTEGER;
+ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS published_at TIMESTAMP WITH TIME ZONE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_websites_public_slug ON event_websites(public_slug) WHERE public_slug IS NOT NULL;
+
 -- Host login codes
 CREATE TABLE IF NOT EXISTS hosts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -108,6 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_admin_sessions_token_hash ON admin_sessions(token
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_expiry ON admin_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_ip_time ON admin_login_attempts(ip_hash, attempted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_hosts_active ON hosts(is_active);
+CREATE INDEX IF NOT EXISTS idx_event_websites_published_slug ON event_websites(public_slug) WHERE published_at IS NOT NULL;
 
 -- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -121,6 +144,10 @@ $$ language 'plpgsql';
 -- Trigger for events table
 DROP TRIGGER IF EXISTS update_events_updated_at ON events;
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_event_websites_updated_at ON event_websites;
+CREATE TRIGGER update_event_websites_updated_at BEFORE UPDATE ON event_websites
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_admin_accounts_updated_at ON admin_accounts;

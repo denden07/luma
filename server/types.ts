@@ -43,6 +43,37 @@ export interface Message {
   created_at: Date;
 }
 
+export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
+
+export interface WebsiteSection {
+  id: string;
+  type: WebsiteSectionType;
+  visible: boolean;
+  content: Record<string, unknown>;
+}
+
+export interface WebsiteDocument {
+  schema_version: 1;
+  template_id: 'garden' | 'modern' | 'classic';
+  theme: {
+    palette_id: string;
+    font_pair_id: string;
+  };
+  sections: WebsiteSection[];
+}
+
+export interface EventWebsite {
+  event_id: string;
+  draft_document: WebsiteDocument;
+  published_document: WebsiteDocument | null;
+  public_slug: string | null;
+  draft_version: number;
+  published_version: number | null;
+  published_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 // Request/Response types
 export interface CreateEventRequest {
   name: string;
@@ -68,4 +99,9 @@ export interface CreatePhotoRequest {
 export interface CreateMessageRequest {
   participant_id?: string;
   message: string;
+}
+
+export interface UpdateEventWebsiteRequest {
+  host_code: string;
+  document: WebsiteDocument;
 }

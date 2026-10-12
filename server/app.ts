@@ -8,6 +8,7 @@ import participantsRouter from './routes/participants.js';
 import photosRouter from './routes/photos.js';
 import hostsRouter from './routes/hosts.js';
 import adminRouter from './routes/admin.js';
+import websitesRouter, { publicWebsitesRouter } from './routes/websites.js';
 
 dotenv.config();
 
@@ -49,7 +50,7 @@ if (!existsSync(UPLOAD_DIR)) {
 
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
     query: req.query,
     contentType: req.headers['content-type'],
@@ -61,6 +62,8 @@ app.use((req, res, next) => {
 app.use('/api/hosts', hostsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/events', eventsRouter);
+app.use('/api/events', websitesRouter);
+app.use('/api/websites', publicWebsitesRouter);
 app.use('/api/events', participantsRouter);
 app.use('/api/events', photosRouter);
 app.use('/api/photos', photosRouter);
