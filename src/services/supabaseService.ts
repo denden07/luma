@@ -160,3 +160,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 export async function uploadEventCover(_eventId: string, _hostCode: string, _cover: File): Promise<Event> {
   throw new Error('Background photo upload will be available after Cloudflare R2 is configured.');
 }
+
+export async function deleteEventCover(_eventId: string, _hostCode: string): Promise<Event> {
+  throw new Error('Background photo removal will be available after Cloudflare R2 is configured.');
+}

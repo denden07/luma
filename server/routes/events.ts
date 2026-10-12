@@ -160,4 +160,33 @@ router.post('/:id/cover', coverUpload.single('cover'), async (req, res) => {
   }
 });
 
+// DELETE /api/events/:id/cover - Remove an event landing-page background.
+router.delete('/:id/cover', async (req, res) => {
+  const { id: eventId } = req.params;
+  const hostCode = req.query.host_code;
+  if (typeof hostCode !== 'string' || !hostCode) return res.status(401).json({ error: 'Host code is required' });
+
+  try {
+    const eventResult = await pool.query<Pick<Event, 'cover_photo_path'>>(
+      'SELECT cover_photo_path FROM events WHERE id = $1 AND host_code = $2 AND is_active = TRUE',
+      [eventId, hostCode],
+    );
+    if (eventResult.rows.length === 0) return res.status(404).json({ error: 'Event not found' });
+
+    const previousPath = eventResult.rows[0].cover_photo_path;
+    const updateResult = await pool.query<Event>(
+      'UPDATE events SET cover_photo_path = NULL WHERE id = $1 RETURNING *',
+      [eventId],
+    );
+    if (previousPath) {
+      const previousFile = join(UPLOAD_DIR, previousPath);
+      if (existsSync(previousFile)) unlinkSync(previousFile);
+    }
+    return res.json(updateResult.rows[0]);
+  } catch (error) {
+    console.error('Error removing event cover:', error);
+    return res.status(500).json({ error: 'Failed to remove event cover' });
+  }
+});
+
 export default router;

@@ -387,6 +387,9 @@ const HostDashboard: React.FC = () => {
             <button className="website-builder-link" type="button" onClick={() => navigate(`/host/events/${eventId}/website`)}>
               Build invitation website
             </button>
+            <button className="website-builder-link guest-manager-link" type="button" onClick={() => navigate(`/host/events/${eventId}/guests`)}>
+              Manage invitation guests
+            </button>
             {eventDetails && <div className="event-health"><span>{participants.length} / {eventDetails.guest_limit} guests</span><span>{photos.length} photos</span><span>{eventDetails.start_time ? 'Scheduled' : 'Open'}</span></div>}
           </>
         )}

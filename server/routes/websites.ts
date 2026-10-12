@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
+import { extname, join } from 'path';
+import { randomUUID } from 'crypto';
 import pool from '../db/index.js';
 import type { EventWebsite, UpdateEventWebsiteRequest, WebsiteDocument, WebsiteSection, WebsiteSectionType } from '../types.js';
 
@@ -6,13 +10,21 @@ const router = Router();
 export const publicWebsitesRouter = Router();
 const templateIds = new Set(['garden', 'modern', 'classic']);
 const sectionTypes = new Set<WebsiteSectionType>(['hero', 'story', 'details', 'gallery', 'entourage', 'rsvp', 'closing']);
+const paletteIds = new Set(['garden', 'modern', 'classic']);
+const fontPairIds = new Set(['modern', 'editorial', 'classic']);
+const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
+const websiteAssetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)),
+});
 const reservedSlugs = new Set(['admin', 'api', 'assets', 'dashboard', 'e', 'host', 'login', 'uploads']);
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 function isWebsiteDocument(value: unknown): value is WebsiteDocument {
   if (!isRecord(value) || value.schema_version !== 1 || typeof value.template_id !== 'string' || !templateIds.has(value.template_id)) return false;
-  if (!isRecord(value.theme) || typeof value.theme.palette_id !== 'string' || typeof value.theme.font_pair_id !== 'string') return false;
+  if (!isRecord(value.theme) || typeof value.theme.palette_id !== 'string' || !paletteIds.has(value.theme.palette_id) || typeof value.theme.font_pair_id !== 'string' || !fontPairIds.has(value.theme.font_pair_id)) return false;
   if (!Array.isArray(value.sections) || value.sections.length === 0 || value.sections.length > 20) return false;
 
   return value.sections.every((section): section is WebsiteSection => (
@@ -35,7 +47,13 @@ async function hostOwnsEvent(eventId: string, hostCode: unknown): Promise<boolea
 
 function normalizeSlug(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slug = value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   if (slug.length < 3 || slug.length > 120 || reservedSlugs.has(slug)) return null;
   return slug;
 }
@@ -76,6 +94,61 @@ router.put('/:eventId/website', async (req, res) => {
   } catch (error) {
     console.error('Error saving event website:', error);
     return res.status(500).json({ error: 'Failed to save website' });
+  }
+});
+
+router.get('/:eventId/website/assets', async (req, res) => {
+  const { eventId } = req.params;
+  try {
+    if (!await hostOwnsEvent(eventId, req.query.host_code)) return res.status(404).json({ error: 'Event not found' });
+    const result = await pool.query('SELECT id, storage_path, original_filename, created_at FROM event_website_assets WHERE event_id = $1 ORDER BY created_at DESC', [eventId]);
+    return res.json(result.rows);
+  } catch (error) {
+    console.error('Error loading invitation assets:', error);
+    return res.status(500).json({ error: 'Failed to load invitation assets' });
+  }
+});
+
+router.post('/:eventId/website/assets', websiteAssetUpload.single('asset'), async (req, res) => {
+  const { eventId } = req.params;
+  const hostCode = req.body.host_code;
+  const file = req.file;
+  if (!file) return res.status(400).json({ error: 'A JPEG, PNG, or WebP image is required' });
+
+  try {
+    if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
+    const extension = extname(file.originalname).toLowerCase() || (file.mimetype === 'image/png' ? '.png' : file.mimetype === 'image/webp' ? '.webp' : '.jpg');
+    const assetDirectory = join(UPLOAD_DIR, 'events', eventId, 'website-assets');
+    if (!existsSync(assetDirectory)) mkdirSync(assetDirectory, { recursive: true });
+    const filename = `${randomUUID()}${extension}`;
+    const storagePath = `/events/${eventId}/website-assets/${filename}`;
+    writeFileSync(join(UPLOAD_DIR, storagePath), file.buffer);
+    const result = await pool.query(
+      'INSERT INTO event_website_assets (event_id, storage_path, original_filename) VALUES ($1, $2, $3) RETURNING id, storage_path, original_filename, created_at',
+      [eventId, storagePath, file.originalname],
+    );
+    return res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error uploading invitation asset:', error);
+    return res.status(500).json({ error: 'Failed to upload invitation asset' });
+  }
+});
+
+router.delete('/:eventId/website/assets/:assetId', async (req, res) => {
+  const { eventId, assetId } = req.params;
+  try {
+    if (!await hostOwnsEvent(eventId, req.query.host_code)) return res.status(404).json({ error: 'Event not found' });
+    const result = await pool.query<{ storage_path: string }>(
+      'DELETE FROM event_website_assets WHERE id = $1 AND event_id = $2 RETURNING storage_path',
+      [assetId, eventId],
+    );
+    if (result.rowCount === 0) return res.status(404).json({ error: 'Invitation image not found' });
+    const imagePath = join(UPLOAD_DIR, result.rows[0].storage_path);
+    if (existsSync(imagePath)) unlinkSync(imagePath);
+    return res.status(204).end();
+  } catch (error) {
+    console.error('Error deleting invitation asset:', error);
+    return res.status(500).json({ error: 'Failed to delete invitation image' });
   }
 });
 

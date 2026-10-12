@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getPublishedWebsite } from '../../services/websiteService';
 import type { PublishedWebsite } from '../../services/websiteService';
-import './PublicInvitation.css';
+import InvitationDocument from './InvitationDocument';
 
 const PublicInvitation = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -17,27 +17,22 @@ const PublicInvitation = () => {
       .finally(() => setIsLoading(false));
   }, [slug]);
 
+  const metadataName = website?.published_document.sections.find(section => section.type === 'hero')?.content.couple_names;
+  useEffect(() => {
+    if (typeof metadataName !== 'string' || !metadataName) return;
+    const previousTitle = document.title;
+    const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]') ?? document.head.appendChild(document.createElement('link'));
+    canonical.rel = 'canonical';
+    canonical.href = window.location.href;
+    document.title = `${metadataName} | madeTogether`;
+    return () => { document.title = previousTitle; };
+  }, [metadataName]);
+
   if (isLoading) return <main className="public-invitation-state">Loading invitation...</main>;
   if (!website) return <main className="public-invitation-state"><h1>Invitation not found</h1><p>This invitation is unavailable or has not been published yet.</p></main>;
 
-  const hero = website.published_document.sections.find(section => section.type === 'hero');
-  const content = hero?.content ?? {};
-  const names = typeof content.couple_names === 'string' ? content.couple_names : website.event_name;
-  const date = typeof content.date === 'string' ? content.date : '';
-  const message = typeof content.message === 'string' ? content.message : '';
-
   return (
-    <main className={`public-invitation public-invitation-${website.published_document.template_id}`}>
-      <section className="public-invitation-hero">
-        <p className="public-invitation-date">{date}</p>
-        <h1>{names}</h1>
-        <p className="public-invitation-message">{message}</p>
-        <a href="#rsvp">RSVP</a>
-      </section>
-      <section className="public-invitation-rsvp" id="rsvp">
-        <p>RSVP details will be available here.</p>
-      </section>
-    </main>
+    <main><InvitationDocument document={website.published_document} eventName={website.event_name} /></main>
   );
 };
 

@@ -9,6 +9,7 @@ import photosRouter from './routes/photos.js';
 import hostsRouter from './routes/hosts.js';
 import adminRouter from './routes/admin.js';
 import websitesRouter, { publicWebsitesRouter } from './routes/websites.js';
+import guestsRouter from './routes/guests.js';
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/events', websitesRouter);
 app.use('/api/websites', publicWebsitesRouter);
+app.use('/api/events', guestsRouter);
 app.use('/api/events', participantsRouter);
 app.use('/api/events', photosRouter);
 app.use('/api/photos', photosRouter);

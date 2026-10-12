@@ -102,6 +102,17 @@ export async function uploadEventCover(eventId: string, hostCode: string, cover:
   return response.json();
 }
 
+export async function deleteEventCover(eventId: string, hostCode: string): Promise<Event> {
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/cover?host_code=${encodeURIComponent(hostCode)}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Failed to remove event cover' }));
+    throw new Error(error.error || 'Failed to remove event cover');
+  }
+  return response.json();
+}
+
 export async function getEvent(eventId: string): Promise<Event> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}`);
 

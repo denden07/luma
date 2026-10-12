@@ -52,6 +52,45 @@ ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS published_version INTEGER;
 ALTER TABLE event_websites ADD COLUMN IF NOT EXISTS published_at TIMESTAMP WITH TIME ZONE;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_event_websites_public_slug ON event_websites(public_slug) WHERE public_slug IS NOT NULL;
 
+CREATE TABLE IF NOT EXISTS event_website_assets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  storage_path VARCHAR(500) NOT NULL,
+  original_filename VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_website_assets_event_id ON event_website_assets(event_id, created_at DESC);
+
+-- Invitation guest management is intentionally separate from camera participants.
+CREATE TABLE IF NOT EXISTS guest_groups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  contact_number VARCHAR(40),
+  invited_party_size INTEGER NOT NULL DEFAULT 1 CHECK (invited_party_size BETWEEN 1 AND 20),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS guests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  group_id UUID REFERENCES guest_groups(id) ON DELETE SET NULL,
+  full_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
+  phone VARCHAR(40),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS contact_number VARCHAR(40);
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone VARCHAR(40);
+
+CREATE INDEX IF NOT EXISTS idx_guest_groups_event_id ON guest_groups(event_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_guests_event_id ON guests(event_id, full_name);
+CREATE INDEX IF NOT EXISTS idx_guests_group_id ON guests(group_id);
+
 -- Host login codes
 CREATE TABLE IF NOT EXISTS hosts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -148,6 +187,14 @@ FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_event_websites_updated_at ON event_websites;
 CREATE TRIGGER update_event_websites_updated_at BEFORE UPDATE ON event_websites
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_guest_groups_updated_at ON guest_groups;
+CREATE TRIGGER update_guest_groups_updated_at BEFORE UPDATE ON guest_groups
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_guests_updated_at ON guests;
+CREATE TRIGGER update_guests_updated_at BEFORE UPDATE ON guests
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_admin_accounts_updated_at ON admin_accounts;
