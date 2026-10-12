@@ -135,7 +135,7 @@ hostRouter.get('/:eventId/rsvp-verification-requests', async (req, res) => {
 
 hostRouter.patch('/:eventId/rsvp-verification-requests/:requestId', async (req, res) => {
   const { eventId, requestId } = req.params;
-  const { host_code: hostCode, status, guest_id: guestId, create_guest: createGuest } = req.body as { host_code?: string; status?: 'approved' | 'rejected'; guest_id?: string; create_guest?: boolean };
+  const { host_code: hostCode, status, guest_id: guestId, create_guest: createGuest, group_id: groupId } = req.body as { host_code?: string; status?: 'approved' | 'rejected'; guest_id?: string; create_guest?: boolean; group_id?: string };
   if (status !== 'approved' && status !== 'rejected') return res.status(400).json({ error: 'Choose approved or rejected' });
   if (status === 'approved' && !guestId && !createGuest) return res.status(400).json({ error: 'Choose a guest or add this person as a new guest' });
   const client = await pool.connect();
@@ -146,7 +146,13 @@ hostRouter.patch('/:eventId/rsvp-verification-requests/:requestId', async (req, 
     if (request.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Pending verification request not found' }); }
     let approvedGuestId = guestId ?? null;
     if (createGuest && status === 'approved') {
-      const guestResult = await client.query('INSERT INTO guests (event_id, full_name, email, phone) VALUES ($1, $2, $3, $4) RETURNING id', [eventId, request.rows[0].submitted_name, request.rows[0].contact_email, request.rows[0].contact_phone]);
+      if (groupId) {
+        const group = await client.query<{ invited_party_size: number }>('SELECT invited_party_size FROM guest_groups WHERE id = $1 AND event_id = $2 FOR UPDATE', [groupId, eventId]);
+        if (group.rowCount === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Guest group belongs to a different event' }); }
+        const groupGuestCount = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE group_id = $1', [groupId]);
+        if (Number(groupGuestCount.rows[0].count) >= group.rows[0].invited_party_size) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'This invitation group has reached its guest limit' }); }
+      }
+      const guestResult = await client.query('INSERT INTO guests (event_id, group_id, full_name, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id', [eventId, groupId ?? null, request.rows[0].submitted_name, request.rows[0].contact_email, request.rows[0].contact_phone]);
       approvedGuestId = guestResult.rows[0].id;
     }
     if (approvedGuestId) {

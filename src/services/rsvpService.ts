@@ -57,8 +57,8 @@ export async function getRsvpVerificationRequests(eventId: string, hostCode: str
   return response.json();
 }
 
-export async function reviewRsvpVerificationRequest(eventId: string, hostCode: string, requestId: string, status: 'approved' | 'rejected', guestId?: string, createGuest = false): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-verification-requests/${requestId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, status, guest_id: guestId, create_guest: createGuest }) });
+export async function reviewRsvpVerificationRequest(eventId: string, hostCode: string, requestId: string, status: 'approved' | 'rejected', guestId?: string, createGuest = false, groupId?: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-verification-requests/${requestId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, status, guest_id: guestId, create_guest: createGuest, group_id: groupId }) });
   if (!response.ok) throw new Error('Failed to review RSVP verification request');
 }
 
