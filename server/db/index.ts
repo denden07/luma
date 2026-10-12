@@ -10,9 +10,10 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://postgres:postgres
 
 export const pool = new Pool({
   connectionString: DATABASE_URL,
-  max: 20,
+  max: process.env.VERCEL ? 1 : 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
 });
 
 pool.on('error', (err) => {

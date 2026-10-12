@@ -290,9 +290,9 @@ function AppRoutes() {
 
   return (
     <>
-        {isLocalMode() && (
+       {/* {isLocalMode() && (
           <div className="local-mode-indicator">LOCAL · CACHE {serviceWorkerStatus.toUpperCase()}</div>
-        )}
+        ) */}
         
         <Routes>
           <Route path="/e/:eventToken/*" element={<EventRoute />} />
