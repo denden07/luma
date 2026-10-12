@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
+import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
+import type { PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
 import './PublicInvitation.css';
 
 type EntourageGroup = { id: string; title: string; members: string[] };
@@ -32,8 +34,51 @@ const entourageGroups = (content: Record<string, unknown>): EntourageGroup[] => 
 interface InvitationDocumentProps {
   document: WebsiteDocument;
   eventName: string;
+  eventId?: string;
+  rsvpPlusLimit?: number;
   preview?: boolean;
 }
+
+const PublicRsvpLookup = ({ eventId, buttonLabel, preview, rsvpPlusLimit = 0 }: { eventId?: string; buttonLabel: string; preview: boolean; rsvpPlusLimit?: number }) => {
+  const [name, setName] = useState('');
+  const [matches, setMatches] = useState<PublicGuestMatch[]>([]);
+  const [selectedGuest, setSelectedGuest] = useState<PublicGuestMatch | null>(null);
+  const [status, setStatus] = useState<RsvpStatus>('attending');
+  const [needsResponse, setNeedsResponse] = useState(false);
+  const partyCount = 1;
+  const [plusOneCount, setPlusOneCount] = useState(0);
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [dietaryNotes, setDietaryNotes] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!eventId || !name.trim()) return;
+    setIsSubmitting(true);
+    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setNeedsResponse(Boolean(result.needs_response)); setMessage(result.message ?? ''); }
+    catch { setMessage('Your RSVP request has been sent to the host for verification.'); }
+    finally { setIsSubmitting(false); }
+  };
+
+  const save = async () => {
+    if (!eventId || !selectedGuest) return;
+    setIsSubmitting(true);
+    try { await submitPublicGuestRsvp(eventId, selectedGuest.id, selectedGuest.full_name, { status, plusOneCount, dietaryNotes }); setMessage('Your RSVP has been saved.'); setMatches([]); setSelectedGuest(null); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save RSVP.'); }
+    finally { setIsSubmitting(false); }
+  };
+  const submitUnmatchedResponse = async () => {
+    if (!eventId || !name.trim()) return;
+    setIsSubmitting(true);
+    try { const result = await submitPublicRsvpLookup(eventId, name, { status, partyCount: status === 'attending' ? partyCount : 0, plusOneCount: status === 'attending' ? plusOneCount : 0, contactEmail: email, contactPhone: phone, dietaryNotes }); setMessage(result.message ?? 'Your RSVP has been sent to the host for review.'); setNeedsResponse(false); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not send RSVP.'); }
+    finally { setIsSubmitting(false); }
+  };
+  if (preview) return <div className="public-rsvp-lookup"><label>Your name<input placeholder="Search your invitation name" readOnly /></label><button type="button">{buttonLabel}</button></div>;
+  return <div className="public-rsvp-lookup"><form onSubmit={submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setSelectedGuest(null); setNeedsResponse(false); }} placeholder="Enter your invitation name" required /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : 'Search name'}</button></form>{matches.length > 0 && <div className="public-rsvp-matches"><p>Select your name</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => { setSelectedGuest(guest); setMatches([]); }}>{guest.full_name}</button>)}</div>}{selectedGuest && <div className="public-rsvp-response"><strong>{selectedGuest.full_name}</strong><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Declined</option><option value="undecided">Undecided</option></select></label>{status === 'attending' && rsvpPlusLimit > 0 && <label>Additional guests<select value={plusOneCount} onChange={input => setPlusOneCount(Number(input.target.value))}>{Array.from({ length: rsvpPlusLimit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label>}<label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label><button type="button" onClick={save} disabled={isSubmitting}>Save RSVP</button></div>}{needsResponse && <div className="public-rsvp-response"><strong>Send RSVP for review</strong><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Declined</option><option value="undecided">Undecided</option></select></label>{status === 'attending' && <><label>Additional guests<select value={plusOneCount} onChange={input => setPlusOneCount(Number(input.target.value))}>{Array.from({ length: rsvpPlusLimit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label></>}<label>Email<input type="email" value={email} onChange={input => setEmail(input.target.value)} /></label><label>Contact number<input type="tel" value={phone} onChange={input => setPhone(input.target.value)} /></label><label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label><button type="button" onClick={submitUnmatchedResponse} disabled={isSubmitting}>Send RSVP to host</button></div>}{message && <p role="status">{message}</p>}</div>;
+};
 
 const InvitationGallery = ({ paths, layout }: { paths: string[]; layout: 'grid' | 'strip' | 'carousel' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -70,7 +115,7 @@ const InvitationGallery = ({ paths, layout }: { paths: string[]; layout: 'grid' 
   );
 };
 
-const InvitationDocument = ({ document, eventName, preview = false }: InvitationDocumentProps) => {
+const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, preview = false }: InvitationDocumentProps) => {
   const hero = document.sections.find(section => section.type === 'hero');
   const heroContent = hero?.content ?? {};
   const names = contentText(heroContent, 'couple_names') || eventName;
@@ -87,7 +132,7 @@ const InvitationDocument = ({ document, eventName, preview = false }: Invitation
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {document.sections.filter(section => section.visible && section.type !== 'hero').map(section => {
-        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id="rsvp" key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>RSVP details will be available here.</p><button type="button">{contentText(section.content, 'button_label') || 'Respond'}</button></div></section>;
+        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id="rsvp" key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} rsvpPlusLimit={rsvpPlusLimit} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
         if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
         if (section.type === 'details') {
           const venue = contentText(section.content, 'venue');

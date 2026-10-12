@@ -32,7 +32,7 @@ const PublicInvitation = () => {
   if (!website) return <main className="public-invitation-state"><h1>Invitation not found</h1><p>This invitation is unavailable or has not been published yet.</p></main>;
 
   return (
-    <main><InvitationDocument document={website.published_document} eventName={website.event_name} /></main>
+    <main><InvitationDocument document={website.published_document} eventName={website.event_name} eventId={website.event_id} rsvpPlusLimit={website.rsvp_plus_limit} /></main>
   );
 };
 

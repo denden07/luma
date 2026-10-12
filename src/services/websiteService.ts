@@ -110,6 +110,7 @@ export interface PublishedWebsite {
   public_slug: string;
   published_document: WebsiteDocument;
   published_at: string;
+  rsvp_plus_limit: number;
 }
 
 export async function getPublishedWebsite(slug: string): Promise<PublishedWebsite | null> {

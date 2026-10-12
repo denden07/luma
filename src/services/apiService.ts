@@ -20,6 +20,7 @@ export interface Event {
   is_active: boolean;
   price_php: number;
   payment_status: 'unpaid' | 'partial' | 'paid';
+  rsvp_plus_limit: number;
   created_at: string;
   updated_at: string;
 }

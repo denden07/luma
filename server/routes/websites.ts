@@ -186,7 +186,7 @@ publicWebsitesRouter.get('/:slug', async (req, res) => {
 
   try {
     const result = await pool.query<Pick<EventWebsite, 'event_id' | 'public_slug' | 'published_document' | 'published_at'> & { event_name: string }>(
-      `SELECT website.event_id, website.public_slug, website.published_document, website.published_at, event.name AS event_name
+      `SELECT website.event_id, website.public_slug, website.published_document, website.published_at, event.name AS event_name, event.rsvp_plus_limit
        FROM event_websites website
        JOIN events event ON event.id = website.event_id
        WHERE website.public_slug = $1 AND website.published_at IS NOT NULL AND event.is_active = TRUE`,

@@ -92,15 +92,21 @@ router.patch('/:eventId/guests/:guestId', async (req, res) => {
 router.delete('/:eventId/guests/:guestId', async (req, res) => {
   const { eventId, guestId } = req.params;
   const hostCode = req.query.host_code;
+  const client = await pool.connect();
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
-    const result = await pool.query('DELETE FROM guests WHERE id = $1 AND event_id = $2 RETURNING id', [guestId, eventId]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'Guest not found' });
+    await client.query('BEGIN');
+    const existing = await client.query('SELECT id FROM guests WHERE id = $1 AND event_id = $2 FOR UPDATE', [guestId, eventId]);
+    if (existing.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Guest not found' }); }
+    await client.query('DELETE FROM rsvp_responses WHERE guest_id = $1', [guestId]);
+    await client.query('DELETE FROM guests WHERE id = $1', [guestId]);
+    await client.query('COMMIT');
     return res.status(204).end();
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
     console.error('Error deleting invitation guest:', error);
     return res.status(500).json({ error: 'Failed to delete invitation guest' });
-  }
+  } finally { client.release(); }
 });
 
 router.patch('/:eventId/guest-groups/:groupId', async (req, res) => {
