@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import pool from '../db/index.js';
+import { reconcileResponse } from './seating.js';
 
 const router = Router();
 
@@ -13,11 +14,22 @@ router.get('/:eventId/guests', async (req, res) => {
   const { eventId } = req.params;
   try {
     if (!await hostOwnsEvent(eventId, req.query.host_code)) return res.status(404).json({ error: 'Event not found' });
-    const [groups, guests] = await Promise.all([
-      pool.query('SELECT * FROM guest_groups WHERE event_id = $1 ORDER BY created_at', [eventId]),
-      pool.query('SELECT * FROM guests WHERE event_id = $1 ORDER BY full_name', [eventId]),
-    ]);
-    return res.json({ groups: groups.rows, guests: guests.rows });
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const groups = await client.query('SELECT * FROM guest_groups WHERE event_id = $1 ORDER BY created_at FOR UPDATE', [eventId]);
+      const responses = await client.query<{ id: string }>('SELECT id FROM rsvp_responses WHERE event_id = $1 ORDER BY id', [eventId]);
+      for (const response of responses.rows) await reconcileResponse(client, response.id);
+      const guests = await client.query(`SELECT g.*, COALESCE(own.status, grp.status, companion.status) AS rsvp_status
+        FROM guests g
+        LEFT JOIN rsvp_responses own ON own.guest_id = g.id
+        LEFT JOIN rsvp_responses grp ON grp.group_id = g.group_id
+        LEFT JOIN rsvp_responses companion ON companion.id = g.rsvp_response_id
+        WHERE g.event_id = $1 ORDER BY g.full_name`, [eventId]);
+      await client.query('COMMIT');
+      return res.json({ groups: groups.rows, guests: guests.rows });
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
   } catch (error) {
     console.error('Error loading invitation guests:', error);
     return res.status(500).json({ error: 'Failed to load invitation guests' });

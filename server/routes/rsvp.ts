@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import pool from '../db/index.js';
+import { reconcileResponse } from './seating.js';
 
 const hostRouter = Router();
 export const publicRsvpRouter = Router();
@@ -22,10 +23,10 @@ async function responseTargetByToken(token: string): Promise<RsvpTarget | null> 
       COALESCE(group_record.invited_party_size, 1) AS invited_party_size, event.rsvp_plus_limit AS plus_limit,
       COALESCE(group_record.name, guest.full_name) AS display_name
      FROM rsvp_links link
-     LEFT JOIN guests guest ON guest.id = link.guest_id
+     LEFT JOIN guests guest ON guest.id = link.guest_id AND guest.rsvp_response_id IS NULL
      LEFT JOIN guest_groups group_record ON group_record.id = link.group_id
      JOIN events event ON event.id = link.event_id AND event.is_active = TRUE
-     WHERE link.token = $1`,
+     WHERE link.token = $1 AND (link.guest_id IS NULL OR guest.id IS NOT NULL)`,
     [token],
   );
   return result.rows[0] ?? null;
@@ -34,7 +35,7 @@ async function responseTargetByToken(token: string): Promise<RsvpTarget | null> 
 async function responseTargetByHost(eventId: string, guestId?: string, groupId?: string): Promise<RsvpTarget | null> {
   if ((guestId && groupId) || (!guestId && !groupId)) return null;
   const result = guestId
-    ? await pool.query<RsvpTarget>(`SELECT guest.event_id, guest.id AS guest_id, NULL::uuid AS group_id, 1 AS invited_party_size, event.rsvp_plus_limit AS plus_limit, guest.full_name AS display_name FROM guests guest JOIN events event ON event.id = guest.event_id WHERE guest.id = $1 AND guest.event_id = $2`, [guestId, eventId])
+    ? await pool.query<RsvpTarget>(`SELECT guest.event_id, guest.id AS guest_id, NULL::uuid AS group_id, 1 AS invited_party_size, event.rsvp_plus_limit AS plus_limit, guest.full_name AS display_name FROM guests guest JOIN events event ON event.id = guest.event_id WHERE guest.id = $1 AND guest.event_id = $2 AND guest.rsvp_response_id IS NULL`, [guestId, eventId])
     : await pool.query<RsvpTarget>(`SELECT group_record.event_id, NULL::uuid AS guest_id, group_record.id AS group_id, group_record.invited_party_size, event.rsvp_plus_limit AS plus_limit, group_record.name AS display_name FROM guest_groups group_record JOIN events event ON event.id = group_record.event_id WHERE group_record.id = $1 AND group_record.event_id = $2`, [groupId, eventId]);
   return result.rows[0] ?? null;
 }
@@ -54,6 +55,11 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
   const ownsTransaction = !transactionClient;
   try {
     if (ownsTransaction) await client.query('BEGIN');
+    // Serialize first submissions for the same invitation, including simultaneous link submissions.
+    await client.query(
+      target.guest_id ? 'SELECT id FROM guests WHERE id = $1 FOR UPDATE' : 'SELECT id FROM guest_groups WHERE id = $1 FOR UPDATE',
+      [target.guest_id ?? target.group_id],
+    );
     const existing = await client.query<{ id: string }>(
       'SELECT id FROM rsvp_responses WHERE (guest_id = $1 AND $1::uuid IS NOT NULL) OR (group_id = $2 AND $2::uuid IS NOT NULL) FOR UPDATE',
       [target.guest_id, target.group_id],
@@ -71,7 +77,9 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
       );
     const responseId = responseResult.rows[0].id;
     await client.query('DELETE FROM rsvp_attendees WHERE response_id = $1', [responseId]);
-    for (const fullName of attendeeNames) await client.query('INSERT INTO rsvp_attendees (response_id, full_name) VALUES ($1, $2)', [responseId, fullName]);
+    for (const [index, fullName] of attendeeNames.entries())
+      await client.query('INSERT INTO rsvp_attendees (response_id, full_name, ordinal) VALUES ($1, $2, $3)', [responseId, fullName, index]);
+    await reconcileResponse(client, responseId);
     if (ownsTransaction) await client.query('COMMIT');
     return responseResult.rows[0];
   } catch (error) {
@@ -156,7 +164,7 @@ hostRouter.patch('/:eventId/rsvp-verification-requests/:requestId', async (req, 
       approvedGuestId = guestResult.rows[0].id;
     }
     if (approvedGuestId) {
-      const guest = await client.query('SELECT 1 FROM guests WHERE id = $1 AND event_id = $2', [approvedGuestId, eventId]);
+      const guest = await client.query('SELECT 1 FROM guests WHERE id = $1 AND event_id = $2 AND rsvp_response_id IS NULL', [approvedGuestId, eventId]);
       if (guest.rowCount === 0) return res.status(400).json({ error: 'Guest belongs to a different event' });
     }
     const result = await client.query(
@@ -182,7 +190,7 @@ hostRouter.post('/:eventId/rsvp-links', async (req, res) => {
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
     const target = guestId
-      ? await pool.query('SELECT 1 FROM guests WHERE id = $1 AND event_id = $2', [guestId, eventId])
+      ? await pool.query('SELECT 1 FROM guests WHERE id = $1 AND event_id = $2 AND rsvp_response_id IS NULL', [guestId, eventId])
       : await pool.query('SELECT 1 FROM guest_groups WHERE id = $1 AND event_id = $2', [groupId, eventId]);
     if (target.rowCount === 0) return res.status(400).json({ error: 'Invitation target belongs to a different event' });
     const result = guestId
@@ -199,7 +207,7 @@ publicRsvpRouter.post('/search', async (req, res) => {
     const event = await pool.query('SELECT 1 FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
     if (event.rowCount === 0) return res.status(404).json({ error: 'Invitation not found' });
     const matches = await pool.query<{ id: string; full_name: string }>(
-      `SELECT id, full_name FROM guests WHERE event_id = $1 AND full_name ILIKE $2 ORDER BY full_name LIMIT 10`,
+      `SELECT id, full_name FROM guests WHERE event_id = $1 AND rsvp_response_id IS NULL AND full_name ILIKE $2 ORDER BY full_name LIMIT 10`,
       [eventId, `%${name.trim()}%`],
     );
     return res.json({ matches: matches.rows });
@@ -213,7 +221,7 @@ publicRsvpRouter.post('/lookup', async (req, res) => {
     const event = await pool.query('SELECT 1 FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
     if (event.rowCount === 0) return res.status(404).json({ error: 'Invitation not found' });
     const matches = await pool.query<{ id: string; full_name: string }>(
-      `SELECT id, full_name FROM guests WHERE event_id = $1 AND full_name ILIKE $2 ORDER BY full_name LIMIT 10`,
+      `SELECT id, full_name FROM guests WHERE event_id = $1 AND rsvp_response_id IS NULL AND full_name ILIKE $2 ORDER BY full_name LIMIT 10`,
       [eventId, `%${name.trim()}%`],
     );
     if (matches.rows.length > 0) return res.json({ matches: matches.rows });

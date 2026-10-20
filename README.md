@@ -38,6 +38,25 @@ The PWA is available at `https://localhost:5173` and the API at
 Run `npm run db:migrate` before the API for a new database. Use `npm run dev` or
 `npm run dev:server` when only one process is needed.
 
+## Seating plan
+
+From an event's host dashboard, open **Plan seating**. Create tables with a seat
+count, search the unassigned guest roster, and choose a table for each guest.
+Guests may be moved or unassigned; removing a table leaves its guests unassigned.
+If a table exceeds its seat count, the plan warns you but permits the assignment.
+Use **Add and seat a guest** to create a guest-list entry and place them at a table
+in one step, with an optional existing invitation group. The roster's total
+counts each guest once.
+
+Attending RSVP companions and previously unlisted named group attendees appear
+in the guest list automatically. Companion entries include their invitation
+origin and friend number; changing or declining an RSVP removes only guests
+created from that RSVP and their seating assignments. Use **Print** for a
+print-friendly plan or **Export CSV** for the current assignments and unassigned
+guests. Run `npm run db:migrate` after updating an existing installation to add
+the seating schema; opening the host guest list or seating plan reconciles
+earlier responses.
+
 ## Vercel Deployment
 
 Create one Vercel project with `luma` as its Root Directory. Vercel builds the PWA,

@@ -11,6 +11,7 @@ import adminRouter from './routes/admin.js';
 import websitesRouter, { publicWebsitesRouter } from './routes/websites.js';
 import guestsRouter from './routes/guests.js';
 import rsvpRouter, { publicRsvpRouter } from './routes/rsvp.js';
+import seatingRouter from './routes/seating.js';
 
 dotenv.config();
 
@@ -68,6 +69,7 @@ app.use('/api/events', websitesRouter);
 app.use('/api/websites', publicWebsitesRouter);
 app.use('/api/events', guestsRouter);
 app.use('/api/events', rsvpRouter);
+app.use('/api/events', seatingRouter);
 app.use('/api/rsvp', publicRsvpRouter);
 app.use('/api/events', participantsRouter);
 app.use('/api/events', photosRouter);

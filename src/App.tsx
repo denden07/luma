@@ -17,6 +17,7 @@ import AdminDashboard from './screens/AdminDashboard';
 import WebsiteBuilder from './screens/websiteBuilder/WebsiteBuilder';
 import PublicInvitation from './screens/websiteBuilder/PublicInvitation';
 import GuestManager from './screens/GuestManager';
+import SeatingPlan from './screens/SeatingPlan';
 import PrivateRsvp from './screens/PrivateRsvp';
 import ErrorBoundary from './components/ErrorBoundary';
 import ErrorPopup from './components/ErrorPopup';
@@ -314,6 +315,7 @@ function AppRoutes() {
             </ProtectedHostRoute>
           } />
           <Route path="/host/events/:eventId/guests" element={<ProtectedHostRoute><GuestManager /></ProtectedHostRoute>} />
+          <Route path="/host/events/:eventId/seating" element={<ProtectedHostRoute><SeatingPlan /></ProtectedHostRoute>} />
           <Route path="/rsvp/:token" element={<PrivateRsvp />} />
           <Route path="/" element={<Navigate to="/host/login" replace />} />
           <Route path="/:slug" element={<PublicInvitation />} />

@@ -1,4 +1,5 @@
 .guest-manager { background: #f3f5ef; color: #202820; min-height: 100vh; }
+.guest-companion-label { color: #925d2e; display: block; font-size: 12px; margin-top: 3px; }
 .guest-manager header { align-items: center; background: #263a32; color: #fffdf7; display: flex; gap: 16px; padding: 22px max(24px, calc((100% - 1160px) / 2)); }
 .guest-manager header button { background: transparent; border: 1px solid rgba(255,253,247,.45); color: inherit; display: grid; height: 40px; place-items: center; width: 40px; }
 .guest-manager header p, .guest-manager header h1 { margin: 0; }.guest-manager header p { color: #d9bf72; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }.guest-manager header h1 { font-family: var(--font-editorial); font-size: 32px; line-height: 1; margin-top: 3px; }

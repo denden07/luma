@@ -15,6 +15,9 @@ export interface InvitationGuest {
   full_name: string;
   email: string | null;
   phone: string | null;
+  companion_label: string | null;
+  is_rsvp_companion: boolean;
+  rsvp_status: 'attending' | 'declined' | 'undecided' | null;
 }
 
 export interface GuestRoster {

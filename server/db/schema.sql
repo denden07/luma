@@ -91,6 +91,22 @@ CREATE TABLE IF NOT EXISTS guests (
 ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS contact_number VARCHAR(40);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone VARCHAR(40);
 
+CREATE TABLE IF NOT EXISTS seating_tables (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  capacity INTEGER NOT NULL CHECK (capacity > 0),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS table_id UUID REFERENCES seating_tables(id) ON DELETE SET NULL;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS companion_label VARCHAR(255);
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS is_rsvp_companion BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_response_id UUID;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_ordinal INTEGER;
+CREATE INDEX IF NOT EXISTS idx_seating_tables_event ON seating_tables(event_id);
+CREATE INDEX IF NOT EXISTS idx_guests_table ON guests(table_id);
+
 CREATE INDEX IF NOT EXISTS idx_guest_groups_event_id ON guest_groups(event_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_guests_event_id ON guests(event_id, full_name);
 CREATE INDEX IF NOT EXISTS idx_guests_group_id ON guests(group_id);
@@ -116,6 +132,12 @@ ALTER TABLE rsvp_responses ADD COLUMN IF NOT EXISTS plus_one_count INTEGER NOT N
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvp_responses_guest_id ON rsvp_responses(guest_id) WHERE guest_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_rsvp_responses_group_id ON rsvp_responses(group_id) WHERE group_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_rsvp_responses_event_status ON rsvp_responses(event_id, status);
+-- Added after responses exist so the same schema works on existing installations.
+ALTER TABLE guests DROP CONSTRAINT IF EXISTS guests_rsvp_response_id_fkey;
+ALTER TABLE guests ADD CONSTRAINT guests_rsvp_response_id_fkey
+  FOREIGN KEY (rsvp_response_id) REFERENCES rsvp_responses(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_guests_rsvp_slot ON guests(rsvp_response_id, rsvp_ordinal)
+  WHERE rsvp_response_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS rsvp_attendees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -124,6 +146,7 @@ CREATE TABLE IF NOT EXISTS rsvp_attendees (
   dietary_notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS ordinal INTEGER;
 
 CREATE TABLE IF NOT EXISTS rsvp_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
