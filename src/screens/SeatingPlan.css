@@ -47,6 +47,12 @@
 .seating-assignment { flex: 0 0 132px; }
 .seating-assignment select { font-size: 13px; }
 @media (max-width: 600px) { .seating-header h1 { font-size: 25px; } .seating-summary { align-items: start; flex-direction: column; } .seating-export { margin: 0; } .seating-table li { align-items: stretch; flex-direction: column; } .seating-assignment { flex: auto; width: 100%; } }
+@media (max-width: 760px) {
+  .seating-content { padding: 24px 16px 48px; }
+  .seating-export { flex-wrap: wrap; }
+  .seating-form label, .seating-form button { min-width: 0; }
+  .seating-table { overflow-wrap: anywhere; }
+}
 @media print {
   .seating-plan { background: #fff; color: #000; }
   .seating-print-title { display: block; }

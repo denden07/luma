@@ -40,7 +40,14 @@ Run `npm run db:migrate` before the API for a new database. Use `npm run dev` or
 
 ## Seating plan
 
-From an event's host dashboard, open **Plan seating**. Create tables with a seat
+From an event's host dashboard, open **Manage invitation**. This opens the
+website builder; the invitation sidebar switches between **Website**, **Guest
+list**, and **Seating plan** for the same event. On phones, open the menu at the
+top to access these sections. Draft website edits are saved before leaving
+the builder, including when using Back; if saving fails, the builder stays
+open with a retry option.
+
+In **Seating plan**, create tables with a seat
 count, search the unassigned guest roster, and choose a table for each guest.
 Guests may be moved or unassigned; removing a table leaves its guests unassigned.
 If a table exceeds its seat count, the plan warns you but permits the assignment.

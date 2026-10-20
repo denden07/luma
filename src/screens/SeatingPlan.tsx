@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Download, Plus, Printer, Search, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Download, Plus, Printer, Search, Trash2 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { getGuestRoster } from '../services/guestService';
 import type { GuestGroup } from '../services/guestService';
 import {
@@ -16,7 +16,6 @@ const emptyPlan: SeatingPlanData = { tables: [], guests: [] };
 
 const SeatingPlan = () => {
   const { eventId } = useParams<{ eventId: string }>();
-  const navigate = useNavigate();
   const hostCode = getHostCode();
   const [plan, setPlan] = useState<SeatingPlanData>(emptyPlan);
   const [groups, setGroups] = useState<GuestGroup[]>([]);
@@ -142,9 +141,7 @@ const SeatingPlan = () => {
 
   return <main className="seating-plan">
     <header className="seating-header">
-      <button type="button" onClick={() => navigate(`/host/dashboard/${eventId}`)} aria-label="Back to dashboard"><ArrowLeft size={20} /></button>
       <div><p>Event planning</p><h1>Seating plan</h1></div>
-      <button className="seating-guest-link" type="button" onClick={() => navigate(`/host/events/${eventId}/guests`)}>Guest list</button>
     </header>
     <div className="seating-content">
       <h1 className="seating-print-title">Seating plan</h1>

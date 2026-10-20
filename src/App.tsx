@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import Landing from './screens/Landing';
 import NameEntry from './screens/NameEntry';
 import Camera from './screens/Camera';
@@ -19,6 +19,7 @@ import PublicInvitation from './screens/websiteBuilder/PublicInvitation';
 import GuestManager from './screens/GuestManager';
 import SeatingPlan from './screens/SeatingPlan';
 import PrivateRsvp from './screens/PrivateRsvp';
+import InvitationWorkspace from './components/InvitationWorkspace';
 import ErrorBoundary from './components/ErrorBoundary';
 import ErrorPopup from './components/ErrorPopup';
 import CopySuccessPopup from './components/CopySuccessPopup';
@@ -309,13 +310,11 @@ function AppRoutes() {
               </ErrorBoundary>
             </ProtectedHostRoute>
           } />
-          <Route path="/host/events/:eventId/website" element={
-            <ProtectedHostRoute>
-              <WebsiteBuilder />
-            </ProtectedHostRoute>
-          } />
-          <Route path="/host/events/:eventId/guests" element={<ProtectedHostRoute><GuestManager /></ProtectedHostRoute>} />
-          <Route path="/host/events/:eventId/seating" element={<ProtectedHostRoute><SeatingPlan /></ProtectedHostRoute>} />
+          <Route path="/host/events/:eventId" element={<ProtectedHostRoute><InvitationWorkspace /></ProtectedHostRoute>}>
+            <Route path="website" element={<WebsiteBuilder />} />
+            <Route path="guests" element={<GuestManager />} />
+            <Route path="seating" element={<SeatingPlan />} />
+          </Route>
           <Route path="/rsvp/:token" element={<PrivateRsvp />} />
           <Route path="/" element={<Navigate to="/host/login" replace />} />
           <Route path="/:slug" element={<PublicInvitation />} />
@@ -324,12 +323,10 @@ function AppRoutes() {
   );
 }
 
+const router = createBrowserRouter([{ path: '*', element: <AppContent /> }]);
+
 function App() {
-  return (
-    <Router>
-      <AppContent />
-    </Router>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

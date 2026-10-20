@@ -91,6 +91,8 @@
 .website-builder-save-state.saving svg { animation: template-spin 1s linear infinite; }
 .website-builder-save-state.saved { color: #2f6d55; }
 .website-builder-save-state.error { color: #a43627; white-space: normal; }
+.website-builder-save-state.error { flex-wrap: wrap; }
+.website-builder-save-state button { background: transparent; border: 1px solid currentColor; color: inherit; font: inherit; min-height: 36px; padding: 5px 10px; }
 @keyframes template-spin { to { transform: rotate(360deg); } }
 
 .template-gallery {
@@ -275,4 +277,30 @@
   .invitation-preview-device.desktop,
   .invitation-preview-device.tablet,
   .invitation-preview-device.mobile { height: min(640px, 78dvh); max-height: 78dvh; }
+}
+
+.website-builder { min-width: 0; }
+.website-builder input, .website-builder select, .website-builder textarea { box-sizing: border-box; min-width: 0; }
+.website-editor-panel, .website-live-preview, .template-option { min-width: 0; }
+.website-slug-input input { flex: 1; }
+.website-slug-input > span { max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+
+@media (min-width: 761px) and (max-width: 1160px) {
+  .template-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .website-editor-workspace { grid-template-columns: minmax(0, 1fr); max-width: 680px; }
+  .website-editor-panel { max-height: none; position: static; }
+  .website-editor-scroll { overflow: visible; }
+}
+
+@media (max-width: 760px) {
+  .website-builder-header { padding: 16px; }
+  .website-builder-intro { align-items: start; flex-direction: column; gap: 12px; padding: 28px 16px 20px; }
+  .template-gallery { grid-template-columns: minmax(0, 1fr); max-width: 440px; padding: 0 16px 24px; }
+  .template-option { display: grid; grid-template-columns: 42% minmax(0, 1fr); }
+  .template-art { aspect-ratio: auto; min-height: 178px; }
+  .website-editor-workspace { grid-template-columns: minmax(0, 1fr); padding: 12px 16px 48px; }
+  .website-editor-panel { max-height: none; position: static; }
+  .website-editor-scroll { overflow: visible; }
+  .website-live-preview { min-height: 0; padding: 12px; }
+  .website-preview-toolbar { flex-wrap: wrap; gap: 8px; }
 }

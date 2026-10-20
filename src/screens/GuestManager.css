@@ -21,3 +21,31 @@
 .rsvp-cell-status { color: #60705d; font-size: 12px; }.rsvp-cell-status.attending { color: #315f37; font-weight: 700; }.rsvp-cell-status.declined { color: #9b392d; font-weight: 700; }
 .modal-content.guest-edit-modal { background: #fffdf7; border: 1px solid #cbd3c6; max-width: 460px; padding: 26px; width: min(100%, 460px); }.guest-edit-modal form { display: grid; gap: 15px; }.guest-edit-modal h2 { font-family: var(--font-editorial); font-size: 30px; margin: 0 0 4px; }.guest-edit-modal label { color: #40503f; display: grid; font-size: 12px; font-weight: 700; gap: 6px; letter-spacing: .04em; text-transform: uppercase; }.guest-edit-modal input, .guest-edit-modal select { background: #fffdf7; border: 1px solid #bdc5b9; color: #202820; font: inherit; padding: 10px; text-transform: none; }.guest-edit-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }.guest-edit-modal-actions button { background: transparent; border: 1px solid #bdc5b9; color: #40503f; font: inherit; padding: 10px 14px; }.guest-edit-modal-actions button:last-child { background: #263a32; border-color: #263a32; color: #fffdf7; }
 @media (max-width: 760px) { .guest-manager header { padding-inline: 20px; }.guest-manager-content { padding-inline: 18px; }.guest-workflow-heading { align-items: start; flex-direction: column; gap: 5px; }.guest-workflow-heading span { margin-left: 0; }.guest-group-workflow-content, .guest-add-workflow form { grid-template-columns: 1fr; }.guest-group-list { border-left: 0; border-top: 1px solid #cbd3c6; padding: 16px 0 0; }.guest-list-heading { align-items: stretch; flex-direction: column; gap: 14px; }.guest-list-controls { flex-direction: column; }.guest-list-controls label { min-width: 0; }.guest-pagination { justify-content: center; } }
+@media (max-width: 760px) {
+  .guest-manager-summary { align-items: flex-start; flex-direction: column; }
+  .guest-manager input, .guest-manager select { box-sizing: border-box; min-width: 0; width: 100%; }
+  .guest-list-controls-inline { align-items: stretch; }
+  .guest-group-table-wrap, .guest-table-wrap { background: transparent; border: 0; overflow: visible; }
+  .guest-group-table-wrap table, .guest-table-wrap table { display: block; min-width: 0; }
+  .guest-group-table-wrap thead, .guest-table-wrap thead { clip: rect(0, 0, 0, 0); clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+  .guest-group-table-wrap tbody, .guest-table-wrap tbody { display: grid; gap: 12px; }
+  .guest-group-table-wrap tr, .guest-table-wrap tr { background: #fffdf7; border: 1px solid #cbd3c6; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 14px; }
+  .guest-group-table-wrap td, .guest-table-wrap td { border: 0; display: grid; font-size: 14px; gap: 3px; min-width: 0; overflow-wrap: anywhere; padding: 0; }
+  .guest-group-table-wrap td::before, .guest-table-wrap td::before { color: #60705d; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .guest-group-table-wrap td:first-child, .guest-table-wrap td:first-child { display: none; }
+  .guest-group-table-wrap td:nth-child(2), .guest-table-wrap td:nth-child(2) { font-size: 17px; font-weight: 700; grid-column: 1 / -1; }
+  .guest-group-table-wrap td:nth-child(2)::before { content: 'Group'; }
+  .guest-group-table-wrap td:nth-child(3)::before { content: 'Contact'; }
+  .guest-group-table-wrap td:nth-child(4)::before { content: 'Guests'; }
+  .guest-group-table-wrap td:nth-child(5) { grid-column: 1 / -1; }
+  .guest-table-wrap td:nth-child(2)::before { content: 'Guest'; }
+  .guest-table-wrap td:nth-child(3)::before { content: 'Group'; }
+  .guest-table-wrap td:nth-child(4)::before { content: 'Email'; }
+  .guest-table-wrap td:nth-child(5)::before { content: 'Contact'; }
+  .guest-table-wrap td:nth-child(6)::before { content: 'RSVP'; }
+  .guest-table-wrap td:nth-child(7)::before { content: 'Party'; }
+  .guest-table-wrap td:nth-child(8)::before { content: 'Pluses'; }
+  .guest-table-wrap td:nth-child(9)::before { content: 'Responded'; }
+  .guest-table-wrap td:nth-child(10) { grid-column: 1 / -1; }
+  .guest-group-table-wrap td:last-child button, .guest-table-wrap td:last-child button { height: 40px; width: 40px; }
+}

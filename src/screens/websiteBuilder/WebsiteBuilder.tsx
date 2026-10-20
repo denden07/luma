@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, X } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, X } from 'lucide-react';
+import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { deleteEventCover, getEventsByHostCode, getPhotoUrl, uploadEventCover } from '../../services/dataService';
 import type { Event } from '../../services/dataService';
 import { createWebsiteDraft, deleteWebsiteAsset, ensureWebsiteSections, getEventWebsite, getWebsiteAssets, publishEventWebsite, saveEventWebsite, slugifyInvitationName, uploadWebsiteAsset } from '../../services/websiteService';
@@ -54,7 +54,48 @@ const WebsiteBuilder = () => {
   const [isUploadingGalleryImage, setIsUploadingGalleryImage] = useState(false);
   const [previewedGalleryAsset, setPreviewedGalleryAsset] = useState<WebsiteAsset | null>(null);
   const [isCoverPreviewOpen, setIsCoverPreviewOpen] = useState(false);
+  const revision = useRef(0);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingSave = useRef<{ revision: number; promise: Promise<void> } | null>(null);
   const navigate = useNavigate();
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    isDirty && currentLocation.pathname !== nextLocation.pathname);
+
+  const markDirty = () => {
+    revision.current += 1;
+    setIsDirty(true);
+    setSaveState('idle');
+  };
+
+  const saveDraft = useCallback(async (draft: WebsiteDocument, snapshot: number) => {
+    const hostCode = getHostCode();
+    if (!eventId || !hostCode) {
+      setSaveState('error');
+      throw new Error('Host access is required to save this invitation.');
+    }
+    setSaveState('saving');
+    let pending = pendingSave.current;
+    if (!pending || pending.revision !== snapshot) {
+      const promise = saveQueue.current.catch(() => undefined)
+        .then(() => saveEventWebsite(eventId, hostCode, draft))
+        .then(() => undefined);
+      pending = { revision: snapshot, promise };
+      pendingSave.current = pending;
+      saveQueue.current = promise;
+    }
+    try {
+      await pending.promise;
+      if (revision.current === snapshot) {
+        setIsDirty(false);
+        setSaveState('saved');
+      }
+    } catch (saveError) {
+      setSaveState('error');
+      throw saveError;
+    } finally {
+      if (pendingSave.current === pending) pendingSave.current = null;
+    }
+  }, [eventId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -105,22 +146,31 @@ const WebsiteBuilder = () => {
 
   useEffect(() => {
     if (!isDirty || !document || !event) return;
-    const hostCode = getHostCode();
-    if (!hostCode) return;
-
-    const timeout = window.setTimeout(async () => {
-      setSaveState('saving');
-      try {
-        await saveEventWebsite(event.id, hostCode, document);
-        setSaveState('saved');
-        setIsDirty(false);
-      } catch {
-        setSaveState('error');
-      }
+    if (blocker.state === 'blocked') return;
+    const timeout = window.setTimeout(() => {
+      void saveDraft(document, revision.current).catch(saveError => {
+        console.error('Could not autosave invitation draft:', saveError);
+      });
     }, 700);
 
     return () => window.clearTimeout(timeout);
-  }, [document, event, isDirty]);
+  }, [document, event, isDirty, blocker.state, saveDraft]);
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    let current = true;
+    if (!document) {
+      blocker.reset();
+      return;
+    }
+    void saveDraft(document, revision.current).then(() => {
+      if (current) blocker.proceed();
+    }).catch(saveError => {
+      console.error('Could not save invitation before leaving:', saveError);
+      if (current) blocker.reset();
+    });
+    return () => { current = false; };
+  }, [blocker, document, saveDraft]);
 
   if (isLoading) {
     return <main className="website-builder-state"><p>Loading invitation workspace...</p></main>;
@@ -151,11 +201,9 @@ const WebsiteBuilder = () => {
       }
       : createWebsiteDraft(event.name, event.date, templateId, event.cover_photo_path);
     setDocument(nextDocument);
-    setIsDirty(false);
-    setSaveState('saving');
+    markDirty();
     try {
-      await saveEventWebsite(event.id, hostCode, nextDocument);
-      setSaveState('saved');
+      await saveDraft(nextDocument, revision.current);
     } catch {
       setSaveState('error');
     }
@@ -195,8 +243,7 @@ const WebsiteBuilder = () => {
         ? { ...section, content: { ...section.content, [field]: value } }
         : section),
     });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
     if (field === 'couple_names' && !hasEditedSlug) setSlug(slugifyInvitationName(value));
   };
 
@@ -208,15 +255,13 @@ const WebsiteBuilder = () => {
         ? { ...section, content: { ...section.content, [field]: value } }
         : section),
     });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const updateTheme = (field: 'palette_id' | 'font_pair_id', value: string) => {
     if (!document) return;
     setDocument({ ...document, theme: { ...document.theme, [field]: value } });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const toggleGalleryPhoto = (storagePath: string) => {
@@ -229,15 +274,13 @@ const WebsiteBuilder = () => {
       : [...galleryPhotoPaths, storagePath];
     if (!document || !gallery?.id) return;
     setDocument({ ...document, sections: document.sections.map(section => section.id === gallery.id ? { ...section, content: { ...section.content, photo_paths: paths } } : section) });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const updateEntourageGroups = (groups: EntourageGroup[]) => {
     if (!document || !entourage?.id) return;
     setDocument({ ...document, sections: document.sections.map(section => section.id === entourage.id ? { ...section, content: { ...section.content, groups } } : section) });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const uploadGalleryImage = async (file: File | null) => {
@@ -263,8 +306,7 @@ const WebsiteBuilder = () => {
       const paths = galleryPhotoPaths.filter(path => path !== asset.storage_path);
       setWebsiteAssets(current => current.filter(current => current.id !== asset.id));
       setDocument({ ...document, sections: document.sections.map(section => section.id === gallery.id ? { ...section, content: { ...section.content, photo_paths: paths } } : section) });
-      setIsDirty(true);
-      setSaveState('idle');
+      markDirty();
       setPreviewedGalleryAsset(null);
     } catch {
       setPublishError('Could not remove the invitation image. Please try again.');
@@ -277,8 +319,7 @@ const WebsiteBuilder = () => {
       ...document,
       sections: document.sections.map(section => section.id === sectionId ? { ...section, visible: !section.visible } : section),
     });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const moveSection = (sectionId: string, direction: -1 | 1) => {
@@ -289,8 +330,7 @@ const WebsiteBuilder = () => {
     const sections = [...document.sections];
     [sections[index], sections[destination]] = [sections[destination], sections[index]];
     setDocument({ ...document, sections });
-    setIsDirty(true);
-    setSaveState('idle');
+    markDirty();
   };
 
   const uploadCover = async (file: File | null) => {
@@ -329,11 +369,9 @@ const WebsiteBuilder = () => {
     setIsPublishing(true);
     setPublishError(null);
     try {
-      await saveEventWebsite(event.id, hostCode, document);
+      await saveDraft(document, revision.current);
       const published = await publishEventWebsite(event.id, hostCode, slug);
       setSlug(published.public_slug ?? slug);
-      setSaveState('saved');
-      setIsDirty(false);
     } catch (publishFailure) {
       setPublishError(publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website');
     } finally {
@@ -358,15 +396,6 @@ const WebsiteBuilder = () => {
   return (
     <main className="website-builder">
       <header className="website-builder-header">
-        <button
-          type="button"
-          className="website-builder-back"
-          onClick={() => navigate(`/host/dashboard/${event.id}`)}
-          aria-label="Back to event dashboard"
-          title="Back to event dashboard"
-        >
-          <ArrowLeft size={20} aria-hidden="true" />
-        </button>
         <div>
           <p className="website-builder-eyebrow">Invitation website</p>
           <h1>{event.name}</h1>
@@ -379,11 +408,11 @@ const WebsiteBuilder = () => {
           <h2 id="website-builder-title">Choose a starting mood</h2>
           <p>Every detail stays editable. Start with the invitation feeling that fits your day.</p>
         </div>
-        <p className={`website-builder-save-state ${saveState}`} role="status">
+        <div className={`website-builder-save-state ${saveState}`} role="status">
           {saveState === 'saving' && <><LoaderCircle size={15} aria-hidden="true" /> Saving draft</>}
           {saveState === 'saved' && <><Check size={15} aria-hidden="true" /> Draft saved</>}
-          {saveState === 'error' && 'Could not save. Choose a template again to retry.'}
-        </p>
+          {saveState === 'error' && <>Could not save invitation draft. Your edits are still here. <button type="button" onClick={() => { if (document) void saveDraft(document, revision.current).catch(saveError => console.error('Could not retry invitation save:', saveError)); }}>Retry save</button></>}
+        </div>
       </section>
 
       <section className="template-gallery" aria-label="Invitation templates">

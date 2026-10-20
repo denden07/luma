@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
+import { LayoutTemplate } from 'lucide-react';
 import { downloadEventPhotosZip, getEvent, getEventPhotos, getPhotoUrl } from '../services/dataService';
 import type { Event, PhotoMetadata } from '../services/dataService';
 import { getFilter } from '../utils/filters';
@@ -385,13 +386,7 @@ const HostDashboard: React.FC = () => {
               </button>
             </div>
             <button className="website-builder-link" type="button" onClick={() => navigate(`/host/events/${eventId}/website`)}>
-              Build invitation website
-            </button>
-            <button className="website-builder-link guest-manager-link" type="button" onClick={() => navigate(`/host/events/${eventId}/guests`)}>
-              Manage invitation guests
-            </button>
-            <button className="website-builder-link guest-manager-link" type="button" onClick={() => navigate(`/host/events/${eventId}/seating`)}>
-              Plan seating
+              <LayoutTemplate size={19} aria-hidden="true" /> Manage invitation
             </button>
             {eventDetails && <div className="event-health"><span>{participants.length} / {eventDetails.guest_limit} guests</span><span>{photos.length} photos</span><span>{eventDetails.start_time ? 'Scheduled' : 'Open'}</span></div>}
           </>

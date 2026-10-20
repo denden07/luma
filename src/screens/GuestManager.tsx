@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Check, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import { createGuestGroup, createInvitationGuest, deleteGuestGroup, deleteInvitationGuest, getGuestRoster, updateInvitationGuest } from '../services/guestService';
 import type { GuestRoster, InvitationGuest } from '../services/guestService';
 import { getRsvpResponses } from '../services/rsvpService';
@@ -15,7 +15,6 @@ type RosterSort = 'responded' | 'name';
 
 const GuestManager = () => {
   const { eventId } = useParams<{ eventId: string }>();
-  const navigate = useNavigate();
   const hostCode = getHostCode() ?? '';
   const [roster, setRoster] = useState<GuestRoster>({ groups: [], guests: [] });
   const [responses, setResponses] = useState<RsvpResponse[]>([]);
@@ -132,7 +131,7 @@ const GuestManager = () => {
   };
 
   return <main className="guest-manager">
-    <header><button type="button" onClick={() => navigate(`/host/dashboard/${eventId}`)} aria-label="Back to event dashboard"><ArrowLeft size={20} /></button><div><p>Invitation guests</p><h1>Guest list</h1></div><button type="button" onClick={() => navigate(`/host/events/${eventId}/seating`)}>Seating plan</button></header>
+    <header><div><p>Invitation guests</p><h1>Guest list</h1></div></header>
     <div className="guest-manager-content">
       {message && <div className="guest-manager-toast" role="status"><Check size={17} /> {message}</div>}
       {error && <p className="guest-manager-error">{error}</p>}
