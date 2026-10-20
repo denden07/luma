@@ -235,7 +235,6 @@
 .share-title { font-weight: 700; }
 .share-link { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-warm-gray); font-size: 12px; }
 .event-health { justify-content: space-between; color: var(--color-warm-gray); font-size: 13px; }
-.website-builder-link { align-items: center; background: var(--color-film-yellow); border: 0; border-radius: 4px; color: var(--color-charcoal); display: flex; font: inherit; font-weight: 700; gap: 9px; justify-content: center; margin: 16px auto 0; padding: 12px 18px; }
 
 /* Empty State */
 .empty-state {

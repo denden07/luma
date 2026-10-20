@@ -40,12 +40,18 @@ Run `npm run db:migrate` before the API for a new database. Use `npm run dev` or
 
 ## Seating plan
 
-From an event's host dashboard, open **Manage invitation**. This opens the
+From an event card on **My Events** (`/host`), open **Manage invitation** beneath
+**View Dashboard**. This opens the
 website builder; the invitation sidebar switches between **Website**, **Guest
 list**, and **Seating plan** for the same event. On phones, open the menu at the
 top to access these sections. Draft website edits are saved before leaving
 the builder, including when using Back; if saving fails, the builder stays
 open with a retry option.
+
+On a published invitation, a circular section menu appears at the bottom right
+after the opening section scrolls out of view. It links to the published,
+visible sections and **Back to top**; the editor preview does not show this
+menu.
 
 In **Seating plan**, create tables with a seat
 count, search the unassigned guest roster, and choose a table for each guest.

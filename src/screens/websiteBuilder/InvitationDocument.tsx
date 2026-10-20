@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
+import { invitationSectionId } from '../../utils/invitationSections';
 import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
 import './PublicInvitation.css';
@@ -127,13 +128,13 @@ const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, p
 
   return (
     <div key={`${document.template_id}-${document.theme.palette_id}-${document.theme.font_pair_id}`} className={`public-invitation public-invitation-${document.template_id} palette-${document.theme.palette_id} font-${document.theme.font_pair_id} ${preview ? 'invitation-document-preview' : ''}`}>
-      {hero?.visible && <section className={`public-invitation-hero ${coverPhotoUrl ? 'has-cover' : ''}`}>
+      {hero?.visible && <section id={invitationSectionId(hero)} tabIndex={-1} className={`public-invitation-hero ${coverPhotoUrl ? 'has-cover' : ''}`}>
         {coverPhotoUrl && <img className="public-invitation-cover-media" src={coverPhotoUrl} alt="" style={{ objectPosition: coverPosition }} />}
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {document.sections.filter(section => section.visible && section.type !== 'hero').map(section => {
-        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id="rsvp" key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} rsvpPlusLimit={rsvpPlusLimit} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
-        if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
+        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} rsvpPlusLimit={rsvpPlusLimit} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
+        if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
         if (section.type === 'details') {
           const venue = contentText(section.content, 'venue');
           const ceremonyPlace = contentText(section.content, 'ceremony_place');
@@ -143,16 +144,16 @@ const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, p
             { label: 'Venue', place: venue, time: contentText(section.content, 'venue_time'), directions: venueDirections },
             { label: 'Ceremony', place: ceremonyPlace, time: contentText(section.content, 'ceremony_time'), directions: ceremonyDirections },
           ].filter(location => location.place || location.time);
-          return <section className="public-invitation-section public-invitation-details" key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div className="public-invitation-locations">{locations.map(location => { const mapEmbedUrl = googleMapsEmbedUrl(location.place); return <article key={location.label}><p className="public-location-label">{location.label}</p>{location.place && <p className="public-location-place">{location.place}</p>}{location.time && <p>{location.time}</p>}{mapEmbedUrl && <iframe className="public-invitation-map" title={`Map for ${location.place}`} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />}{location.directions && <a className="public-invitation-directions" href={location.directions} target="_blank" rel="noreferrer"><MapPinned size={18} aria-hidden="true" /> Get directions</a>}</article>; })}</div></section>;
+          return <section className="public-invitation-section public-invitation-details" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div className="public-invitation-locations">{locations.map(location => { const mapEmbedUrl = googleMapsEmbedUrl(location.place); return <article key={location.label}><p className="public-location-label">{location.label}</p>{location.place && <p className="public-location-place">{location.place}</p>}{location.time && <p>{location.time}</p>}{mapEmbedUrl && <iframe className="public-invitation-map" title={`Map for ${location.place}`} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />}{location.directions && <a className="public-invitation-directions" href={location.directions} target="_blank" rel="noreferrer"><MapPinned size={18} aria-hidden="true" /> Get directions</a>}</article>; })}</div></section>;
         }
         if (section.type === 'gallery') {
           const paths = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
           const selectedLayout = contentText(section.content, 'layout');
           const layout = selectedLayout === 'strip' || selectedLayout === 'carousel' ? selectedLayout : 'grid';
-          return <section className="public-invitation-section public-invitation-gallery" key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><InvitationGallery paths={paths} layout={layout} /></section>;
+          return <section className="public-invitation-section public-invitation-gallery" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><InvitationGallery paths={paths} layout={layout} /></section>;
         }
-        if (section.type === 'entourage') return <section className="public-invitation-section public-invitation-entourage" key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div>{entourageGroups(section.content).map(group => { const members = group.members.map(member => member.trim()).filter(Boolean); return <article key={group.id}><h2>{group.title}</h2>{members.length > 0 && <ul>{members.map(member => <li key={member}>{member}</li>)}</ul>}</article>; })}</div></section>;
-        if (section.type === 'closing') return <section className="public-invitation-section public-invitation-closing" key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
+        if (section.type === 'entourage') return <section className="public-invitation-section public-invitation-entourage" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div>{entourageGroups(section.content).map(group => { const members = group.members.map(member => member.trim()).filter(Boolean); return <article key={group.id}><h2>{group.title}</h2>{members.length > 0 && <ul>{members.map(member => <li key={member}>{member}</li>)}</ul>}</article>; })}</div></section>;
+        if (section.type === 'closing') return <section className="public-invitation-section public-invitation-closing" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
         return null;
       })}
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LayoutTemplate } from 'lucide-react';
 import { getEventsByHostCode } from '../services/dataService';
 import { getHostCode, clearHostCode } from '../utils/hostAuth';
 import { copyTextToClipboard } from '../utils/clipboard';
@@ -137,15 +138,28 @@ const HostEventsList: React.FC = () => {
                     <span>Guests: {event.guest_limit}</span>
                     <span>Photos: {event.photo_limit} / guest</span>
                   </div>
-                  <button 
-                    className="view-dashboard-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/host/dashboard/${event.id}`);
-                    }}
-                  >
-                    View Dashboard →
-                  </button>
+                  <div className="event-card-actions">
+                    <button
+                      className="view-dashboard-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/host/dashboard/${event.id}`);
+                      }}
+                    >
+                      View Dashboard →
+                    </button>
+                    <button
+                      className="manage-invitation-button"
+                      type="button"
+                      aria-label={`Manage invitation for ${event.name}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/host/events/${event.id}/website`);
+                      }}
+                    >
+                      <LayoutTemplate size={17} aria-hidden="true" /> Manage invitation
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
