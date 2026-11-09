@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, X } from 'lucide-react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { deleteEventCover, getEventsByHostCode, getPhotoUrl, uploadEventCover } from '../../services/dataService';
 import type { Event } from '../../services/dataService';
@@ -196,7 +196,7 @@ const WebsiteBuilder = () => {
         theme: {
           ...document.theme,
           palette_id: templateId,
-          font_pair_id: templateId === 'classic' ? 'editorial' : document.theme.font_pair_id,
+          font_pair_id: templateId === 'modern' ? 'modern' : 'editorial',
         },
       }
       : createWebsiteDraft(event.name, event.date, templateId, event.cover_photo_path);
@@ -416,7 +416,7 @@ const WebsiteBuilder = () => {
       </section>
 
       <section className="template-gallery" aria-label="Invitation templates">
-        {templates.map(template => {
+        {templates.map((template, index) => {
           const isSelected = document?.template_id === template.id;
           return (
             <button
@@ -428,12 +428,16 @@ const WebsiteBuilder = () => {
             >
               <span className="template-art" aria-hidden="true">
                 <img src={templateSampleImage} alt="" />
+                <span className="template-art-kicker">An invitation to celebrate</span>
                 <span className="template-art-names">Avery<br />&amp; Jordan</span>
                 <span className="template-art-date">SEPTEMBER 21</span>
+                <span className="template-art-mark">A <span>&amp;</span> J</span>
               </span>
               <span className="template-copy">
+                <span className="template-copy-index">0{index + 1} / 0{templates.length}</span>
                 <strong>{template.name}</strong>
                 <small>{template.description}</small>
+                <span className="template-copy-action">Explore this look <ArrowUpRight size={18} aria-hidden="true" /></span>
               </span>
               {isSelected && <span className="template-selected"><Check size={15} aria-hidden="true" /> Selected</span>}
             </button>

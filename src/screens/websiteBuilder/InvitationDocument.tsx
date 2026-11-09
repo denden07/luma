@@ -130,6 +130,7 @@ const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, p
     <div key={`${document.template_id}-${document.theme.palette_id}-${document.theme.font_pair_id}`} className={`public-invitation public-invitation-${document.template_id} palette-${document.theme.palette_id} font-${document.theme.font_pair_id} ${preview ? 'invitation-document-preview' : ''}`}>
       {hero?.visible && <section id={invitationSectionId(hero)} tabIndex={-1} className={`public-invitation-hero ${coverPhotoUrl ? 'has-cover' : ''}`}>
         {coverPhotoUrl && <img className="public-invitation-cover-media" src={coverPhotoUrl} alt="" style={{ objectPosition: coverPosition }} />}
+        <span className="public-invitation-ornament" aria-hidden="true" />
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {document.sections.filter(section => section.visible && section.type !== 'hero').map(section => {

@@ -162,3 +162,175 @@
 @keyframes garden-cover-drift { from { transform: scale(1.08) translateY(-2%); } to { transform: scale(1) translateY(2%); } }
 @keyframes modern-cover-shift { from { transform: scale(1.12) translateX(-2%); } to { transform: scale(1.02) translateX(2%); } }
 @keyframes classic-cover-soften { from { transform: scale(1.06); filter: sepia(.65) brightness(1.03); } to { transform: scale(1); filter: sepia(.42) brightness(1.12); } }
+
+.public-invitation-hero { container-type: inline-size; grid-template-columns: minmax(0, 1fr); isolation: isolate; min-width: 0; }
+.public-invitation-hero h1, .public-invitation-message { max-width: 100%; overflow-wrap: anywhere; }
+.public-invitation-message { width: 100%; }
+.public-invitation-ornament { pointer-events: none; position: absolute; z-index: 2; }
+.public-invitation-hero a:focus-visible,
+.public-invitation-section a:focus-visible,
+.public-invitation-section button:focus-visible,
+.public-invitation-rsvp button:focus-visible { outline: 3px solid currentColor; outline-offset: 4px; }
+.public-invitation-section-kicker { text-wrap: balance; }
+.public-invitation-garden .public-invitation-hero {
+  background: radial-gradient(circle at 50% 38%, #f4f5e8 0, #dfebdf 50%, #b8d0bb 100%);
+}
+.public-invitation-garden .public-invitation-hero:not(.has-cover)::before {
+  border: 1px solid rgba(38, 67, 51, .55);
+  inset: clamp(14px, 3vw, 32px);
+}
+.public-invitation-garden .public-invitation-ornament {
+  border: 1px solid currentColor;
+  border-radius: 48% 52% 45% 55%;
+  height: clamp(200px, 42vw, 440px);
+  opacity: .19;
+  top: 50%;
+  transform: translateY(-50%) rotate(-18deg);
+  width: clamp(200px, 42vw, 440px);
+}
+.public-invitation-garden .public-invitation-ornament::after {
+  border: 1px solid currentColor;
+  border-radius: 55% 45% 52% 48%;
+  content: '';
+  inset: 14px;
+  position: absolute;
+  transform: rotate(36deg);
+}
+.public-invitation-garden .public-invitation-hero h1 {
+  font-size: clamp(38px, 10cqw, 108px);
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -.055em;
+}
+.public-invitation-garden .public-invitation-date { letter-spacing: .34em; }
+.public-invitation-garden .public-invitation-hero a { border-bottom: 0; border-top: 1px solid currentColor; padding: 10px 16px 0; }
+.public-invitation-garden .public-invitation-section-kicker { font-style: italic; font-weight: 500; }
+.public-invitation-garden .public-invitation-story { background-image: radial-gradient(circle at 0 0, rgba(93, 127, 89, .14), transparent 52%); }
+.public-invitation-garden .public-invitation-hero:not(.has-cover) .public-invitation-ornament { animation: garden-breathe 8s ease-in-out infinite alternate; }
+
+.public-invitation-modern .public-invitation-hero {
+  align-content: end;
+  background: radial-gradient(circle at 80% 20%, #374746, #101918 65%);
+  justify-items: start;
+  padding: clamp(28px, 6cqw, 100px);
+  text-align: left;
+}
+.public-invitation-modern .public-invitation-hero:not(.has-cover)::before {
+  background: #e1c86b;
+  height: 3px;
+  left: clamp(28px, 6cqw, 100px);
+  top: 15%;
+  transform: none;
+  width: clamp(42px, 8vw, 96px);
+}
+.public-invitation-modern .public-invitation-ornament {
+  border: 1px solid rgba(225, 200, 107, .53);
+  border-radius: 50%;
+  height: clamp(180px, 38vw, 470px);
+  right: -8%;
+  top: 6%;
+  width: clamp(180px, 38vw, 470px);
+}
+.public-invitation-modern .public-invitation-ornament::after {
+  border: 1px solid rgba(225, 200, 107, .32);
+  border-radius: 50%;
+  content: '';
+  inset: 15%;
+  position: absolute;
+}
+.public-invitation-modern .public-invitation-hero h1 {
+  font-family: var(--font-primary);
+  font-size: clamp(38px, 14cqw, 122px);
+  font-weight: 800;
+  letter-spacing: -.085em;
+  line-height: .91;
+  text-transform: uppercase;
+}
+.public-invitation-modern .public-invitation-date { color: #e1c86b; }
+.public-invitation-modern .public-invitation-hero a {
+  border: 1px solid #e1c86b;
+  color: #e1c86b;
+  padding: 13px 26px;
+}
+.public-invitation-modern .public-invitation-hero a:hover { background: #e1c86b; color: #1d211c; }
+.public-invitation-modern .public-invitation-section-kicker {
+  font-family: var(--font-primary);
+  font-size: clamp(30px, 6vw, 64px);
+  font-weight: 800;
+  letter-spacing: -.06em;
+  text-transform: uppercase;
+}
+.public-invitation-modern .public-invitation-section { border-top: 1px solid rgba(225, 200, 107, .25); }
+.public-invitation-modern .public-invitation-ornament { animation: modern-orbit 18s linear infinite; }
+
+.public-invitation-classic .public-invitation-hero {
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(111, 73, 42, .025) 3px 4px), radial-gradient(circle at 50% 40%, #fff6e7, #e4c7a5);
+}
+.public-invitation-classic .public-invitation-hero:not(.has-cover)::before {
+  border: 1px solid rgba(107, 72, 48, .75);
+  inset: clamp(16px, 3vw, 34px);
+}
+.public-invitation-classic .public-invitation-ornament {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  height: 58px;
+  opacity: .6;
+  top: clamp(48px, 8%, 90px);
+  width: 58px;
+}
+.public-invitation-classic .public-invitation-ornament::after {
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: '';
+  inset: 6px;
+  position: absolute;
+}
+.public-invitation-classic .public-invitation-date { letter-spacing: .3em; }
+.public-invitation-classic .public-invitation-hero h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(38px, 9cqw, 96px);
+  font-weight: 400;
+  letter-spacing: -.055em;
+  line-height: 1.04;
+}
+.public-invitation-classic .public-invitation-message { font-family: var(--font-editorial); font-size: clamp(20px, 3vw, 27px); }
+.public-invitation-classic .public-invitation-hero a { border: 1px solid currentColor; letter-spacing: .23em; padding: 12px 28px; }
+.public-invitation-classic .public-invitation-section-kicker { font-family: Georgia, serif; font-size: clamp(30px, 6vw, 48px); font-weight: 400; }
+.public-invitation-classic .public-invitation-story,
+.public-invitation-classic .public-invitation-gallery { background-image: repeating-linear-gradient(0deg, transparent 0 3px, rgba(111, 73, 42, .025) 3px 4px); }
+.public-invitation-classic .public-invitation-ornament { animation: classic-seal 4s ease-in-out infinite alternate; }
+
+.public-invitation.font-modern .public-invitation-hero h1,
+.public-invitation.font-modern .public-invitation-rsvp h2,
+.public-invitation.font-modern .public-invitation-section-kicker { font-family: var(--font-primary); }
+.public-invitation.font-editorial .public-invitation-hero h1,
+.public-invitation.font-editorial .public-invitation-section-kicker { font-family: var(--font-editorial); }
+.public-invitation.font-classic .public-invitation-hero h1,
+.public-invitation.font-classic .public-invitation-section-kicker { font-family: Georgia, serif; }
+
+.public-invitation-garden .public-invitation-hero h1 { animation: garden-unfold 1.3s .12s cubic-bezier(.16, 1, .3, 1) both; }
+.public-invitation-modern .public-invitation-hero h1 { animation: modern-arrive 1s .12s cubic-bezier(.16, 1, .3, 1) both; }
+.public-invitation-classic .public-invitation-hero h1 { animation: classic-unveil 1.5s .12s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes garden-unfold { from { opacity: 0; transform: translateY(55px) scale(.88); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes modern-arrive { from { opacity: 0; transform: translateX(-90px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes classic-unveil { from { opacity: 0; filter: blur(9px); transform: scale(1.08); } to { opacity: 1; filter: blur(0); transform: scale(1); } }
+@keyframes garden-breathe { from { transform: translateY(-50%) rotate(-18deg) scale(.96); } to { transform: translateY(-50%) rotate(-8deg) scale(1.07); } }
+@keyframes modern-orbit { to { transform: rotate(360deg); } }
+@keyframes classic-seal { to { opacity: .95; transform: scale(1.12); } }
+
+@media (max-width: 640px) {
+  .public-invitation-modern .public-invitation-hero { padding: 90px 28px 70px; }
+  .public-invitation-modern .public-invitation-hero:not(.has-cover)::before { left: 28px; }
+  .public-invitation-modern .public-invitation-hero h1 { font-size: clamp(38px, 14cqw, 76px); }
+  .public-invitation-classic .public-invitation-hero h1 { font-size: clamp(38px, 9cqw, 72px); }
+  .public-invitation-classic .public-invitation-ornament { top: 8%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .public-invitation, .public-invitation *, .public-invitation *::before, .public-invitation *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+  .public-invitation-ornament { animation: none !important; }
+  .public-invitation-hero h1, .public-invitation-rsvp > div, .public-invitation-section { filter: none !important; opacity: 1 !important; transform: none !important; }
+}

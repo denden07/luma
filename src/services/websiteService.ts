@@ -46,7 +46,7 @@ export function createWebsiteDraft(eventName: string, eventDate: string, templat
     template_id: templateId,
     theme: {
       palette_id: templateId,
-      font_pair_id: templateId === 'classic' ? 'editorial' : 'modern',
+      font_pair_id: templateId === 'modern' ? 'modern' : 'editorial',
     },
     sections: [
       {

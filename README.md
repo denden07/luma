@@ -48,6 +48,14 @@ top to access these sections. Draft website edits are saved before leaving
 the builder, including when using Back; if saving fails, the builder stays
 open with a retry option.
 
+The builder offers three invitation looks: **Photo Letter** (botanical and
+photo-forward), **City Vow** (bold editorial), and **Sunday Heirloom** (warm
+and classic). Selection cards show each look; the live preview uses the same
+layout as the published invitation. Cover photos, palette, and heading style
+remain editable after choosing a look. Each template includes entrance and
+scroll motion, with ambient details where appropriate; motion is disabled
+when the visitor requests reduced motion.
+
 On a published invitation, a circular section menu appears at the bottom right
 after the opening section scrolls out of view. It links to the published,
 visible sections and **Back to top**; the editor preview does not show this
