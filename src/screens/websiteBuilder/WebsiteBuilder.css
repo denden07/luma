@@ -216,7 +216,7 @@
   .template-option:hover .template-copy-action svg, .template-option:focus-visible .template-copy-action svg { transform: none; }
 }
 
-.website-editor-workspace { align-items: start; display: grid; gap: 32px; grid-template-columns: minmax(400px, 460px) minmax(0, 1fr); margin: 0 auto; max-width: 1440px; padding: 16px 32px 64px; }
+.website-editor-workspace { align-items: start; display: grid; gap: 32px; grid-template-columns: minmax(400px, 460px) minmax(0, 1fr); margin: 0 auto; max-width: 1440px; overflow-x: visible; overflow-y: clip; padding: 16px 32px 24px; }
 .website-editor-panel { background: #fffdf7; border: 1px solid #d8d1c2; border-radius: 6px; display: flex; flex-direction: column; max-height: calc(100dvh - 32px); position: sticky; top: 16px; }
 .website-editor-panel-heading { align-items: start; display: flex; justify-content: space-between; }
 .website-editor-panel-heading { padding: 24px 24px 18px; }.website-editor-scroll { display: grid; gap: 18px; overflow-y: auto; overscroll-behavior: contain; padding: 0 24px 24px; scrollbar-gutter: stable; }.editor-collapse-button { display: none; }
@@ -265,7 +265,7 @@
   .template-option { display: grid; grid-template-columns: 42% 1fr; }
   .template-art { aspect-ratio: auto; min-height: 178px; }
   .template-copy { align-content: center; }
-  .website-editor-workspace { gap: 16px; grid-template-columns: 1fr; max-width: 560px; padding: 16px 16px 48px; }
+  .website-editor-workspace { gap: 16px; grid-template-columns: 1fr; max-width: 560px; padding: 16px 16px 24px; }
   .website-editor-panel { max-height: none; position: static; }.website-editor-panel-heading { align-items: center; padding: 18px; }.website-editor-scroll { padding: 0 18px 18px; }.website-editor-panel.collapsed .website-editor-scroll { display: none; }.editor-collapse-button { align-items: center; background: transparent; border: 1px solid #bcb5a8; color: #41463e; display: inline-flex; height: 36px; justify-content: center; width: 36px; }
   .website-live-preview { min-height: 420px; }
   .invitation-preview { min-height: 360px; }
@@ -362,7 +362,7 @@
   .template-gallery { grid-template-columns: minmax(0, 1fr); max-width: 440px; padding: 0 16px 24px; }
   .template-option { display: grid; grid-template-columns: 42% minmax(0, 1fr); }
   .template-art { aspect-ratio: auto; min-height: 178px; }
-  .website-editor-workspace { grid-template-columns: minmax(0, 1fr); padding: 12px 16px 48px; }
+  .website-editor-workspace { grid-template-columns: minmax(0, 1fr); padding: 12px 16px 24px; }
   .website-editor-panel { max-height: none; position: static; }
   .website-editor-scroll { overflow: visible; }
   .website-live-preview { min-height: 0; padding: 12px; }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Routes, Route, Navigate, Outlet, useLocation, useParams } from 'react-router-dom';
 import Landing from './screens/Landing';
 import NameEntry from './screens/NameEntry';
 import Camera from './screens/Camera';
@@ -23,6 +23,7 @@ import InvitationWorkspace from './components/InvitationWorkspace';
 import ErrorBoundary from './components/ErrorBoundary';
 import ErrorPopup from './components/ErrorPopup';
 import CopySuccessPopup from './components/CopySuccessPopup';
+import CopyrightFooter from './components/CopyrightFooter';
 import { getParticipant, createParticipant, updatePhotosRemaining, saveParticipant } from './utils/participant';
 import { createParticipant as createParticipantAPI, getEvent, getPhotoUrl } from './services/dataService';
 import type { Event } from './services/dataService';
@@ -230,6 +231,13 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/admin/login" replace state={{ from: location }} />;
 }
 
+function HostPage() {
+  return <div className="host-page">
+    <div className="host-page-content"><Outlet /></div>
+    <CopyrightFooter />
+  </div>;
+}
+
 function AppContent() {
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -290,9 +298,10 @@ function AppRoutes() {
         
         <Routes>
           <Route path="/e/:eventToken/*" element={<EventRoute />} />
-          <Route path="/host/login" element={<HostLogin />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<ProtectedAdminRoute><AdminDashboard /></ProtectedAdminRoute>} />
+          <Route element={<HostPage />}>
+          <Route path="/host/login" element={<HostLogin />} />
           <Route path="/host" element={
             <ProtectedHostRoute>
               <HostEventsList />
@@ -314,6 +323,7 @@ function AppRoutes() {
             <Route path="website" element={<WebsiteBuilder />} />
             <Route path="guests" element={<GuestManager />} />
             <Route path="seating" element={<SeatingPlan />} />
+          </Route>
           </Route>
           <Route path="/rsvp/:token" element={<PrivateRsvp />} />
           <Route path="/" element={<Navigate to="/host/login" replace />} />

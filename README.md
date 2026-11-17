@@ -58,6 +58,10 @@ when the visitor requests reduced motion.
 The preview shows the current draft; publish again after edits to update the
 public invitation. The RSVP search button uses the editor's Button label in
 both views, and the closing message stays visible at the end of the page.
+Every invitation ends with a madeTogether copyright footer, even when the
+optional closing section is hidden. Host pages, including invitation management
+and the event dashboard, use the same compact copyright footer below their
+content.
 
 On a published invitation, a circular section menu appears at the bottom right
 after the opening section scrolls out of view. It links to the published,

@@ -1,5 +1,5 @@
-.invitation-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 100vh; }
-.invitation-navigation { background: #263a32; box-sizing: border-box; color: #fffdf7; display: flex; flex-direction: column; gap: 28px; height: 100dvh; overflow-y: auto; padding: 30px 14px 20px; position: sticky; top: 0; z-index: 30; }
+.invitation-workspace { display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+.invitation-navigation { background: #263a32; box-sizing: border-box; color: #fffdf7; display: flex; flex-direction: column; gap: 28px; height: min(100%, 100dvh); overflow-y: auto; padding: 30px 14px 20px; position: sticky; top: 0; z-index: 30; }
 .invitation-navigation-heading { color: #d9bf72; font-family: var(--font-editorial); font-size: 22px; line-height: 1.15; padding: 0 8px; }
 .invitation-navigation-heading button { display: none; }
 .invitation-navigation nav { display: grid; gap: 5px; }
@@ -7,7 +7,8 @@
 .invitation-navigation a:hover, .invitation-navigation a:focus-visible { background: rgba(255, 253, 247, .15); }
 .invitation-navigation nav a.active { background: #d9bf72; color: #263a32; font-weight: 700; }
 .invitation-navigation .invitation-dashboard-link { border-top: 1px solid rgba(255, 253, 247, .28); margin-top: auto; padding-top: 17px; }
-.invitation-workspace-content { min-width: 0; }
+.invitation-workspace-content { display: flex; flex-direction: column; min-width: 0; }
+.invitation-workspace-content > * { flex: 1; min-height: 0; }
 .invitation-mobile-bar, .invitation-drawer-backdrop { display: none; }
 @media (max-width: 760px) {
   .invitation-workspace { display: block; }

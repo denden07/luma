@@ -5,6 +5,7 @@ import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId } from '../../utils/invitationSections';
 import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
+import CopyrightFooter from '../../components/CopyrightFooter';
 import './PublicInvitation.css';
 
 type EntourageGroup = { id: string; title: string; members: string[] };
@@ -156,6 +157,7 @@ const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, p
         if (section.type === 'closing') return <section className="public-invitation-section public-invitation-closing" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
         return null;
       })}
+      <CopyrightFooter className="public-invitation-footer" />
     </div>
   );
 };

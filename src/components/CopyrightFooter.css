@@ -1,0 +1,18 @@
+.copyright-footer {
+  background: #1d211c;
+  border-top: 1px solid rgba(255, 253, 247, .18);
+  color: #fffdf7;
+  padding: 20px 24px max(20px, env(safe-area-inset-bottom) + 12px);
+  text-align: center;
+}
+
+.copyright-footer small {
+  font-size: 12px;
+  letter-spacing: .03em;
+  line-height: 1.5;
+  opacity: .8;
+}
+
+@media print {
+  .host-page > .copyright-footer { display: none; }
+}

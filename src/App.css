@@ -5,6 +5,24 @@
   min-height: 100vh;
 }
 
+.host-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.host-page-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.host-page-content > * {
+  flex: 1;
+  min-height: 0;
+}
+
 .local-mode-indicator {
   position: fixed;
   top: max(10px, env(safe-area-inset-top));

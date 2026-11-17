@@ -82,6 +82,7 @@
 .public-invitation .public-invitation-details,
 .public-invitation .public-invitation-entourage { background: var(--invitation-muted-surface); color: var(--invitation-ink); }
 .public-invitation .public-invitation-closing { background: var(--invitation-strong); color: #fffdf7; }
+.public-invitation-footer { background: var(--invitation-strong); }
 .public-invitation .public-invitation-rsvp { background: var(--invitation-accent); color: #fffdf7; }
 .public-invitation.palette-modern .public-invitation-rsvp { color: #1d211c; }
 
