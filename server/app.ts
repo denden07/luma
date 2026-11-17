@@ -69,7 +69,7 @@ app.use((req, _res, next) => {
 
 app.use(async (req, res, next) => {
   const slug = req.query.invitation_slug;
-  if (req.method !== 'GET' || typeof slug !== 'string') return next();
+  if ((req.method !== 'GET' && req.method !== 'HEAD') || typeof slug !== 'string') return next();
   try {
     const template = await readFile(resolve(process.cwd(), 'dist', 'index.html'), 'utf8');
     if (!/^[a-z0-9-]{3,120}$/.test(slug)) return res.type('html').send(template);
