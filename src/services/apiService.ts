@@ -21,6 +21,7 @@ export interface Event {
   price_php: number;
   payment_status: 'unpaid' | 'partial' | 'paid';
   rsvp_plus_limit: number;
+  rsvp_dietary_notes_enabled: boolean;
   created_at: string;
   updated_at: string;
 }

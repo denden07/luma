@@ -37,7 +37,7 @@ test('seating remains event-scoped and RSVP roster reconciliation is stable', { 
   const seating = `/api/events/${eventId}/seating`;
   try {
     const group = await pool.query<{ id: string }>(
-      'INSERT INTO guest_groups (event_id, name, invited_party_size) VALUES ($1, $2, 2) RETURNING id',
+      'INSERT INTO guest_groups (event_id, name, invited_party_size, rsvp_plus_limit) VALUES ($1, $2, 2, 2) RETURNING id',
       [eventId, 'The Smiths'],
     );
     const groupId = group.rows[0].id;

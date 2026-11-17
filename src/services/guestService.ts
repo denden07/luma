@@ -6,6 +6,7 @@ export interface GuestGroup {
   name: string;
   contact_number: string | null;
   invited_party_size: number;
+  rsvp_plus_limit: number;
 }
 
 export interface InvitationGuest {
@@ -17,6 +18,9 @@ export interface InvitationGuest {
   phone: string | null;
   companion_label: string | null;
   is_rsvp_companion: boolean;
+  rsvp_plus_limit: number | null;
+  rsvp_owner_id: string | null;
+  rsvp_response_id: string | null;
   rsvp_status: 'attending' | 'declined' | 'undecided' | null;
 }
 
@@ -31,19 +35,19 @@ export async function getGuestRoster(eventId: string, hostCode: string): Promise
   return response.json();
 }
 
-export async function createGuestGroup(eventId: string, hostCode: string, name: string, invitedPartySize: number, contactNumber?: string): Promise<GuestGroup> {
+export async function createGuestGroup(eventId: string, hostCode: string, name: string, invitedPartySize: number, contactNumber?: string, plusLimit = 0): Promise<GuestGroup> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guest-groups`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_code: hostCode, name, contact_number: contactNumber, invited_party_size: invitedPartySize }),
+    body: JSON.stringify({ host_code: hostCode, name, contact_number: contactNumber, invited_party_size: invitedPartySize, rsvp_plus_limit: plusLimit }),
   });
   if (!response.ok) throw new Error('Failed to create guest group');
   return response.json();
 }
 
-export async function updateGuestGroup(eventId: string, hostCode: string, groupId: string, name: string, invitedPartySize: number, contactNumber?: string): Promise<GuestGroup> {
+export async function updateGuestGroup(eventId: string, hostCode: string, groupId: string, name: string, invitedPartySize: number, contactNumber?: string, plusLimit = 0): Promise<GuestGroup> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guest-groups/${groupId}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_code: hostCode, name, contact_number: contactNumber, invited_party_size: invitedPartySize }),
+    body: JSON.stringify({ host_code: hostCode, name, contact_number: contactNumber, invited_party_size: invitedPartySize, rsvp_plus_limit: plusLimit }),
   });
   if (!response.ok) throw new Error('Failed to update guest group');
   return response.json();
@@ -55,21 +59,21 @@ export async function deleteGuestGroup(eventId: string, hostCode: string, groupI
   return response.json();
 }
 
-export async function createInvitationGuest(eventId: string, hostCode: string, guest: { fullName: string; email?: string; phone?: string; groupId?: string }): Promise<InvitationGuest> {
+export async function createInvitationGuest(eventId: string, hostCode: string, guest: { fullName: string; email?: string; phone?: string; groupId?: string; plusLimit?: number | null; ownerId?: string }): Promise<InvitationGuest> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guests`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_code: hostCode, full_name: guest.fullName, email: guest.email, phone: guest.phone, group_id: guest.groupId || null }),
+    body: JSON.stringify({ host_code: hostCode, full_name: guest.fullName, email: guest.email, phone: guest.phone, group_id: guest.groupId || null, rsvp_plus_limit: guest.plusLimit ?? null, rsvp_owner_id: guest.ownerId || null }),
   });
-  if (!response.ok) throw new Error('Failed to create guest');
+  if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Failed to create guest'); }
   return response.json();
 }
 
-export async function updateInvitationGuest(eventId: string, hostCode: string, guestId: string, guest: { fullName: string; email?: string; phone?: string; groupId?: string }): Promise<InvitationGuest> {
+export async function updateInvitationGuest(eventId: string, hostCode: string, guestId: string, guest: { fullName: string; email?: string; phone?: string; groupId?: string; plusLimit?: number | null; ownerId?: string }): Promise<InvitationGuest> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/guests/${guestId}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ host_code: hostCode, full_name: guest.fullName, email: guest.email, phone: guest.phone, group_id: guest.groupId || null }),
+    body: JSON.stringify({ host_code: hostCode, full_name: guest.fullName, email: guest.email, phone: guest.phone, group_id: guest.groupId || null, rsvp_plus_limit: guest.plusLimit ?? null, rsvp_owner_id: guest.ownerId || null }),
   });
-  if (!response.ok) throw new Error('Failed to update guest');
+  if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Failed to update guest'); }
   return response.json();
 }
 

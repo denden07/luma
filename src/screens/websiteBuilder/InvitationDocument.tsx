@@ -4,8 +4,9 @@ import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId } from '../../utils/invitationSections';
 import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
-import type { PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
+import type { CompanionChoice, PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
 import CopyrightFooter from '../../components/CopyrightFooter';
+import Modal from '../../components/Modal';
 import './PublicInvitation.css';
 
 type EntourageGroup = { id: string; title: string; members: string[] };
@@ -37,18 +38,20 @@ interface InvitationDocumentProps {
   document: WebsiteDocument;
   eventName: string;
   eventId?: string;
-  rsvpPlusLimit?: number;
+  dietaryEnabled?: boolean;
   preview?: boolean;
 }
 
-const PublicRsvpLookup = ({ eventId, buttonLabel, preview, rsvpPlusLimit = 0 }: { eventId?: string; buttonLabel: string; preview: boolean; rsvpPlusLimit?: number }) => {
+const PublicRsvpLookup = ({ eventId, buttonLabel, preview, dietaryEnabled = true }: { eventId?: string; buttonLabel: string; preview: boolean; dietaryEnabled?: boolean }) => {
   const [name, setName] = useState('');
   const [matches, setMatches] = useState<PublicGuestMatch[]>([]);
   const [selectedGuest, setSelectedGuest] = useState<PublicGuestMatch | null>(null);
   const [status, setStatus] = useState<RsvpStatus>('attending');
   const [needsResponse, setNeedsResponse] = useState(false);
-  const partyCount = 1;
+  const [modalOpen, setModalOpen] = useState(false);
   const [plusOneCount, setPlusOneCount] = useState(0);
+  const [additionalNames, setAdditionalNames] = useState<string[]>([]);
+  const [namedChoices, setNamedChoices] = useState<CompanionChoice[]>([]);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
@@ -59,26 +62,45 @@ const PublicRsvpLookup = ({ eventId, buttonLabel, preview, rsvpPlusLimit = 0 }: 
     event.preventDefault();
     if (!eventId || !name.trim()) return;
     setIsSubmitting(true);
-    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setNeedsResponse(Boolean(result.needs_response)); setMessage(result.message ?? ''); }
-    catch { setMessage('Your RSVP request has been sent to the host for verification.'); }
+    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(Boolean(result.needs_response)); setModalOpen(Boolean(result.needs_response)); setStatus('attending'); setPlusOneCount(0); setAdditionalNames([]); setMessage(''); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not search invitations.'); }
     finally { setIsSubmitting(false); }
   };
 
-  const save = async () => {
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!eventId || !selectedGuest) return;
     setIsSubmitting(true);
-    try { await submitPublicGuestRsvp(eventId, selectedGuest.id, selectedGuest.full_name, { status, plusOneCount, dietaryNotes }); setMessage('Your RSVP has been saved.'); setMatches([]); setSelectedGuest(null); }
+    try { await submitPublicGuestRsvp(eventId, selectedGuest, { status, namedCompanions: namedChoices, attendeeNames: status === 'attending' ? additionalNames.slice(0, plusOneCount) : [], dietaryNotes: dietaryEnabled ? dietaryNotes : undefined }); setMessage('Your RSVP has been saved.'); setModalOpen(false); setMatches([]); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save RSVP.'); }
     finally { setIsSubmitting(false); }
   };
-  const submitUnmatchedResponse = async () => {
+  const submitUnmatchedResponse = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!eventId || !name.trim()) return;
     setIsSubmitting(true);
-    try { const result = await submitPublicRsvpLookup(eventId, name, { status, partyCount: status === 'attending' ? partyCount : 0, plusOneCount: status === 'attending' ? plusOneCount : 0, contactEmail: email, contactPhone: phone, dietaryNotes }); setMessage(result.message ?? 'Your RSVP has been sent to the host for review.'); setNeedsResponse(false); }
+    try { const result = await submitPublicRsvpLookup(eventId, name, { status, partyCount: status === 'attending' ? 1 : 0, plusOneCount: 0, attendeeNames: [], contactEmail: email, contactPhone: phone, dietaryNotes: dietaryEnabled ? dietaryNotes : undefined }); if (result.matches.length) { setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(false); setModalOpen(false); setMessage('We found an invitation. Please select your name below.'); } else { setMessage(result.message ?? 'Your RSVP has been sent to the host for review.'); setModalOpen(false); } }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Could not send RSVP.'); }
     finally { setIsSubmitting(false); }
   };
-  return <div className="public-rsvp-lookup"><form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setSelectedGuest(null); setNeedsResponse(false); }} placeholder="Enter your invitation name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>{!preview && matches.length > 0 && <div className="public-rsvp-matches"><p>Select your name</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => { setSelectedGuest(guest); setMatches([]); }}>{guest.full_name}</button>)}</div>}{!preview && selectedGuest && <div className="public-rsvp-response"><strong>{selectedGuest.full_name}</strong><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Declined</option><option value="undecided">Undecided</option></select></label>{status === 'attending' && rsvpPlusLimit > 0 && <label>Additional guests<select value={plusOneCount} onChange={input => setPlusOneCount(Number(input.target.value))}>{Array.from({ length: rsvpPlusLimit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label>}<label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label><button type="button" onClick={save} disabled={isSubmitting}>Save RSVP</button></div>}{!preview && needsResponse && <div className="public-rsvp-response"><strong>Send RSVP for review</strong><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Declined</option><option value="undecided">Undecided</option></select></label>{status === 'attending' && <><label>Additional guests<select value={plusOneCount} onChange={input => setPlusOneCount(Number(input.target.value))}>{Array.from({ length: rsvpPlusLimit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label></>}<label>Email<input type="email" value={email} onChange={input => setEmail(input.target.value)} /></label><label>Contact number<input type="tel" value={phone} onChange={input => setPhone(input.target.value)} /></label><label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label><button type="button" onClick={submitUnmatchedResponse} disabled={isSubmitting}>Send RSVP to host</button></div>}{!preview && message && <p role="status">{message}</p>}</div>;
+  const openGuest = (guest: PublicGuestMatch) => { setSelectedGuest(guest); setNamedChoices(guest.companions.map(companion => ({ id: companion.id, status: companion.status ?? 'undecided' }))); setPlusOneCount(0); setAdditionalNames([]); setModalOpen(true); setMessage(''); };
+  const attendingNamed = namedChoices.filter(choice => choice.status === 'attending').length;
+  const limit = Math.max(0, Math.min(19, selectedGuest?.plus_limit ?? 0) - attendingNamed);
+  const chooseCount = (value: number) => { setPlusOneCount(value); setAdditionalNames(current => Array.from({ length: value }, (_, index) => current[index] ?? '')); };
+  const companionFields = status === 'attending' && limit > 0 && <>
+    <label>Additional guests<select value={Math.min(plusOneCount, limit)} onChange={input => chooseCount(Number(input.target.value))}>{Array.from({ length: limit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label>
+    {Array.from({ length: Math.min(plusOneCount, limit) }, (_, index) => <label key={index}>Additional guest #{index + 1} name (optional)<input maxLength={255} value={additionalNames[index] ?? ''} placeholder={`${selectedGuest?.full_name ?? name.trim()} friend #${index + 1}`} onChange={input => setAdditionalNames(current => current.map((value, position) => position === index ? input.target.value : value))} /></label>)}
+  </>;
+  return <div className="public-rsvp-lookup">
+    <form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setModalOpen(false); }} placeholder="Enter your invitation name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>
+    {!preview && matches.length > 0 && <div className="public-rsvp-matches" aria-label="Matching invitations"><p>Select your name from the list</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => openGuest(guest)}>{guest.full_name}{guest.companions.length > 0 && <small> · {guest.companions.map(companion => companion.full_name).join(', ')}</small>}</button>)}</div>}
+    {!preview && message && <p role="status">{message}</p>}
+    <Modal isOpen={!preview && modalOpen} onClose={() => setModalOpen(false)} className="public-rsvp-modal" ariaLabel="RSVP response">
+      <button type="button" className="public-rsvp-close" onClick={() => setModalOpen(false)} aria-label="Close RSVP"><X size={20} /></button>
+      {selectedGuest && <form className="public-rsvp-response" onSubmit={save}><h2>RSVP for {selectedGuest.full_name}</h2><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>{status === 'attending' && selectedGuest.companions.map((companion, index) => <label key={companion.id}>Will {companion.full_name} attend?<select value={namedChoices[index]?.status ?? 'undecided'} onChange={input => { const next = namedChoices.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice); setNamedChoices(next); const available = Math.max(0, selectedGuest.plus_limit - next.filter(choice => choice.status === 'attending').length); if (plusOneCount > available) chooseCount(available); }}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>)}{companionFields}{dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}{message && <p role="alert">{message}</p>}<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save RSVP'}</button></form>}
+      {needsResponse && <form className="public-rsvp-response" onSubmit={submitUnmatchedResponse}><h2>Name not found</h2><p>We couldn't find {name.trim()} on the guest list. You can still send an RSVP request; the host will review it before your attendance is confirmed. Additional guests are not available for unlisted names.</p><label>Your name<input value={name} onChange={input => setName(input.target.value)} required maxLength={255} /></label><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label><label>Email<input type="email" value={email} onChange={input => setEmail(input.target.value)} /></label><label>Contact number<input type="tel" value={phone} onChange={input => setPhone(input.target.value)} /></label>{dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}{message && <p role="alert">{message}</p>}<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending...' : 'Send RSVP to host'}</button></form>}
+    </Modal>
+  </div>;
 };
 
 const InvitationGallery = ({ paths, layout }: { paths: string[]; layout: 'grid' | 'strip' | 'carousel' }) => {
@@ -116,7 +138,7 @@ const InvitationGallery = ({ paths, layout }: { paths: string[]; layout: 'grid' 
   );
 };
 
-const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, preview = false }: InvitationDocumentProps) => {
+const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = true, preview = false }: InvitationDocumentProps) => {
   const hero = document.sections.find(section => section.type === 'hero');
   const heroContent = hero?.content ?? {};
   const names = contentText(heroContent, 'couple_names') || eventName;
@@ -134,7 +156,7 @@ const InvitationDocument = ({ document, eventName, eventId, rsvpPlusLimit = 0, p
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {document.sections.filter(section => section.visible && section.type !== 'hero').map(section => {
-        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} rsvpPlusLimit={rsvpPlusLimit} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
+        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
         if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
         if (section.type === 'details') {
           const venue = contentText(section.content, 'venue');

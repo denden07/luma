@@ -100,7 +100,7 @@ export interface PublishedWebsite {
   public_slug: string;
   published_document: WebsiteDocument;
   published_at: string;
-  rsvp_plus_limit: number;
+  rsvp_dietary_notes_enabled: boolean;
 }
 
 export async function getPublishedWebsite(slug: string): Promise<PublishedWebsite | null> {

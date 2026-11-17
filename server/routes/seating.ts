@@ -33,13 +33,13 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
     await client.query('DELETE FROM guests WHERE rsvp_response_id = $1', [responseId]);
     return;
   }
-  const attendees = await client.query<{ full_name: string }>(
-    'SELECT full_name FROM rsvp_attendees WHERE response_id = $1 ORDER BY ordinal NULLS LAST, created_at, id',
+  const attendees = await client.query<{ full_name: string; guest_id: string | null }>(
+    'SELECT full_name, guest_id FROM rsvp_attendees WHERE response_id = $1 ORDER BY ordinal NULLS LAST, created_at, id',
     [responseId],
   );
-  const roster = await client.query<{ id: string; full_name: string }>(
-    `SELECT id, full_name FROM guests WHERE event_id = $1 AND rsvp_response_id IS NULL
-       AND (id = $2 OR ($3::uuid IS NOT NULL AND group_id = $3))
+  const roster = await client.query<{ id: string; full_name: string; rsvp_owner_id: string | null }>(
+    `SELECT id, full_name, rsvp_owner_id FROM guests WHERE event_id = $1 AND rsvp_response_id IS NULL
+       AND (id = $2 OR rsvp_owner_id = $2 OR ($3::uuid IS NOT NULL AND group_id = $3))
      ORDER BY created_at, id`,
     [response.event_id, response.guest_id, response.group_id],
   );
@@ -61,9 +61,11 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
     const name = attendees.rows[index]?.full_name?.trim() || '';
     const generic = !name || /^(additional guest|plus[\s-]*one|guest|companion|friend)(?:\s*#?\d+)?$/i.test(name);
     const isCompanion = index >= response.party_count - response.plus_one_count;
-    const match = isCompanion ? undefined : roster.rows.find(guest => !used.has(guest.id) && (
-      (!response.group_id && guest.id === response.guest_id && (index === 0 || guest.full_name.trim().toLowerCase() === name.toLowerCase())) ||
-      (!generic && guest.full_name.trim().toLowerCase() === name.toLowerCase())
+    const match = roster.rows.find(guest => !used.has(guest.id) && (
+      isCompanion
+        ? guest.rsvp_owner_id === response.guest_id && (guest.id === attendees.rows[index]?.guest_id || guest.full_name.trim().toLowerCase() === name.toLowerCase())
+        : ((!response.group_id && guest.id === response.guest_id && (index === 0 || guest.full_name.trim().toLowerCase() === name.toLowerCase())) ||
+          (!generic && !guest.rsvp_owner_id && guest.full_name.trim().toLowerCase() === name.toLowerCase()))
     ));
     if (match) { used.add(match.id); continue; }
     // For an individual invitation the first attendee is the invited guest, even for legacy placeholder names.
@@ -102,7 +104,7 @@ async function authorized(eventId: string, code: unknown): Promise<boolean> {
 }
 
 const guestQuery = `SELECT g.id, g.event_id, g.group_id, g.full_name, g.email, g.phone,
-  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, grp.status, companion.status) AS rsvp_status, g.table_id
+  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, grp.status, companion.status, g.rsvp_companion_status) AS rsvp_status, g.table_id
   FROM guests g
   LEFT JOIN rsvp_responses own ON own.guest_id = g.id
   LEFT JOIN rsvp_responses grp ON grp.group_id = g.group_id

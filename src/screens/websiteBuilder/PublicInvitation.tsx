@@ -145,7 +145,7 @@ const PublicInvitation = () => {
 
   return (
     <main id="published-invitation" tabIndex={-1} aria-label="Published invitation">
-      <InvitationDocument document={website.published_document} eventName={website.event_name} eventId={website.event_id} rsvpPlusLimit={website.rsvp_plus_limit} />
+      <InvitationDocument document={website.published_document} eventName={website.event_name} eventId={website.event_id} dietaryEnabled={website.rsvp_dietary_notes_enabled} />
       <PublishedSectionMenu publishedDocument={website.published_document} />
     </main>
   );

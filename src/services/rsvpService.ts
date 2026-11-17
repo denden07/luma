@@ -1,6 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export type RsvpStatus = 'attending' | 'declined' | 'undecided';
+export interface NamedCompanion { id: string; full_name: string; status: RsvpStatus | null }
+export interface CompanionChoice { id: string; status: RsvpStatus }
 
 export interface RsvpResponse {
   id: string;
@@ -27,19 +29,20 @@ export interface RsvpVerificationRequest {
   contact_email: string | null;
   contact_phone: string | null;
   dietary_notes: string | null;
+  attendee_names: string[] | null;
 }
 
-export interface PublicGuestMatch { id: string; full_name: string; }
+export interface PublicGuestMatch { id: string; full_name: string; plus_limit: number; companions: NamedCompanion[] }
 
 export async function searchPublicRsvpGuests(eventId: string, name: string): Promise<PublicGuestMatch[]> {
   const response = await fetch(`${API_BASE_URL}/api/rsvp/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name }) });
-  if (!response.ok) return [];
+  if (!response.ok) throw new Error('Could not search invitations');
   const payload = await response.json();
   return Array.isArray(payload.matches) ? payload.matches : [];
 }
 
-export async function submitPublicRsvpLookup(eventId: string, name: string, responseData?: { status: RsvpStatus; partyCount: number; plusOneCount: number; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<{ matches: PublicGuestMatch[]; message?: string; needs_response?: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/api/rsvp/lookup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name, ...(responseData ? { status: responseData.status, party_count: responseData.partyCount, plus_one_count: responseData.plusOneCount, contact_email: responseData.contactEmail, contact_phone: responseData.contactPhone, dietary_notes: responseData.dietaryNotes } : {}) }) });
+export async function submitPublicRsvpLookup(eventId: string, name: string, responseData?: { status: RsvpStatus; partyCount: number; plusOneCount: number; attendeeNames: string[]; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<{ matches: PublicGuestMatch[]; message?: string; needs_response?: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/api/rsvp/lookup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name, ...(responseData ? { status: responseData.status, party_count: responseData.partyCount, plus_one_count: responseData.plusOneCount, attendee_names: responseData.attendeeNames, contact_email: responseData.contactEmail, contact_phone: responseData.contactPhone, dietary_notes: responseData.dietaryNotes } : {}) }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || 'Could not send RSVP request');
   return payload;
@@ -59,7 +62,7 @@ export async function getRsvpVerificationRequests(eventId: string, hostCode: str
 
 export async function reviewRsvpVerificationRequest(eventId: string, hostCode: string, requestId: string, status: 'approved' | 'rejected', guestId?: string, createGuest = false, groupId?: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-verification-requests/${requestId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, status, guest_id: guestId, create_guest: createGuest, group_id: groupId }) });
-  if (!response.ok) throw new Error('Failed to review RSVP verification request');
+  if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Failed to review RSVP verification request'); }
 }
 
 export async function createRsvpLink(eventId: string, hostCode: string, target: { guestId?: string; groupId?: string }): Promise<string> {
@@ -78,6 +81,9 @@ export interface PrivateRsvpInvitation {
   token: string;
   invitation_name: string;
   invited_party_size: number;
+  plus_limit: number;
+  dietary_enabled: boolean;
+  companions: NamedCompanion[];
 }
 
 export async function getPrivateRsvpInvitation(token: string): Promise<PrivateRsvpInvitation> {
@@ -86,18 +92,20 @@ export async function getPrivateRsvpInvitation(token: string): Promise<PrivateRs
   return response.json();
 }
 
-export async function submitPrivateRsvp(token: string, responseData: { status: RsvpStatus; partyCount: number; attendees: string[]; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/rsvp/link/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: responseData.status, party_count: responseData.partyCount, attendees: responseData.attendees, contact_email: responseData.contactEmail, contact_phone: responseData.contactPhone, dietary_notes: responseData.dietaryNotes }) });
+export async function submitPrivateRsvp(token: string, responseData: { status: RsvpStatus; partyCount: number; plusOneCount: number; attendees: string[]; namedCompanions?: CompanionChoice[]; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/rsvp/link/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: responseData.status, party_count: responseData.partyCount, plus_one_count: responseData.plusOneCount, attendees: responseData.attendees, named_companions: responseData.namedCompanions, contact_email: responseData.contactEmail, contact_phone: responseData.contactPhone, dietary_notes: responseData.dietaryNotes }) });
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
 }
 
-export async function submitPublicGuestRsvp(eventId: string, guestId: string, guestName: string, responseData: { status: RsvpStatus; plusOneCount: number; dietaryNotes?: string }): Promise<void> {
-  const attendeeNames = responseData.status === 'attending' ? [guestName, ...Array.from({ length: responseData.plusOneCount }, (_, index) => `Additional guest ${index + 1}`)] : [];
-  const response = await fetch(`${API_BASE_URL}/api/rsvp/guest/${guestId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, status: responseData.status, party_count: responseData.status === 'attending' ? 1 : 0, plus_one_count: responseData.status === 'attending' ? responseData.plusOneCount : 0, attendees: attendeeNames, dietary_notes: responseData.dietaryNotes }) });
+export async function submitPublicGuestRsvp(eventId: string, guest: PublicGuestMatch, responseData: { status: RsvpStatus; namedCompanions: CompanionChoice[]; attendeeNames: string[]; dietaryNotes?: string }): Promise<void> {
+  const named = guest.companions.filter((companion, index) => responseData.namedCompanions[index]?.id === companion.id && responseData.namedCompanions[index].status === 'attending').map(companion => companion.full_name);
+  const attendeeNames = responseData.status === 'attending' ? [guest.full_name, ...named, ...responseData.attendeeNames.map((name, index) => name.trim() || `${guest.full_name.slice(0, 230)} friend #${index + 1}`)] : [];
+  const plusOneCount = responseData.status === 'attending' ? named.length + responseData.attendeeNames.length : 0;
+  const response = await fetch(`${API_BASE_URL}/api/rsvp/guest/${guest.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, status: responseData.status, party_count: responseData.status === 'attending' ? 1 : 0, plus_one_count: plusOneCount, named_companions: responseData.status === 'attending' ? responseData.namedCompanions : undefined, attendees: attendeeNames, dietary_notes: responseData.dietaryNotes }) });
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
 }
 
-export async function updateRsvpPlusLimit(eventId: string, hostCode: string, plusLimit: number): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-settings`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, plus_limit: plusLimit }) });
-  if (!response.ok) throw new Error('Failed to update additional guest limit');
+export async function updateRsvpDietaryEnabled(eventId: string, hostCode: string, enabled: boolean): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-settings`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, dietary_notes_enabled: enabled }) });
+  if (!response.ok) throw new Error('Failed to update dietary note setting');
 }

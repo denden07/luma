@@ -30,6 +30,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT T
 ALTER TABLE events ADD COLUMN IF NOT EXISTS price_php INTEGER NOT NULL DEFAULT 0 CHECK (price_php >= 0);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_status VARCHAR(10) NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid'));
 ALTER TABLE events ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER NOT NULL DEFAULT 0 CHECK (rsvp_plus_limit >= 0);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS rsvp_dietary_notes_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_rsvp_plus_limit_check;
 ALTER TABLE events ADD CONSTRAINT events_rsvp_plus_limit_check CHECK (rsvp_plus_limit >= 0);
 ALTER TABLE events ALTER COLUMN guest_limit SET DEFAULT 30;
@@ -89,7 +90,14 @@ CREATE TABLE IF NOT EXISTS guests (
 );
 
 ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS contact_number VARCHAR(40);
+ALTER TABLE guest_groups ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER NOT NULL DEFAULT 0 CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone VARCHAR(40);
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_owner_id UUID REFERENCES guests(id) ON DELETE CASCADE;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_companion_status VARCHAR(12) CHECK (rsvp_companion_status IN ('attending', 'declined', 'undecided'));
+CREATE INDEX IF NOT EXISTS idx_guests_rsvp_owner ON guests(rsvp_owner_id);
+ALTER TABLE guests DROP CONSTRAINT IF EXISTS guests_rsvp_plus_limit_check;
+ALTER TABLE guests ADD CONSTRAINT guests_rsvp_plus_limit_check CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
 
 CREATE TABLE IF NOT EXISTS seating_tables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -147,6 +155,7 @@ CREATE TABLE IF NOT EXISTS rsvp_attendees (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS ordinal INTEGER;
+ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS guest_id UUID REFERENCES guests(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS rsvp_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -183,6 +192,7 @@ ALTER TABLE rsvp_verification_requests ADD COLUMN IF NOT EXISTS contact_email VA
 ALTER TABLE rsvp_verification_requests ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(40);
 ALTER TABLE rsvp_verification_requests ADD COLUMN IF NOT EXISTS dietary_notes TEXT;
 ALTER TABLE rsvp_verification_requests ADD COLUMN IF NOT EXISTS plus_one_count INTEGER NOT NULL DEFAULT 0 CHECK (plus_one_count BETWEEN 0 AND 20);
+ALTER TABLE rsvp_verification_requests ADD COLUMN IF NOT EXISTS attendee_names TEXT[];
 
 CREATE INDEX IF NOT EXISTS idx_rsvp_verification_requests_event_status ON rsvp_verification_requests(event_id, status, requested_at DESC);
 
