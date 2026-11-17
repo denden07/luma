@@ -87,6 +87,11 @@ Invitation-management success and error messages appear as dismissible,
 upper-right notifications across the website editor, guest list, and seating plan.
 When adding a guest to a group, the individual named-additional-guest and
 additional-guest-allowance fields are hidden; use the group allowance instead.
+The guest-list overview highlights confirmed attendees first as the food
+headcount. It counts every person on the roster, including additional
+guests, and separately shows how many have responded,
+or are still awaiting a response. Each group member is counted individually;
+the RSVP Party total is not repeated in each guest's table row.
 
 Attending RSVP companions and previously unlisted named group attendees appear
 in the guest list automatically. The guest list's RSVP relationship column

@@ -7,7 +7,9 @@
 .guest-manager-content { margin: 0 auto; max-width: 1160px; padding: 32px 24px 72px; }
 .guest-overview-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 .guest-overview-cards > div { background: #fffdf7; border: 1px solid #cbd3c6; display: grid; gap: 6px; min-width: 0; padding: 16px; }
-.guest-overview-cards > div:first-child { border-top: 3px solid #66865d; padding-top: 14px; }
+.guest-overview-cards > div.guest-overview-confirmed { background: #263a32; border-color: #263a32; border-top: 3px solid #d9bf72; padding-top: 14px; }
+.guest-overview-cards .guest-overview-confirmed span, .guest-overview-cards .guest-overview-confirmed small { color: #fffdf7; }
+.guest-overview-cards .guest-overview-confirmed strong { color: #d9bf72; font-size: 36px; }
 .guest-overview-cards strong { color: #263a32; font-size: 28px; line-height: 1; }
 .guest-overview-cards span { color: #52634f; font-size: 14px; font-weight: 700; }
 .guest-overview-title { align-items: center; display: inline-flex; gap: 7px; }
@@ -60,9 +62,8 @@
   .guest-table-wrap td:nth-child(5)::before { content: 'Email'; }
   .guest-table-wrap td:nth-child(6)::before { content: 'Contact'; }
   .guest-table-wrap td:nth-child(7)::before { content: 'RSVP'; }
-  .guest-table-wrap td:nth-child(8)::before { content: 'Party'; }
-  .guest-table-wrap td:nth-child(9)::before { content: 'Pluses'; }
-  .guest-table-wrap td:nth-child(10)::before { content: 'Responded'; }
-  .guest-table-wrap td:nth-child(11) { grid-column: 1 / -1; }
+  .guest-table-wrap td:nth-child(8)::before { content: 'Pluses'; }
+  .guest-table-wrap td:nth-child(9)::before { content: 'Responded'; }
+  .guest-table-wrap td:nth-child(10) { grid-column: 1 / -1; }
   .guest-group-table-wrap td:last-child button, .guest-table-wrap td:last-child button { height: 40px; width: 40px; }
 }

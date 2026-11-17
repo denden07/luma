@@ -61,6 +61,7 @@ const GuestManager = () => {
 
   const groupNameFor = (groupId: string | null) => roster.groups.find(group => group.id === groupId)?.name ?? 'Individual';
   const responseFor = (guest: InvitationGuest) => responses.find(response => response.guest_id === guest.id) ?? (guest.group_id ? responses.find(response => response.group_id === guest.group_id) : undefined);
+  const statusFor = (guest: InvitationGuest) => guest.group_id ? guest.rsvp_status : responseFor(guest)?.status ?? guest.rsvp_status;
   const recordedResponseFor = (guest: InvitationGuest) => guest.rsvp_response_id
     ? responses.find(response => response.id === guest.rsvp_response_id)
     : guest.rsvp_owner_id
@@ -70,10 +71,10 @@ const GuestManager = () => {
     ? roster.guests.find(owner => owner.id === guest.rsvp_owner_id)?.full_name ?? null
     : guest.companion_label?.replace(/ friend #\d+$/, '') ?? null;
   const plusTotal = roster.guests.filter(guest => guest.is_rsvp_companion).length;
-  const respondedCount = roster.guests.filter(guest => (guest.group_id ? guest.rsvp_status : responseFor(guest)?.status ?? guest.rsvp_status) !== null).length;
+  const respondedCount = roster.guests.filter(guest => Boolean(statusFor(guest))).length;
+  const confirmedCount = roster.guests.filter(guest => statusFor(guest) === 'attending').length;
   const guests = roster.guests.filter(guest => {
-    const response = responseFor(guest);
-    const status = guest.group_id ? guest.rsvp_status : response?.status ?? guest.rsvp_status;
+    const status = statusFor(guest);
     const matchesRsvp = rsvpFilter === 'all' || (rsvpFilter === 'awaiting' ? !status : status === rsvpFilter);
     const matchesGroup = (groupFilter === 'all' || (groupFilter === 'individual' ? !guest.group_id : guest.group_id === groupFilter)) &&
       (!rosterGroupSearch.trim() || groupNameFor(guest.group_id).toLocaleLowerCase().includes(rosterGroupSearch.trim().toLocaleLowerCase()));
@@ -154,9 +155,10 @@ const GuestManager = () => {
     <header><div><p>Invitation guests</p><h1>Guest list</h1></div></header>
     <div className="guest-manager-content">
       <section className="guest-overview-cards" aria-label="Guest overview">
-        <div><span className="guest-overview-title"><Users size={18} aria-hidden="true" /> Total guests</span><strong>{roster.guests.length}</strong><small>{roster.guests.length - plusTotal} invited / added · {plusTotal} additional · {roster.groups.length} groups</small></div>
-        <div><span>Responded</span><strong>{respondedCount}</strong></div>
-        <div><span>Awaiting response</span><strong>{roster.guests.length - respondedCount}</strong></div>
+        <div className="guest-overview-confirmed"><span>Confirmed attending</span><strong>{confirmedCount}</strong><small>Food headcount · includes attending additional guests</small></div>
+        <div><span className="guest-overview-title"><Users size={18} aria-hidden="true" /> People on guest list</span><strong>{roster.guests.length}</strong><small>{roster.guests.length - plusTotal} invited / added + {plusTotal} additional guests</small></div>
+        <div><span>Responded</span><strong>{respondedCount}</strong><small>Includes attending, declined, and undecided</small></div>
+        <div><span>Awaiting response</span><strong>{roster.guests.length - respondedCount}</strong><small>No RSVP recorded yet</small></div>
       </section>
 
       <section className="guest-group-workflow"><div className="guest-workflow-heading"><p>Step 1</p><h2>Invitation groups (optional)</h2><span>Groups organize families or shared invitations. Guests can remain individual.</span></div><div className="guest-group-workflow-content"><form onSubmit={addGroup}><label>Group name<input value={groupName} onChange={input => setGroupName(input.target.value)} required /></label><label>Contact number<input type="tel" value={groupPhone} onChange={input => setGroupPhone(input.target.value)} /></label><label>Party size<input type="number" min="1" max="20" value={groupSize} onChange={input => setGroupSize(Number(input.target.value) || 1)} /></label><button type="submit"><Plus size={16} /> Create group</button></form><div><div className="guest-table-toolbar"><strong>Current groups</strong><label>Rows<select value={groupPageSize} onChange={input => { const value = input.target.value; setGroupPageSize(value === 'all' ? 'all' : Number(value)); setGroupPage(1); }}><option value="5">5</option><option value="15">15</option><option value="30">30</option><option value="all">All</option></select></label></div><div className="guest-group-table-wrap"><table><thead><tr><th>#</th><th>Group</th><th>Contact</th><th>Guests</th><th /></tr></thead><tbody>{displayedGroups.map((group, index) => <tr key={group.id}><td>{(currentGroupPage - 1) * (groupPageSize === 'all' ? 1 : groupPageSize) + index + 1}</td><td>{group.name}</td><td>{group.contact_number || '-'}</td><td>{roster.guests.filter(guest => guest.group_id === group.id).length} / {group.invited_party_size}</td><td><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGroup(group.id, group.name)} title="Delete group"><Trash2 size={15} /></button></td></tr>)}</tbody></table></div>{groupPageSize !== 'all' && <nav className="guest-pagination"><button type="button" disabled={currentGroupPage === 1} onClick={() => setGroupPage(current => Math.max(1, current - 1))}><ChevronLeft size={18} /></button><span>Page {currentGroupPage} of {groupTotalPages}</span><button type="button" disabled={currentGroupPage === groupTotalPages} onClick={() => setGroupPage(current => Math.min(groupTotalPages, current + 1))}><ChevronRight size={18} /></button></nav>}</div></div></section>
@@ -195,12 +197,12 @@ const GuestManager = () => {
           <label>Order<select value={rosterSort} onChange={input => { setRosterSort(input.target.value as RosterSort); setPage(1); }}><option value="responded">Date responded</option><option value="name">Name</option></select></label>
           <label>Rows<select value={pageSize} onChange={input => { const value = input.target.value; setPageSize(value === 'all' ? 'all' : Number(value)); setPage(1); }}><option value="5">5</option><option value="15">15</option><option value="30">30</option><option value="all">All</option></select></label>
         </div>
-        <div className="guest-table-wrap"><table><thead><tr><th>#</th><th>Guest</th><th>RSVP relationship</th><th>Group</th><th>Email</th><th>Contact</th><th>RSVP</th><th>Party</th><th>Pluses</th><th>Responded</th><th /></tr></thead><tbody>{displayedGuests.map((guest, index) => {
+        <div className="guest-table-wrap"><table><thead><tr><th>#</th><th>Guest</th><th>RSVP relationship</th><th>Group</th><th>Email</th><th>Contact</th><th>RSVP</th><th>Responded</th><th /></tr></thead><tbody>{displayedGuests.map((guest, index) => {
           const response = responseFor(guest);
           const recordedResponse = recordedResponseFor(guest);
-          const status = (guest.group_id ? guest.rsvp_status : response?.status ?? guest.rsvp_status) ?? 'awaiting';
+          const status = statusFor(guest) ?? 'awaiting';
           const companionOrigin = companionOriginFor(guest);
-          return <tr key={guest.id}><td>{(currentPage - 1) * (pageSize === 'all' ? 1 : pageSize) + index + 1}</td><td>{guest.full_name}</td><td className="guest-relationship">{companionOrigin ? `${guest.is_rsvp_companion || guest.rsvp_owner_id ? 'Additional guest' : 'RSVP guest'} of ${companionOrigin}` : '-'}{guest.proxy_of && <div>Proxy of {guest.proxy_of}</div>}</td><td>{groupNameFor(guest.group_id)}</td><td>{guest.email || '-'}</td><td>{guest.phone || '-'}</td><td><span className={`rsvp-cell-status ${status}`}>{status === 'awaiting' ? 'Awaiting response' : status}</span></td><td>{response?.party_count ?? '-'}</td><td>{response?.plus_one_count ?? 0}</td><td>{recordedResponse ? new Date(recordedResponse.submitted_at).toLocaleDateString() : '-'}</td><td><div className="guest-table-actions"><button className="guest-table-action" type="button" onClick={() => openEdit(guest)} title="Edit guest"><Pencil size={15} /></button><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGuest(guest)} title="Delete guest"><Trash2 size={15} /></button></div></td></tr>;
+          return <tr key={guest.id}><td>{(currentPage - 1) * (pageSize === 'all' ? 1 : pageSize) + index + 1}</td><td>{guest.full_name}</td><td className="guest-relationship">{companionOrigin ? `${guest.is_rsvp_companion || guest.rsvp_owner_id ? 'Additional guest' : 'RSVP guest'} of ${companionOrigin}` : '-'}{guest.proxy_of && <div>Proxy of {guest.proxy_of}</div>}</td><td>{groupNameFor(guest.group_id)}</td><td>{guest.email || '-'}</td><td>{guest.phone || '-'}</td><td><span className={`rsvp-cell-status ${status}`}>{status === 'awaiting' ? 'Awaiting response' : status}</span></td><td>{recordedResponse ? new Date(recordedResponse.submitted_at).toLocaleDateString() : '-'}</td><td><div className="guest-table-actions"><button className="guest-table-action" type="button" onClick={() => openEdit(guest)} title="Edit guest"><Pencil size={15} /></button><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGuest(guest)} title="Delete guest"><Trash2 size={15} /></button></div></td></tr>;
         })}</tbody></table></div>
         {pageSize !== 'all' && <nav className="guest-pagination"><button type="button" disabled={currentPage === 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft size={18} /></button><span>Page {currentPage} of {totalPages}</span><button disabled={currentPage === totalPages} type="button" onClick={() => setPage(current => Math.min(totalPages, current + 1))}><ChevronRight size={18} /></button></nav>}
       </section>
