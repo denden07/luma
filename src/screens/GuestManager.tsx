@@ -64,6 +64,11 @@ const GuestManager = () => {
 
   const groupNameFor = (groupId: string | null) => roster.groups.find(group => group.id === groupId)?.name ?? 'Individual';
   const responseFor = (guest: InvitationGuest) => responses.find(response => response.guest_id === guest.id) ?? (guest.group_id ? responses.find(response => response.group_id === guest.group_id) : undefined);
+  const recordedResponseFor = (guest: InvitationGuest) => guest.rsvp_response_id
+    ? responses.find(response => response.id === guest.rsvp_response_id)
+    : guest.rsvp_owner_id
+      ? responses.find(response => response.guest_id === guest.rsvp_owner_id)
+      : responseFor(guest);
   const companionOriginFor = (guest: InvitationGuest) => guest.rsvp_owner_id
     ? roster.guests.find(owner => owner.id === guest.rsvp_owner_id)?.full_name ?? null
     : guest.companion_label?.replace(/ friend #\d+$/, '') ?? null;
@@ -78,8 +83,8 @@ const GuestManager = () => {
     return matchesRsvp && matchesGroup;
   }).sort((firstGuest, secondGuest) => {
     if (rosterSort === 'name') return firstGuest.full_name.localeCompare(secondGuest.full_name);
-    const firstResponse = responseFor(firstGuest);
-    const secondResponse = responseFor(secondGuest);
+    const firstResponse = recordedResponseFor(firstGuest);
+    const secondResponse = recordedResponseFor(secondGuest);
     if (firstResponse && secondResponse) return new Date(secondResponse.submitted_at).getTime() - new Date(firstResponse.submitted_at).getTime();
     if (firstResponse) return -1;
     if (secondResponse) return 1;
@@ -195,9 +200,10 @@ const GuestManager = () => {
         </div>
         <div className="guest-table-wrap"><table><thead><tr><th>#</th><th>Guest</th><th>RSVP relationship</th><th>Group</th><th>Email</th><th>Contact</th><th>RSVP</th><th>Party</th><th>Pluses</th><th>Responded</th><th /></tr></thead><tbody>{displayedGuests.map((guest, index) => {
           const response = responseFor(guest);
+          const recordedResponse = recordedResponseFor(guest);
           const status = response?.status ?? guest.rsvp_status ?? 'awaiting';
           const companionOrigin = companionOriginFor(guest);
-          return <tr key={guest.id}><td>{(currentPage - 1) * (pageSize === 'all' ? 1 : pageSize) + index + 1}</td><td>{guest.full_name}</td><td className="guest-relationship">{companionOrigin ? `${guest.is_rsvp_companion || guest.rsvp_owner_id ? 'Additional guest' : 'RSVP guest'} of ${companionOrigin}` : '-'}{guest.proxy_of && <div>Proxy of {guest.proxy_of}</div>}</td><td>{groupNameFor(guest.group_id)}</td><td>{guest.email || '-'}</td><td>{guest.phone || '-'}</td><td><span className={`rsvp-cell-status ${status}`}>{status === 'awaiting' ? 'Awaiting response' : status}</span></td><td>{response?.party_count ?? '-'}</td><td>{response?.plus_one_count ?? 0}</td><td>{response ? new Date(response.submitted_at).toLocaleDateString() : '-'}</td><td><div className="guest-table-actions"><button className="guest-table-action" type="button" onClick={() => openEdit(guest)} title="Edit guest"><Pencil size={15} /></button><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGuest(guest)} title="Delete guest"><Trash2 size={15} /></button></div></td></tr>;
+          return <tr key={guest.id}><td>{(currentPage - 1) * (pageSize === 'all' ? 1 : pageSize) + index + 1}</td><td>{guest.full_name}</td><td className="guest-relationship">{companionOrigin ? `${guest.is_rsvp_companion || guest.rsvp_owner_id ? 'Additional guest' : 'RSVP guest'} of ${companionOrigin}` : '-'}{guest.proxy_of && <div>Proxy of {guest.proxy_of}</div>}</td><td>{groupNameFor(guest.group_id)}</td><td>{guest.email || '-'}</td><td>{guest.phone || '-'}</td><td><span className={`rsvp-cell-status ${status}`}>{status === 'awaiting' ? 'Awaiting response' : status}</span></td><td>{response?.party_count ?? '-'}</td><td>{response?.plus_one_count ?? 0}</td><td>{recordedResponse ? new Date(recordedResponse.submitted_at).toLocaleDateString() : '-'}</td><td><div className="guest-table-actions"><button className="guest-table-action" type="button" onClick={() => openEdit(guest)} title="Edit guest"><Pencil size={15} /></button><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGuest(guest)} title="Delete guest"><Trash2 size={15} /></button></div></td></tr>;
         })}</tbody></table></div>
         {pageSize !== 'all' && <nav className="guest-pagination"><button type="button" disabled={currentPage === 1} onClick={() => setPage(current => Math.max(1, current - 1))}><ChevronLeft size={18} /></button><span>Page {currentPage} of {totalPages}</span><button disabled={currentPage === totalPages} type="button" onClick={() => setPage(current => Math.min(totalPages, current + 1))}><ChevronRight size={18} /></button></nav>}
       </section>

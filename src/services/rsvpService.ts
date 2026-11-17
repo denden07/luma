@@ -99,13 +99,14 @@ export async function submitPrivateRsvp(token: string, responseData: { status: R
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
 }
 
-export async function submitPublicGuestRsvp(eventId: string, guest: PublicGuestMatch, responseData: { status: RsvpStatus; namedCompanions: CompanionChoice[]; reservedSeats: ReservedSeatChoice[]; proxy: RsvpProxy | null; dietaryNotes?: string }): Promise<void> {
+export async function submitPublicGuestRsvp(eventId: string, guest: PublicGuestMatch, responseData: { status: RsvpStatus; namedCompanions: CompanionChoice[]; reservedSeats: ReservedSeatChoice[]; proxy: RsvpProxy | null; dietaryNotes?: string }): Promise<Pick<RsvpResponse, 'id' | 'submitted_at'>> {
   const named = guest.companions.filter((companion, index) => responseData.namedCompanions[index]?.id === companion.id && responseData.namedCompanions[index].status === 'attending').map(companion => companion.full_name);
   const seats = responseData.reservedSeats.map((seat, index) => ({ name: seat.name.trim() || `${guest.full_name.slice(0, 230)} friend #${index + 1}`, status: seat.status }));
   const attendeeNames = [...(responseData.status === 'attending' ? [guest.full_name] : []), ...named, ...seats.filter(seat => seat.status === 'attending').map(seat => seat.name)];
   const plusOneCount = named.length + seats.filter(seat => seat.status === 'attending').length;
   const response = await fetch(`${API_BASE_URL}/api/rsvp/guest/${guest.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, status: responseData.status, party_count: responseData.status === 'attending' ? 1 : 0, plus_one_count: plusOneCount, named_companions: responseData.namedCompanions, reserved_seats: seats, proxy: responseData.proxy, attendees: attendeeNames, dietary_notes: responseData.dietaryNotes }) });
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
+  return response.json();
 }
 
 export async function updateRsvpDietaryEnabled(eventId: string, hostCode: string, enabled: boolean): Promise<void> {

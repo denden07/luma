@@ -90,14 +90,21 @@ shows their invitation origin and proxy role without friend numbers; autogenerat
 guest names still use friend numbers. The public search list shows only the invitation
 holder's name, even when a named additional guest matches the search. The
 RSVP modal highlights the total reserved seats; guests first respond for
-themselves, then respond for every reserved additional seat. Host-named guests
-consume their reserved seats; unnamed seats can be named or left as
+themselves, then respond for every reserved additional seat. Additional guests
+show the invitation's response date in the roster when their attendance is
+submitted. Host-named guests consume their reserved seats; unnamed seats can
+be named or left as
 “Guest name friend #N.” All reserved seats remain on the host roster with
 their own attending, declined, or undecided status. If the invited guest
 selects “Not attending,” a confirmation offers a proxy choice or declines
 all additional seats. If an additional guest attends, the invited guest must
 choose an attending guest as their proxy; the roster labels that guest
 “Proxy of [invited guest].”
+Guests review their complete response before confirming. A saved RSVP then
+shows a guest-list receipt with the invitation name, responses, submission
+time, and reference, downloadable as a PDF generated entirely in the browser
+(including on Android and iOS). Unlisted names instead receive a request
+receipt clearly marked pending host review, not guest-list confirmation.
 RSVP party totals include only attending guests; declined or undecided reserved
 seats are removed from table assignments. Changing an RSVP
 reconciles only guests created from that RSVP and their seating assignments.
