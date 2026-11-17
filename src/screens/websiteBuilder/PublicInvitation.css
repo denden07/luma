@@ -78,6 +78,12 @@
 .public-rsvp-warning h3 { font-family: var(--font-editorial); font-size: 30px; margin: 0 24px 0 0; }
 .public-rsvp-modal .public-rsvp-warning button:last-child, .public-rsvp-modal button.public-rsvp-decline-all { background: #e7dfd1; color: #263a32; }
 .public-rsvp-seat { border: 1px solid #d9dfd4; display: grid; gap: 10px; padding: 14px; }
+.public-rsvp-bulk { display: flex; flex-wrap: wrap; gap: 10px; }
+.public-rsvp-error-toast { align-items: flex-start; background: #8a3028; border-radius: 6px; box-shadow: 0 8px 24px rgba(18, 25, 20, .25); box-sizing: border-box; color: #fffdf7; display: flex; gap: 10px; max-width: min(390px, calc(100vw - 32px)); padding: 14px; position: fixed; right: max(16px, env(safe-area-inset-right)); top: max(16px, env(safe-area-inset-top)); width: max-content; z-index: 1100; }
+.public-rsvp-error-toast > svg { flex: none; }
+.public-rsvp-error-toast span { line-height: 1.4; overflow-wrap: anywhere; }
+.public-rsvp-error-toast button { align-items: center; background: transparent; border: 0; color: inherit; cursor: pointer; display: flex; flex: none; justify-content: center; margin: -4px -4px -4px auto; padding: 4px; }
+.public-rsvp-modal .public-rsvp-bulk button:last-child { background: #e7dfd1; color: #263a32; }
 .public-rsvp-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .public-rsvp-modal .public-rsvp-actions button:first-child { background: #e7dfd1; color: #263a32; }
 .public-rsvp-modal .public-rsvp-receipt .public-rsvp-actions button:first-child { background: #263a32; color: #fffdf7; }

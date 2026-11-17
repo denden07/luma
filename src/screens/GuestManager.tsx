@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { createGuestGroup, createInvitationGuest, deleteGuestGroup, deleteInvitationGuest, getGuestRoster, updateGuestGroup, updateInvitationGuest } from '../services/guestService';
 import type { GuestRoster, InvitationGuest } from '../services/guestService';
@@ -8,6 +8,7 @@ import type { RsvpResponse } from '../services/rsvpService';
 import { getHostCode } from '../utils/hostAuth';
 import RsvpHostPanel from '../components/RsvpHostPanel';
 import Modal from '../components/Modal';
+import { useInvitationNotice } from '../components/useInvitationNotice';
 import './GuestManager.css';
 
 type RsvpFilter = 'all' | 'attending' | 'declined' | 'undecided' | 'awaiting';
@@ -16,10 +17,9 @@ type RosterSort = 'responded' | 'name';
 const GuestManager = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const hostCode = getHostCode() ?? '';
+  const { success: setMessage, error: setError } = useInvitationNotice();
   const [roster, setRoster] = useState<GuestRoster>({ groups: [], guests: [] });
   const [responses, setResponses] = useState<RsvpResponse[]>([]);
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [groupName, setGroupName] = useState('');
   const [groupPhone, setGroupPhone] = useState('');
   const [groupSize, setGroupSize] = useState(1);
@@ -31,6 +31,7 @@ const GuestManager = () => {
   const [guestPlusLimit, setGuestPlusLimit] = useState('');
   const [guestOwnerId, setGuestOwnerId] = useState('');
   const [guestGroupId, setGuestGroupId] = useState('');
+  const [guestResponder, setGuestResponder] = useState(false);
   const [groupFilter, setGroupFilter] = useState('all');
   const [rosterGroupSearch, setRosterGroupSearch] = useState('');
   const [rsvpFilter, setRsvpFilter] = useState<RsvpFilter>('all');
@@ -44,6 +45,7 @@ const GuestManager = () => {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editGroupId, setEditGroupId] = useState('');
+  const [editResponder, setEditResponder] = useState(false);
   const [editPlusLimit, setEditPlusLimit] = useState('');
 
   const load = async () => {
@@ -56,11 +58,6 @@ const GuestManager = () => {
   };
 
   useEffect(() => { load(); }, [eventId]);
-  useEffect(() => {
-    if (!message) return;
-    const timeout = window.setTimeout(() => setMessage(''), 2600);
-    return () => window.clearTimeout(timeout);
-  }, [message]);
 
   const groupNameFor = (groupId: string | null) => roster.groups.find(group => group.id === groupId)?.name ?? 'Individual';
   const responseFor = (guest: InvitationGuest) => responses.find(response => response.guest_id === guest.id) ?? (guest.group_id ? responses.find(response => response.group_id === guest.group_id) : undefined);
@@ -73,10 +70,10 @@ const GuestManager = () => {
     ? roster.guests.find(owner => owner.id === guest.rsvp_owner_id)?.full_name ?? null
     : guest.companion_label?.replace(/ friend #\d+$/, '') ?? null;
   const plusTotal = roster.guests.filter(guest => guest.is_rsvp_companion).length;
-  const respondedCount = roster.guests.filter(guest => (responseFor(guest)?.status ?? guest.rsvp_status) !== null).length;
+  const respondedCount = roster.guests.filter(guest => (guest.group_id ? guest.rsvp_status : responseFor(guest)?.status ?? guest.rsvp_status) !== null).length;
   const guests = roster.guests.filter(guest => {
     const response = responseFor(guest);
-    const status = response?.status ?? guest.rsvp_status;
+    const status = guest.group_id ? guest.rsvp_status : response?.status ?? guest.rsvp_status;
     const matchesRsvp = rsvpFilter === 'all' || (rsvpFilter === 'awaiting' ? !status : status === rsvpFilter);
     const matchesGroup = (groupFilter === 'all' || (groupFilter === 'individual' ? !guest.group_id : guest.group_id === groupFilter)) &&
       (!rosterGroupSearch.trim() || groupNameFor(guest.group_id).toLocaleLowerCase().includes(rosterGroupSearch.trim().toLocaleLowerCase()));
@@ -111,8 +108,8 @@ const GuestManager = () => {
     event.preventDefault();
     if (!eventId || !hostCode || !guestName.trim()) return;
     try {
-      await createInvitationGuest(eventId, hostCode, { fullName: guestName, email: guestEmail, phone: guestPhone, groupId: guestOwnerId ? undefined : guestGroupId, ownerId: guestOwnerId, plusLimit: guestOwnerId ? null : guestPlusLimit === '' ? null : Number(guestPlusLimit) });
-      setGuestName(''); setGuestEmail(''); setGuestPhone(''); setGuestGroupId(''); setGuestPlusLimit(''); setGuestOwnerId('');
+      await createInvitationGuest(eventId, hostCode, { fullName: guestName, email: guestEmail, phone: guestPhone, groupId: guestOwnerId ? undefined : guestGroupId, ownerId: guestOwnerId, plusLimit: guestOwnerId || guestGroupId ? null : guestPlusLimit === '' ? null : Number(guestPlusLimit), isGroupResponder: Boolean(guestGroupId && !guestOwnerId && guestResponder) });
+      setGuestName(''); setGuestEmail(''); setGuestPhone(''); setGuestGroupId(''); setGuestPlusLimit(''); setGuestOwnerId(''); setGuestResponder(false);
       setMessage('Guest added.'); await load();
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not add guest.'); }
   };
@@ -130,6 +127,7 @@ const GuestManager = () => {
     setEditEmail(guest.email ?? '');
     setEditPhone(guest.phone ?? '');
     setEditGroupId(guest.group_id ?? '');
+    setEditResponder(guest.is_group_responder);
     setEditPlusLimit(guest.rsvp_plus_limit === null ? '' : String(guest.rsvp_plus_limit));
   };
 
@@ -137,7 +135,7 @@ const GuestManager = () => {
     event.preventDefault();
     if (!eventId || !hostCode || !editingGuest || !editName.trim()) return;
     try {
-      await updateInvitationGuest(eventId, hostCode, editingGuest.id, { fullName: editName, email: editEmail, phone: editPhone, groupId: editGroupId, ownerId: editingGuest.rsvp_owner_id ?? undefined, plusLimit: editPlusLimit === '' ? null : Number(editPlusLimit) });
+      await updateInvitationGuest(eventId, hostCode, editingGuest.id, { fullName: editName, email: editEmail, phone: editPhone, groupId: editGroupId, ownerId: editingGuest.rsvp_owner_id ?? undefined, plusLimit: editGroupId || editPlusLimit === '' ? null : Number(editPlusLimit), isGroupResponder: Boolean(editGroupId && editResponder) });
       setEditingGuest(null); setMessage('Guest updated.'); await load();
     } catch (error) { setError(error instanceof Error ? error.message : 'Could not update guest.'); }
   };
@@ -155,8 +153,6 @@ const GuestManager = () => {
   return <main className="guest-manager">
     <header><div><p>Invitation guests</p><h1>Guest list</h1></div></header>
     <div className="guest-manager-content">
-      {message && <div className="guest-manager-toast" role="status"><Check size={17} /> {message}</div>}
-      {error && <p className="guest-manager-error">{error}</p>}
       <section className="guest-overview-cards" aria-label="Guest overview">
         <div><span className="guest-overview-title"><Users size={18} aria-hidden="true" /> Total guests</span><strong>{roster.guests.length}</strong><small>{roster.guests.length - plusTotal} invited / added · {plusTotal} additional · {roster.groups.length} groups</small></div>
         <div><span>Responded</span><strong>{respondedCount}</strong></div>
@@ -173,18 +169,19 @@ const GuestManager = () => {
             <label>Name<input value={guestName} onChange={input => setGuestName(input.target.value)} required /></label>
             <label>Email<input type="email" value={guestEmail} onChange={input => setGuestEmail(input.target.value)} /></label>
             <label>Contact<input type="tel" value={guestPhone} onChange={input => setGuestPhone(input.target.value)} /></label>
-            <label>Named additional guest of
+            {!guestGroupId && <label>Named additional guest of
               <select value={guestOwnerId} onChange={input => { setGuestOwnerId(input.target.value); setGuestGroupId(''); }}>
                 <option value="">No - regular guest</option>
-                {roster.guests.filter(guest => !guest.rsvp_owner_id && !guest.rsvp_response_id && (guest.rsvp_plus_limit ?? 0) > 0).map(guest => <option key={guest.id} value={guest.id}>{guest.full_name} ({roster.guests.filter(companion => companion.rsvp_owner_id === guest.id).length}/{guest.rsvp_plus_limit})</option>)}
+                {roster.guests.filter(guest => !guest.group_id && !guest.rsvp_owner_id && !guest.rsvp_response_id && (guest.rsvp_plus_limit ?? 0) > 0).map(guest => <option key={guest.id} value={guest.id}>{guest.full_name} ({roster.guests.filter(companion => companion.rsvp_owner_id === guest.id).length}/{guest.rsvp_plus_limit})</option>)}
               </select>
-            </label>
+            </label>}
             {!guestOwnerId && <>
-              <label>Group<select value={guestGroupId} onChange={input => setGuestGroupId(input.target.value)}><option value="">Individual guest</option>{roster.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
-              <label>Additional guests allowed<input type="number" min="0" max="19" value={guestPlusLimit} onChange={input => setGuestPlusLimit(input.target.value)} placeholder="None" /></label>
+              <label>Group<select value={guestGroupId} onChange={input => { setGuestGroupId(input.target.value); setGuestResponder(false); setGuestPlusLimit(''); }}><option value="">Individual guest</option>{roster.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
+              {guestGroupId && <label className="guest-responder-option"><input type="checkbox" checked={guestResponder} onChange={input => setGuestResponder(input.target.checked)} /> RSVP responder for this group (maximum two)</label>}
+              {!guestGroupId && <label>Additional guests allowed<input type="number" min="0" max="19" value={guestPlusLimit} onChange={input => setGuestPlusLimit(input.target.value)} placeholder="None" /></label>}
             </>}
           </div>
-          {!guestOwnerId && Number(guestPlusLimit) > 0 && <p className="guest-plus-warning">Allowing additional guests lets this person add up to {guestPlusLimit} people to your roster when they RSVP. Only set this for guests you wish to permit.</p>}
+          {!guestOwnerId && !guestGroupId && Number(guestPlusLimit) > 0 && <p className="guest-plus-warning">Allowing additional guests lets this person add up to {guestPlusLimit} people to your roster when they RSVP. Only set this for guests you wish to permit.</p>}
           <button type="submit"><Plus size={16} /> Add guest</button>
         </form>
       </section>
@@ -201,7 +198,7 @@ const GuestManager = () => {
         <div className="guest-table-wrap"><table><thead><tr><th>#</th><th>Guest</th><th>RSVP relationship</th><th>Group</th><th>Email</th><th>Contact</th><th>RSVP</th><th>Party</th><th>Pluses</th><th>Responded</th><th /></tr></thead><tbody>{displayedGuests.map((guest, index) => {
           const response = responseFor(guest);
           const recordedResponse = recordedResponseFor(guest);
-          const status = response?.status ?? guest.rsvp_status ?? 'awaiting';
+          const status = (guest.group_id ? guest.rsvp_status : response?.status ?? guest.rsvp_status) ?? 'awaiting';
           const companionOrigin = companionOriginFor(guest);
           return <tr key={guest.id}><td>{(currentPage - 1) * (pageSize === 'all' ? 1 : pageSize) + index + 1}</td><td>{guest.full_name}</td><td className="guest-relationship">{companionOrigin ? `${guest.is_rsvp_companion || guest.rsvp_owner_id ? 'Additional guest' : 'RSVP guest'} of ${companionOrigin}` : '-'}{guest.proxy_of && <div>Proxy of {guest.proxy_of}</div>}</td><td>{groupNameFor(guest.group_id)}</td><td>{guest.email || '-'}</td><td>{guest.phone || '-'}</td><td><span className={`rsvp-cell-status ${status}`}>{status === 'awaiting' ? 'Awaiting response' : status}</span></td><td>{response?.party_count ?? '-'}</td><td>{response?.plus_one_count ?? 0}</td><td>{recordedResponse ? new Date(recordedResponse.submitted_at).toLocaleDateString() : '-'}</td><td><div className="guest-table-actions"><button className="guest-table-action" type="button" onClick={() => openEdit(guest)} title="Edit guest"><Pencil size={15} /></button><button className="guest-table-action guest-table-delete" type="button" onClick={() => deleteGuest(guest)} title="Delete guest"><Trash2 size={15} /></button></div></td></tr>;
         })}</tbody></table></div>
@@ -209,7 +206,7 @@ const GuestManager = () => {
       </section>
 
       {eventId && hostCode && <RsvpHostPanel eventId={eventId} hostCode={hostCode} guests={roster.guests} groups={roster.groups} onSuccess={setMessage} onError={setError} onRosterUpdated={load} />}
-      <Modal isOpen={Boolean(editingGuest)} onClose={() => setEditingGuest(null)} className="guest-edit-modal"><form onSubmit={saveGuest}><h2>Edit guest</h2><label>Name<input value={editName} onChange={input => setEditName(input.target.value)} required /></label><label>Email<input type="email" value={editEmail} onChange={input => setEditEmail(input.target.value)} /></label><label>Contact<input type="tel" value={editPhone} onChange={input => setEditPhone(input.target.value)} /></label>{editingGuest?.rsvp_owner_id ? <p>Named additional guest of {roster.guests.find(guest => guest.id === editingGuest.rsvp_owner_id)?.full_name}</p> : <><label>Group<select value={editGroupId} onChange={input => setEditGroupId(input.target.value)}><option value="">Individual guest</option>{roster.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label><label>Additional guests allowed<input type="number" min="0" max="19" value={editPlusLimit} onChange={input => setEditPlusLimit(input.target.value)} placeholder="None" /></label>{Number(editPlusLimit) > 0 && <p className="guest-plus-warning">Allowing additional guests lets this person add people to your roster when they RSVP.</p>}</>}<div className="guest-edit-modal-actions"><button type="button" onClick={() => setEditingGuest(null)}>Cancel</button><button type="submit">Save guest</button></div></form></Modal>
+      <Modal isOpen={Boolean(editingGuest)} onClose={() => setEditingGuest(null)} className="guest-edit-modal"><form onSubmit={saveGuest}><h2>Edit guest</h2><label>Name<input value={editName} onChange={input => setEditName(input.target.value)} required /></label><label>Email<input type="email" value={editEmail} onChange={input => setEditEmail(input.target.value)} /></label><label>Contact<input type="tel" value={editPhone} onChange={input => setEditPhone(input.target.value)} /></label>{editingGuest?.rsvp_owner_id ? <p>Named additional guest of {roster.guests.find(guest => guest.id === editingGuest.rsvp_owner_id)?.full_name}</p> : <><label>Group<select value={editGroupId} onChange={input => { setEditGroupId(input.target.value); setEditResponder(false); setEditPlusLimit(''); }}><option value="">Individual guest</option>{roster.groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>{editGroupId && <label className="guest-responder-option"><input type="checkbox" checked={editResponder} onChange={input => setEditResponder(input.target.checked)} /> RSVP responder for this group (maximum two)</label>}{!editGroupId && <label>Additional guests allowed<input type="number" min="0" max="19" value={editPlusLimit} onChange={input => setEditPlusLimit(input.target.value)} placeholder="None" /></label>}{!editGroupId && Number(editPlusLimit) > 0 && <p className="guest-plus-warning">Allowing additional guests lets this person add people to your roster when they RSVP.</p>}</>}<div className="guest-edit-modal-actions"><button type="button" onClick={() => setEditingGuest(null)}>Cancel</button><button type="submit">Save guest</button></div></form></Modal>
     </div>
   </main>;
 };

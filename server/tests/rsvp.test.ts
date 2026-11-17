@@ -9,7 +9,7 @@ import pool from '../db/index.js';
 after(async () => { await pool.end(); });
 
 test('guest-specific allowances, companion names and host-reviewed requests', { timeout: 15000 }, async context => {
-  try { await pool.query('SELECT rsvp_plus_limit FROM guests LIMIT 0'); await pool.query('SELECT attendee_names FROM rsvp_verification_requests LIMIT 0'); }
+  try { await pool.query('SELECT is_group_responder FROM guests LIMIT 0'); await pool.query('SELECT attendee_names FROM rsvp_verification_requests LIMIT 0'); }
   catch { context.skip('Migrated Postgres unavailable'); return; }
   const hostCode = randomUUID();
   const event = await pool.query<{ id: string }>(
@@ -29,13 +29,61 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     return { status: response.status, data: await response.json() };
   }
   try {
-    const group = await request(`/api/events/${eventId}/guest-groups`, 'POST', { host_code: hostCode, name: 'Example family', invited_party_size: 2 });
+    const group = await request(`/api/events/${eventId}/guest-groups`, 'POST', { host_code: hostCode, name: 'Example family', invited_party_size: 4 });
     assert.equal(group.status, 201);
     assert.equal(group.data.rsvp_plus_limit, 0);
-    const groupUpdated = await request(`/api/events/${eventId}/guest-groups/${group.data.id}`, 'PATCH', { host_code: hostCode, name: 'Example family', invited_party_size: 2, rsvp_plus_limit: 2 });
+    const groupUpdated = await request(`/api/events/${eventId}/guest-groups/${group.data.id}`, 'PATCH', { host_code: hostCode, name: 'Example family', invited_party_size: 4, rsvp_plus_limit: 2 });
     assert.equal(groupUpdated.data.rsvp_plus_limit, 2);
     const groupLink = await request(`/api/events/${eventId}/rsvp-links`, 'POST', { host_code: hostCode, group_id: group.data.id });
     assert.equal((await request(`/api/rsvp/link/${groupLink.data.token}`)).data.plus_limit, 2);
+    const responder = await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Group Responder', group_id: group.data.id, is_group_responder: true });
+    const member = await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Group Member', group_id: group.data.id });
+    assert.equal(responder.status, 201);
+    assert.equal(member.status, 201);
+    assert.equal((await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Invalid group allowance', group_id: group.data.id, rsvp_plus_limit: 1 })).status, 400);
+    assert.equal((await request(`/api/events/${eventId}/guests/${member.data.id}`, 'PATCH', { host_code: hostCode, full_name: 'Group Member', group_id: group.data.id, rsvp_plus_limit: 1 })).status, 400);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Group Member' })).data.needs_response, true);
+    for (const searchName of ['Group Responder', 'Example family']) {
+      const found = await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: searchName });
+      assert.equal(found.data.matches[0].group_id, group.data.id);
+      assert.deepEqual(found.data.matches[0].members.map((guest: { full_name: string }) => guest.full_name), ['Group Responder', 'Group Member']);
+    }
+    assert.equal((await request(`/api/rsvp/guest/${member.data.id}`, 'POST', { event_id: eventId, status: 'attending', party_count: 1, plus_one_count: 0, attendees: ['Group Member'] })).status, 400);
+    const groupReply = (first: string, second: string) => request(`/api/rsvp/group/${group.data.id}`, 'POST', {
+      event_id: eventId, members: [{ id: responder.data.id, status: first }, { id: member.data.id, status: second }],
+    });
+    assert.equal((await groupReply('attending', 'declined')).status, 200);
+    let groupRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    assert.equal(groupRoster.data.guests.find((guest: { id: string }) => guest.id === responder.data.id).rsvp_status, 'attending');
+    assert.equal(groupRoster.data.guests.find((guest: { id: string }) => guest.id === member.data.id).rsvp_status, 'declined');
+    assert.equal((await request(`/api/rsvp/group/${group.data.id}`, 'POST', { event_id: eventId, members: [{ id: responder.data.id, status: 'attending' }] })).status, 400);
+    assert.equal((await groupReply('undecided', 'declined')).status, 200);
+    groupRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    assert.equal(groupRoster.data.guests.find((guest: { id: string }) => guest.id === responder.data.id).rsvp_status, 'undecided');
+    assert.equal((await groupReply('declined', 'declined')).status, 200);
+    groupRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    assert.equal(groupRoster.data.guests.find((guest: { id: string }) => guest.id === responder.data.id).rsvp_status, 'declined');
+    assert.equal((await groupReply('attending', 'attending')).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Second Responder', group_id: group.data.id, is_group_responder: true })).status, 201);
+    assert.equal((await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Third', group_id: group.data.id, is_group_responder: true })).status, 409);
+    const family = await request(`/api/events/${eventId}/guest-groups`, 'POST', { host_code: hostCode, name: 'Dela Cruz family', invited_party_size: 10 });
+    const familyMembers = [];
+    for (let index = 0; index < 10; index++) {
+      const added = await request(`/api/events/${eventId}/guests`, 'POST', {
+        host_code: hostCode, full_name: `Family Guest ${index + 1}`, group_id: family.data.id, is_group_responder: index === 0 || index === 1,
+      });
+      assert.equal(added.status, 201);
+      familyMembers.push(added.data);
+    }
+    const familySearch = await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Dela Cruz family' });
+    assert.equal(familySearch.data.matches[0].members.length, 10);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Family Guest 3' })).data.needs_response, true);
+    const familyReply = await request(`/api/rsvp/group/${family.data.id}`, 'POST', {
+      event_id: eventId, members: familyMembers.map((guest: { id: string }, index: number) => ({ id: guest.id, status: index < 8 ? 'attending' : 'declined' })),
+    });
+    assert.equal(familyReply.status, 200);
+    assert.equal(familyReply.data.party_count, 8);
+    assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === familyMembers[9].id).rsvp_status, 'declined');
     const unallowed = await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'No Allowance' });
     assert.equal(unallowed.status, 201);
     assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'No Allowance' })).data.matches[0].plus_limit, 0);

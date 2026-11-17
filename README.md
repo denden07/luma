@@ -83,6 +83,10 @@ If a table exceeds its seat count, the plan warns you but permits the assignment
 Use **Add and seat a guest** to create a guest-list entry and place them at a table
 in one step, with an optional existing invitation group. The roster's total
 counts each guest once.
+Invitation-management success and error messages appear as dismissible,
+upper-right notifications across the website editor, guest list, and seating plan.
+When adding a guest to a group, the individual named-additional-guest and
+additional-guest-allowance fields are hidden; use the group allowance instead.
 
 Attending RSVP companions and previously unlisted named group attendees appear
 in the guest list automatically. The guest list's RSVP relationship column
@@ -91,6 +95,15 @@ guest names still use friend numbers. The public search list shows only the invi
 holder's name, even when a named additional guest matches the search. The
 RSVP modal highlights the total reserved seats; guests first respond for
 themselves, then respond for every reserved additional seat. Additional guests
+can be marked **Attend all** or **Decline all** at the top of the second step.
+For a family invitation, add each named member to the group and mark one or
+two of them as **RSVP responder** in the guest list. Public RSVP search accepts
+the group name or a responder's name, but not the name of a non-responder.
+Selecting the group shows every member on the second step, where the responder
+can set each person's attendance or use **Attend all** or **Decline all**.
+The host can change responders by editing guests; additional-guest allowances
+for groups remain available through private RSVP links.
+Additional guests
 show the invitation's response date in the roster when their attendance is
 submitted. Host-named guests consume their reserved seats; unnamed seats can
 be named or left as
@@ -105,6 +118,9 @@ shows a guest-list receipt with the invitation name, responses, submission
 time, and reference, downloadable as a PDF generated entirely in the browser
 (including on Android and iOS). Unlisted names instead receive a request
 receipt clearly marked pending host review, not guest-list confirmation.
+On the public invitation, RSVP search, submission, and receipt-download errors
+appear in a dismissible upper-right notification; a failed submission keeps
+the guest's answers so they can retry.
 RSVP party totals include only attending guests; declined or undecided reserved
 seats are removed from table assignments. Changing an RSVP
 reconciles only guests created from that RSVP and their seating assignments.

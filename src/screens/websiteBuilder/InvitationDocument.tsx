@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, MapPinned, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, ChevronRight, CircleAlert, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId } from '../../utils/invitationSections';
-import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
+import { submitPublicGroupRsvp, submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { CompanionChoice, PublicGuestMatch, ReservedSeatChoice, RsvpStatus } from '../../services/rsvpService';
 import { downloadRsvpReceiptPdf, prepareRsvpReceiptPdf, rsvpStatusLabel } from '../../utils/rsvpReceiptPdf';
 import type { RsvpReceipt } from '../../utils/rsvpReceiptPdf';
@@ -60,26 +61,38 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
   const [receipt, setReceipt] = useState<RsvpReceipt | null>(null);
   const [pdfReady, setPdfReady] = useState(false);
   const [namedChoices, setNamedChoices] = useState<CompanionChoice[]>([]);
+  const [groupChoices, setGroupChoices] = useState<CompanionChoice[]>([]);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [dietaryNotes, setDietaryNotes] = useState('');
   const [message, setMessage] = useState('');
+  const [errorToast, setErrorToast] = useState<{ id: number; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showError = useCallback((error: unknown, fallback: string) => {
+    const message = error instanceof Error && !(error instanceof TypeError) ? error.message : fallback;
+    setErrorToast(current => ({ id: (current?.id ?? 0) + 1, message }));
+  }, []);
+
+  useEffect(() => {
+    if (!errorToast) return;
+    const timeout = window.setTimeout(() => setErrorToast(current => current?.id === errorToast.id ? null : current), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [errorToast]);
 
   useEffect(() => {
     if (!receipt) return;
     let active = true;
     prepareRsvpReceiptPdf().then(() => { if (active) setPdfReady(true); })
-      .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'Could not load the PDF generator.'); });
+      .catch(error => { if (active) showError(error, 'Could not load the PDF generator. Please try again.'); });
     return () => { active = false; };
-  }, [receipt]);
+  }, [receipt, showError]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!eventId || !name.trim()) return;
     setIsSubmitting(true);
-    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(Boolean(result.needs_response)); setModalOpen(Boolean(result.needs_response)); setStatus('attending'); setPage(1); setReservedSeats([]); setProxy(''); setProxyRequired(false); setDeclineWarningOpen(false); setReviewOpen(false); setReceipt(null); setMessage(''); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not search invitations.'); }
+    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(Boolean(result.needs_response)); setModalOpen(Boolean(result.needs_response)); setStatus('attending'); setPage(1); setReservedSeats([]); setProxy(''); setProxyRequired(false); setDeclineWarningOpen(false); setReviewOpen(false); setReceipt(null); setMessage(''); setErrorToast(null); }
+    catch (error) { showError(error, 'Could not search invitations. Check your connection and try again.'); }
     finally { setIsSubmitting(false); }
   };
 
@@ -87,8 +100,9 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
     event.preventDefault();
     if (!eventId || !selectedGuest) return;
     const attendingCount = namedChoices.filter(choice => choice.status === 'attending').length + reservedSeats.filter(seat => seat.status === 'attending').length;
-    if (status === 'declined' && proxyRequired && attendingCount === 0) { setMessage('Choose an additional guest to attend as your proxy.'); return; }
-    if (status === 'declined' && attendingCount > 0 && !attendingOptions.some(option => option.value === proxy)) { setMessage('Choose an attending additional guest as your proxy.'); return; }
+    if (selectedGuest.group_id) { setMessage(''); setReviewOpen(true); return; }
+    if (status === 'declined' && proxyRequired && attendingCount === 0) { showError(null, 'Choose an additional guest to attend as your proxy.'); return; }
+    if (status === 'declined' && attendingCount > 0 && !attendingOptions.some(option => option.value === proxy)) { showError(null, 'Choose an attending additional guest as your proxy.'); return; }
     setMessage('');
     setReviewOpen(true);
   };
@@ -96,12 +110,15 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
     if (!eventId || !selectedGuest || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const saved = await submitPublicGuestRsvp(eventId, selectedGuest, { status, namedCompanions: namedChoices, reservedSeats, proxy: status === 'declined' && proxy ? proxy.startsWith('named:') ? { id: proxy.slice(6) } : { index: Number(proxy.slice(5)) } : null, dietaryNotes: dietaryEnabled ? dietaryNotes : undefined });
+      const groupStatus = groupChoices.some(choice => choice.status === 'attending') ? 'attending' : groupChoices.some(choice => choice.status === 'undecided') ? 'undecided' : 'declined';
+      const saved = selectedGuest.group_id
+        ? await submitPublicGroupRsvp(eventId, selectedGuest, groupChoices, dietaryEnabled ? dietaryNotes : undefined)
+        : await submitPublicGuestRsvp(eventId, selectedGuest, { status, namedCompanions: namedChoices, reservedSeats, proxy: status === 'declined' && proxy ? proxy.startsWith('named:') ? { id: proxy.slice(6) } : { index: Number(proxy.slice(5)) } : null, dietaryNotes: dietaryEnabled ? dietaryNotes : undefined });
       setPdfReady(false);
-      setReceipt({ kind: 'listed', guestName: selectedGuest.full_name, status, companions: companionResponses, proxyName: status === 'declined' ? attendingOptions.find(option => option.value === proxy)?.label : undefined, submittedAt: saved.submitted_at, reference: saved.id });
-      setReviewOpen(false); setNeedsResponse(false); setMatches([]); setMessage('');
+      setReceipt({ kind: 'listed', guestName: selectedGuest.full_name, status: selectedGuest.group_id ? groupStatus : status, companions: companionResponses, proxyName: status === 'declined' && !selectedGuest.group_id ? attendingOptions.find(option => option.value === proxy)?.label : undefined, submittedAt: saved.submitted_at, reference: saved.id });
+      setReviewOpen(false); setNeedsResponse(false); setMatches([]); setMessage(''); setErrorToast(null);
     }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save RSVP.'); }
+    catch (error) { showError(error, 'Could not save RSVP. Check your connection and try again.'); }
     finally { setIsSubmitting(false); }
   };
   const reviewUnmatchedResponse = (event: React.FormEvent) => {
@@ -116,10 +133,11 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
     try {
       const result = await submitPublicRsvpLookup(eventId, name, { status, partyCount: status === 'attending' ? 1 : 0, plusOneCount: 0, attendeeNames: [], contactEmail: email, contactPhone: phone, dietaryNotes: dietaryEnabled ? dietaryNotes : undefined });
       setReviewOpen(false);
+      setErrorToast(null);
       if (result.matches.length) { setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(false); setModalOpen(false); setMessage('We found an invitation. Please select your name below.'); }
       else { setPdfReady(false); setReceipt({ kind: 'pending', guestName: name.trim(), status, companions: [], submittedAt: new Date().toISOString() }); setNeedsResponse(false); setMessage(''); }
     }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'Could not send RSVP.'); }
+    catch (error) { showError(error, 'Could not send RSVP. Check your connection and try again.'); }
     finally { setIsSubmitting(false); }
   };
   const openGuest = (guest: PublicGuestMatch) => {
@@ -128,6 +146,7 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
     setStatus(guest.response_status ?? 'attending');
     setDeclineWarningOpen(false);
     setNamedChoices(guest.companions.map(companion => ({ id: companion.id, status: companion.status ?? 'undecided' })));
+    setGroupChoices((guest.members ?? []).map(member => ({ id: member.id, status: member.status ?? 'undecided' })));
     const count = Math.max(0, guest.plus_limit - guest.companions.length);
     setReservedSeats(Array.from({ length: count }, (_, index) => guest.reserved_seats?.[index] ?? { name: '', status: 'undecided' }));
     const proxyNamed = guest.companions.find(companion => companion.is_proxy);
@@ -146,18 +165,31 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
     setMessage('');
     setPage(2);
   };
-  const additionalCount = selectedGuest?.plus_limit ?? 0;
+  const setAllSeats = (next: RsvpStatus) => {
+    setStatus(next);
+    setNamedChoices(current => current.map(choice => ({ ...choice, status: next })));
+    setReservedSeats(current => current.map(seat => ({ ...seat, status: next })));
+    setGroupChoices(current => current.map(choice => ({ ...choice, status: next })));
+    setProxy('');
+    setProxyRequired(false);
+    setMessage('');
+  };
+  const additionalCount = selectedGuest?.group_id ? (selectedGuest.members?.length ?? 0) : (selectedGuest?.plus_limit ?? 0);
   const attendingOptions = [
     ...(selectedGuest?.companions ?? []).filter((_, index) => namedChoices[index]?.status === 'attending').map(companion => ({ value: `named:${companion.id}`, label: companion.full_name })),
     ...reservedSeats.map((seat, index) => ({ value: `seat:${index}`, label: seat.name.trim() || `${selectedGuest?.full_name ?? name.trim()} friend #${index + 1}`, status: seat.status })).filter(seat => seat.status === 'attending'),
   ];
   const companionResponses = selectedGuest ? [
-    ...selectedGuest.companions.map((companion, index) => ({ name: companion.full_name, status: namedChoices[index]?.status ?? 'undecided' })),
+    ...(selectedGuest.group_id ? (selectedGuest.members ?? []).map((member, index) => ({ name: member.full_name, status: groupChoices[index]?.status ?? 'undecided' })) : selectedGuest.companions.map((companion, index) => ({ name: companion.full_name, status: namedChoices[index]?.status ?? 'undecided' }))),
     ...reservedSeats.map((seat, index) => ({ name: seat.name.trim() || `${selectedGuest.full_name.slice(0, 230)} friend #${index + 1}`, status: seat.status })),
   ] : [];
   return <div className="public-rsvp-lookup">
-    <form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setModalOpen(false); setDeclineWarningOpen(false); setReviewOpen(false); setReceipt(null); }} placeholder="Enter your invitation name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>
-    {!preview && matches.length > 0 && <div className="public-rsvp-matches" aria-label="Matching invitations"><p>Select your name from the list</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => openGuest(guest)}>{guest.full_name}</button>)}</div>}
+    {errorToast && createPortal(<div key={errorToast.id} className="public-rsvp-error-toast" role="alert">
+      <CircleAlert size={19} aria-hidden="true" /><span>{errorToast.message}</span>
+      <button type="button" aria-label="Dismiss RSVP error" onClick={() => setErrorToast(null)}><X size={17} aria-hidden="true" /></button>
+    </div>, document.body)}
+    <form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name or group name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setModalOpen(false); setDeclineWarningOpen(false); setReviewOpen(false); setReceipt(null); }} placeholder="Enter your name or group name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>
+    {!preview && matches.length > 0 && <div className="public-rsvp-matches" aria-label="Matching invitations"><p>Select your invitation from the list</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => openGuest(guest)}>{guest.full_name}{guest.group_id ? ' (group)' : ''}</button>)}</div>}
     {!preview && message && <p role="status">{message}</p>}
     <Modal isOpen={!preview && modalOpen} onClose={() => { if (declineWarningOpen) setDeclineWarningOpen(false); else if (reviewOpen) setReviewOpen(false); else setModalOpen(false); }} className="public-rsvp-modal" ariaLabel="RSVP response">
       <button type="button" className="public-rsvp-close" onClick={() => { setDeclineWarningOpen(false); setModalOpen(false); }} aria-label="Close RSVP"><X size={20} /></button>
@@ -165,14 +197,19 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
         <h2>RSVP for {selectedGuest.full_name}</h2>
         <p className="public-rsvp-step">Step {page} of {additionalCount > 0 ? 2 : 1}</p>
         {page === 1 ? <>
-          <div className="public-rsvp-reserved"><span>Reserved for you</span><strong>{additionalCount + 1} {additionalCount === 0 ? 'seat' : 'seats'}</strong>{additionalCount > 0 && <p>Including {additionalCount} {additionalCount === 1 ? 'additional guest' : 'additional guests'}</p>}</div>
+          <div className="public-rsvp-reserved"><span>Reserved for {selectedGuest.group_id ? 'your group' : 'you'}</span><strong>{selectedGuest.group_id ? additionalCount : additionalCount + 1} {additionalCount === 0 && !selectedGuest.group_id ? 'seat' : 'seats'}</strong>{additionalCount > 0 && !selectedGuest.group_id && <p>Including {additionalCount} {additionalCount === 1 ? 'additional guest' : 'additional guests'}</p>}</div>
+          {selectedGuest.group_id ? <button type="button" onClick={() => { setMessage(''); setPage(2); }}>Next: group members</button> : <>
           <label>Will you attend?<select value={status} onChange={input => { const next = input.target.value as RsvpStatus; if (next === 'declined' && additionalCount > 0 && status !== 'declined') { setDeclineWarningOpen(true); return; } setStatus(next); if (next !== 'declined') { setProxyRequired(false); setProxy(''); } }}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
           {additionalCount > 0 ? <button type="button" onClick={() => { setMessage(''); setPage(2); }}>Next: additional guests</button> : <>
             {dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}
             <button type="submit">Review RSVP</button>
-          </>}
+          </>}</>}
         </> : <>
-          <p>Choose an attendance response for each additional seat.</p>
+          <div className="public-rsvp-bulk"><button type="button" onClick={() => setAllSeats('attending')}>Attend all</button><button type="button" onClick={() => setAllSeats('declined')}>Decline all</button></div>
+          <p>Choose an attendance response for each {selectedGuest.group_id ? 'group member' : 'additional seat'}.</p>
+          {selectedGuest.group_id && selectedGuest.members?.map((member, index) => <div className="public-rsvp-seat" key={member.id}>
+            <strong>{member.full_name}</strong><label>Attendance<select value={groupChoices[index]?.status ?? 'undecided'} onChange={input => setGroupChoices(current => current.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice))}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
+          </div>)}
           {selectedGuest.companions.map((companion, index) => <div className="public-rsvp-seat" key={companion.id}>
             <strong>{companion.full_name}</strong><label>Attendance<select value={namedChoices[index]?.status ?? 'undecided'} onChange={input => setNamedChoices(current => current.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice))}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
           </div>)}
@@ -181,8 +218,8 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
             <label>Name (optional)<input maxLength={255} value={seat.name} placeholder={`${selectedGuest.full_name.slice(0, 230)} friend #${index + 1}`} onChange={input => setReservedSeats(current => current.map((choice, position) => position === index ? { ...choice, name: input.target.value } : choice))} /></label>
             <label>Attendance<select value={seat.status} onChange={input => setReservedSeats(current => current.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice))}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
           </div>)}
-          {status === 'declined' && attendingOptions.length > 0 && <label>Who will be your proxy?<select value={attendingOptions.some(option => option.value === proxy) ? proxy : ''} onChange={input => setProxy(input.target.value)} required><option value="">Choose an attending additional guest</option>{attendingOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
-          {status === 'declined' && !proxyRequired && <button type="button" className="public-rsvp-decline-all" onClick={declineAllSeats}>Decline all reserved additional seats</button>}
+          {!selectedGuest.group_id && status === 'declined' && attendingOptions.length > 0 && <label>Who will be your proxy?<select value={attendingOptions.some(option => option.value === proxy) ? proxy : ''} onChange={input => setProxy(input.target.value)} required><option value="">Choose an attending additional guest</option>{attendingOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
+          {!selectedGuest.group_id && status === 'declined' && !proxyRequired && <button type="button" className="public-rsvp-decline-all" onClick={declineAllSeats}>Decline all reserved additional seats</button>}
           {dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}
           <div className="public-rsvp-actions"><button type="button" onClick={() => { setMessage(''); setPage(1); }}>Back</button><button type="submit">Review RSVP</button></div>
         </>}
@@ -196,7 +233,7 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
         <div className="public-rsvp-review-summary">
           <p><strong>Event</strong><span>{eventName}</span></p>
           <p><strong>{selectedGuest ? 'Invitation' : 'Requested name'}</strong><span>{selectedGuest?.full_name ?? name.trim()}</span></p>
-          <p><strong>Your response</strong><span>{rsvpStatusLabel(status)}</span></p>
+          <p><strong>{selectedGuest?.group_id ? 'Group response' : 'Your response'}</strong><span>{rsvpStatusLabel(selectedGuest?.group_id ? groupChoices.some(choice => choice.status === 'attending') ? 'attending' : groupChoices.some(choice => choice.status === 'undecided') ? 'undecided' : 'declined' : status)}</span></p>
           {companionResponses.map((companion, index) => <p key={index}><strong>{companion.name}</strong><span>{rsvpStatusLabel(companion.status)}</span></p>)}
           {selectedGuest && status === 'declined' && proxy && <p><strong>Proxy for {selectedGuest.full_name}</strong><span>{attendingOptions.find(option => option.value === proxy)?.label}</span></p>}
         </div>
@@ -221,7 +258,7 @@ const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEna
         {message && <p role="alert">{message}</p>}
         <div className="public-rsvp-actions"><button type="button" autoFocus disabled={!pdfReady} onClick={() => {
           try { downloadRsvpReceiptPdf(receipt, eventName); setMessage(''); }
-          catch (error) { setMessage(error instanceof Error ? error.message : 'Could not download the PDF receipt.'); }
+          catch (error) { showError(error, 'Could not download the PDF receipt. Please try again.'); }
         }}>{pdfReady ? 'Download PDF' : 'Preparing PDF...'}</button><button type="button" onClick={() => setModalOpen(false)}>Done</button></div>
       </div>}
       {selectedGuest && declineWarningOpen && <div className="public-rsvp-warning-backdrop">

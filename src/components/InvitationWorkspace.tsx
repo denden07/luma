@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Armchair, Globe2, Menu, UsersRound, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Armchair, Check, CircleAlert, Globe2, Menu, UsersRound, X } from 'lucide-react';
 import { NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
+import type { InvitationNoticeActions } from './useInvitationNotice';
 import './InvitationWorkspace.css';
 
+type InvitationNotice = { id: number; kind: 'success' | 'error'; message: string };
 const InvitationWorkspace = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const { pathname } = useLocation();
@@ -11,6 +13,15 @@ const InvitationWorkspace = () => {
   const menuButton = useRef<HTMLButtonElement>(null);
   const navigation = useRef<HTMLElement>(null);
   const base = `/host/events/${eventId}`;
+  const [notice, setNotice] = useState<InvitationNotice | null>(null);
+  const success = useCallback((message: string) => setNotice(current => ({ id: (current?.id ?? 0) + 1, kind: 'success', message })), []);
+  const error = useCallback((message: string) => setNotice(current => ({ id: (current?.id ?? 0) + 1, kind: 'error', message })), []);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(current => current?.id === notice.id ? null : current), notice.kind === 'error' ? 6000 : 4000);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   useEffect(() => {
     const closeOnHistory = () => setOpenedAt(null);
@@ -72,7 +83,12 @@ const InvitationWorkspace = () => {
       </nav>
       <NavLink className="invitation-dashboard-link" to={`/host/dashboard/${eventId}`} onClick={closeMenu}><ArrowLeft size={18} aria-hidden="true" /> Event dashboard</NavLink>
     </aside>
-    <div className="invitation-workspace-content"><Outlet /></div>
+    <div className="invitation-workspace-content"><Outlet context={{ success, error } satisfies InvitationNoticeActions} /></div>
+    {notice && <div key={notice.id} className={`invitation-notice ${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
+      {notice.kind === 'error' ? <CircleAlert size={19} aria-hidden="true" /> : <Check size={19} aria-hidden="true" />}
+      <span>{notice.message}</span>
+      <button type="button" aria-label="Dismiss notification" onClick={() => setNotice(null)}><X size={17} aria-hidden="true" /></button>
+    </div>}
   </div>;
 };
 

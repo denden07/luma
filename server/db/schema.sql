@@ -95,6 +95,7 @@ ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone VARCHAR(40);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_owner_id UUID REFERENCES guests(id) ON DELETE CASCADE;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_companion_status VARCHAR(12) CHECK (rsvp_companion_status IN ('attending', 'declined', 'undecided'));
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS is_group_responder BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_proxy_for_id UUID REFERENCES guests(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_guests_rsvp_owner ON guests(rsvp_owner_id);
 ALTER TABLE guests DROP CONSTRAINT IF EXISTS guests_rsvp_plus_limit_check;

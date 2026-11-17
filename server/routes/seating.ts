@@ -70,7 +70,8 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
       isCompanion
         ? guest.rsvp_owner_id === response.guest_id && (guest.id === attendees.rows[index]?.guest_id || guest.full_name.trim().toLowerCase() === name.toLowerCase())
         : ((!response.group_id && guest.id === response.guest_id && (index === 0 || guest.full_name.trim().toLowerCase() === name.toLowerCase())) ||
-          (!generic && !guest.rsvp_owner_id && guest.full_name.trim().toLowerCase() === name.toLowerCase()))
+          (!generic && !guest.rsvp_owner_id && (guest.id === attendees.rows[index]?.guest_id ||
+            guest.full_name.trim().toLowerCase() === name.toLowerCase())))
     ));
     if (match) { used.add(match.id); continue; }
     // For an individual invitation the first attendee is the invited guest, even for legacy placeholder names.
@@ -129,7 +130,7 @@ async function authorized(eventId: string, code: unknown): Promise<boolean> {
 }
 
 const guestQuery = `SELECT g.id, g.event_id, g.group_id, g.full_name, g.email, g.phone,
-  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
+  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, CASE WHEN g.group_id IS NOT NULL THEN g.rsvp_companion_status END, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
   proxy_owner.full_name AS proxy_of, g.table_id
   FROM guests g
   LEFT JOIN rsvp_responses own ON own.guest_id = g.id

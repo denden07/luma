@@ -34,7 +34,17 @@ export interface RsvpVerificationRequest {
   attendee_names: string[] | null;
 }
 
-export interface PublicGuestMatch { id: string; full_name: string; plus_limit: number; companions: NamedCompanion[]; response_status?: RsvpStatus | null; reserved_seats?: ReservedSeatChoice[] }
+export interface PublicGuestMatch { id: string; full_name: string; group_id?: string; members?: NamedCompanion[]; plus_limit: number; companions: NamedCompanion[]; response_status?: RsvpStatus | null; reserved_seats?: ReservedSeatChoice[] }
+
+export async function submitPublicGroupRsvp(eventId: string, group: PublicGuestMatch, members: CompanionChoice[], dietaryNotes?: string): Promise<Pick<RsvpResponse, 'id' | 'submitted_at'>> {
+  const response = await fetch(`${API_BASE_URL}/api/rsvp/group/${group.id}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ event_id: eventId, members, dietary_notes: dietaryNotes }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Could not save group RSVP');
+  return payload;
+}
 
 export async function searchPublicRsvpGuests(eventId: string, name: string): Promise<PublicGuestMatch[]> {
   const response = await fetch(`${API_BASE_URL}/api/rsvp/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name }) });

@@ -10,8 +10,7 @@
 .seating-header h1 { font-size: 32px; line-height: 1.2; }
 .seating-content { margin: 0 auto; max-width: 1160px; padding: 32px 24px 72px; }
 .seating-content h2 { font-size: 25px; margin: 0 0 12px; }
-.seating-error, .seating-warning { background: #f8e4e0; border-left: 4px solid #9b392d; color: #862b24; padding: 12px; }
-.seating-notice { background: #dce7d8; border-left: 4px solid #66865d; padding: 12px; }
+.seating-warning { background: #f8e4e0; border-left: 4px solid #9b392d; color: #862b24; padding: 12px; }
 .seating-summary { align-items: center; background: #dce7d8; display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; }
 .seating-summary span { color: #52634f; }
 .seating-export { display: flex; gap: 8px; margin-left: auto; }
@@ -56,7 +55,7 @@
 @media print {
   .seating-plan { background: #fff; color: #000; }
   .seating-print-title { display: block; }
-  .seating-header, .seating-export, .seating-form, .seating-search, .seating-table-actions, .seating-edit, .seating-assignment, .seating-error, .seating-notice { display: none !important; }
+  .seating-header, .seating-export, .seating-form, .seating-search, .seating-table-actions, .seating-edit, .seating-assignment { display: none !important; }
   .seating-content { max-width: none; padding: 0; }
   .seating-grid { display: block; }
   .seating-table { border: 1px solid #888; break-inside: avoid; margin-bottom: 16px; }

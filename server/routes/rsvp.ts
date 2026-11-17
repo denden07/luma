@@ -18,9 +18,31 @@ const publicMatchQuery = `SELECT guest.id, guest.full_name, COALESCE(guest.rsvp_
   , COALESCE((SELECT json_agg(json_build_object('name', seat.full_name, 'status', seat.status, 'is_proxy', seat.is_proxy) ORDER BY seat.slot_index)
     FROM rsvp_reserved_seats seat WHERE seat.response_id = response.id), '[]'::json) AS reserved_seats
   FROM guests guest LEFT JOIN rsvp_responses response ON response.guest_id = guest.id
-  WHERE guest.event_id = $1 AND guest.rsvp_response_id IS NULL AND guest.rsvp_owner_id IS NULL
+  WHERE guest.event_id = $1 AND guest.group_id IS NULL AND guest.rsvp_response_id IS NULL AND guest.rsvp_owner_id IS NULL
   AND (guest.full_name ILIKE $2 OR EXISTS (SELECT 1 FROM guests companion WHERE companion.rsvp_owner_id = guest.id AND companion.full_name ILIKE $2))
   ORDER BY guest.full_name LIMIT 10`;
+const publicGroupMatchQuery = `SELECT group_record.id, group_record.name AS full_name, group_record.id AS group_id,
+  0 AS plus_limit, response.status AS response_status, '[]'::json AS companions, '[]'::json AS reserved_seats,
+  COALESCE((SELECT json_agg(json_build_object('id', member.id, 'full_name', member.full_name,
+    'status', COALESCE(member.rsvp_companion_status, CASE WHEN response.id IS NOT NULL THEN response.status END))
+    ORDER BY member.created_at, member.id)
+    FROM guests member WHERE member.group_id = group_record.id AND member.rsvp_response_id IS NULL), '[]'::json) AS members
+  FROM guest_groups group_record
+  LEFT JOIN rsvp_responses response ON response.group_id = group_record.id
+  WHERE group_record.event_id = $1 AND
+    (group_record.name ILIKE $2 OR EXISTS (SELECT 1 FROM guests responder
+      WHERE responder.group_id = group_record.id AND responder.is_group_responder = TRUE AND responder.full_name ILIKE $2))
+    AND EXISTS (SELECT 1 FROM guests responder WHERE responder.group_id = group_record.id AND responder.is_group_responder = TRUE)
+  ORDER BY group_record.name LIMIT 10`;
+
+async function findPublicMatches(eventId: string, name: string) {
+  const search = `%${name.trim().replace(/[\\%_]/g, '\\$&')}%`;
+  const [individuals, groups] = await Promise.all([
+    pool.query(publicMatchQuery, [eventId, search]),
+    pool.query(publicGroupMatchQuery, [eventId, search]),
+  ]);
+  return [...individuals.rows, ...groups.rows].slice(0, 10);
+}
 
 async function hostOwnsEvent(eventId: string, hostCode: unknown): Promise<boolean> {
   if (typeof hostCode !== 'string' || !hostCode) return false;
@@ -141,7 +163,9 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
     const attendingCompanions = hasReservedSeats || status === 'attending' ? attendingNamed : [];
     const attendingSeats = seats.map((seat, index) => ({ ...seat, index })).filter(seat => seat.status === 'attending');
     for (const [index, fullName] of attendeeNames.entries())
-      await client.query('INSERT INTO rsvp_attendees (response_id, full_name, ordinal, guest_id, reserved_slot_index) VALUES ($1, $2, $3, $4, $5)', [responseId, fullName, index, target.guest_id && index >= partyCount && index < partyCount + attendingCompanions.length ? attendingCompanions[index - partyCount].id : null, index >= partyCount + attendingCompanions.length ? attendingSeats[index - partyCount - attendingCompanions.length]?.index ?? null : null]);
+      await client.query('INSERT INTO rsvp_attendees (response_id, full_name, ordinal, guest_id, reserved_slot_index) VALUES ($1, $2, $3, $4, $5)', [responseId, fullName, index, target.group_id && Array.isArray(payload.group_member_ids) ? payload.group_member_ids[index] : target.guest_id && index >= partyCount && index < partyCount + attendingCompanions.length ? attendingCompanions[index - partyCount].id : null, index >= partyCount + attendingCompanions.length ? attendingSeats[index - partyCount - attendingCompanions.length]?.index ?? null : null]);
+    if (target.group_id && !Array.isArray(payload.group_member_ids))
+      await client.query('UPDATE guests SET rsvp_companion_status = NULL WHERE group_id = $1 AND rsvp_response_id IS NULL', [target.group_id]);
     await reconcileResponse(client, responseId);
     if (ownsTransaction) await client.query('COMMIT');
     return responseResult.rows[0];
@@ -270,8 +294,7 @@ publicRsvpRouter.post('/search', async (req, res) => {
   try {
     const event = await pool.query('SELECT 1 FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
     if (event.rowCount === 0) return res.status(404).json({ error: 'Invitation not found' });
-    const matches = await pool.query(publicMatchQuery, [eventId, `%${name.trim()}%`]);
-    return res.json({ matches: matches.rows });
+    return res.json({ matches: await findPublicMatches(eventId, name) });
   } catch (error) { console.error('Error searching RSVP guests:', error); return res.status(500).json({ error: 'Could not search invitations' }); }
 });
 
@@ -281,8 +304,8 @@ publicRsvpRouter.post('/lookup', async (req, res) => {
   try {
     const event = await pool.query('SELECT 1 FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
     if (event.rowCount === 0) return res.status(404).json({ error: 'Invitation not found' });
-    const matches = await pool.query(publicMatchQuery, [eventId, `%${name.trim()}%`]);
-    if (matches.rows.length > 0) return res.json({ matches: matches.rows });
+    const matches = await findPublicMatches(eventId, name);
+    if (matches.length > 0) return res.json({ matches });
     if (!isStatus(status)) return res.json({ matches: [], needs_response: true });
     const normalizedPartyCount = Number(partyCount);
     const normalizedPlusOneCount = Number(plusOneCount);
@@ -307,8 +330,51 @@ publicRsvpRouter.post('/guest/:guestId', async (req, res) => {
   if (!eventId) return res.status(400).json({ error: 'Invitation not found' });
   const target = await responseTargetByHost(eventId, guestId);
   if (!target) return res.status(404).json({ error: 'Guest invitation not found' });
+  const membership = await pool.query('SELECT group_id FROM guests WHERE id = $1 AND event_id = $2', [guestId, eventId]);
+  if (membership.rows[0]?.group_id) return res.status(400).json({ error: 'Respond through the group invitation' });
   try { return res.json(await saveResponse(target, payload)); }
   catch (error) { return res.status(400).json({ error: error instanceof Error ? error.message : 'Could not save RSVP' }); }
+});
+
+publicRsvpRouter.post('/group/:groupId', async (req, res) => {
+  const { groupId } = req.params;
+  const { event_id: eventId, members, dietary_notes: dietaryNotes } = req.body as { event_id?: string; members?: unknown; dietary_notes?: unknown };
+  if (!eventId || !Array.isArray(members)) return res.status(400).json({ error: 'Select an RSVP for every group member' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const group = await client.query<{ event_id: string; invited_party_size: number; rsvp_dietary_notes_enabled: boolean }>(
+      `SELECT group_record.event_id, group_record.invited_party_size, events.rsvp_dietary_notes_enabled
+       FROM guest_groups group_record JOIN events ON events.id = group_record.event_id AND events.is_active = TRUE
+       WHERE group_record.id = $1 AND group_record.event_id = $2 FOR UPDATE OF group_record`, [groupId, eventId]);
+    if (!group.rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Group invitation not found' }); }
+    if (!group.rows[0].rsvp_dietary_notes_enabled && typeof dietaryNotes === 'string' && dietaryNotes.trim()) {
+      await client.query('ROLLBACK'); return res.status(400).json({ error: 'Dietary notes are disabled for this event' });
+    }
+    const roster = await client.query<{ id: string; full_name: string; is_group_responder: boolean }>(
+      'SELECT id, full_name, is_group_responder FROM guests WHERE group_id = $1 AND rsvp_response_id IS NULL ORDER BY created_at, id FOR UPDATE', [groupId]);
+    if (!roster.rows.some(member => member.is_group_responder)) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Group invitation not found' }); }
+    if (members.length !== roster.rows.length || members.some((member, index) =>
+      !member || typeof member !== 'object' || member.id !== roster.rows[index].id || !isStatus(member.status))) {
+      await client.query('ROLLBACK'); return res.status(400).json({ error: 'Select an RSVP for every group member' });
+    }
+    const choices = members as { id: string; status: RsvpStatus }[];
+    const attending = roster.rows.filter((_, index) => choices[index].status === 'attending');
+    const status = attending.length ? 'attending' : choices.some(member => member.status === 'undecided') ? 'undecided' : 'declined';
+    const target: RsvpTarget = { event_id: eventId, guest_id: null, group_id: groupId,
+      invited_party_size: group.rows[0].invited_party_size, plus_limit: 0,
+      dietary_enabled: group.rows[0].rsvp_dietary_notes_enabled, display_name: '' };
+    const saved = await saveResponse(target, { status, party_count: attending.length, plus_one_count: 0,
+      attendees: attending.map(member => member.full_name), group_member_ids: attending.map(member => member.id), dietary_notes: dietaryNotes }, client);
+    for (const [index, member] of roster.rows.entries())
+      await client.query('UPDATE guests SET rsvp_companion_status = $1 WHERE id = $2', [choices[index].status, member.id]);
+    await client.query('COMMIT');
+    return res.json(saved);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error saving group RSVP:', error);
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Could not save group RSVP' });
+  } finally { client.release(); }
 });
 
 publicRsvpRouter.get('/link/:token', async (req, res) => {

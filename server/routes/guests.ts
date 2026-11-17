@@ -20,7 +20,7 @@ router.get('/:eventId/guests', async (req, res) => {
       const groups = await client.query('SELECT * FROM guest_groups WHERE event_id = $1 ORDER BY created_at FOR UPDATE', [eventId]);
       const responses = await client.query<{ id: string }>('SELECT id FROM rsvp_responses WHERE event_id = $1 ORDER BY id', [eventId]);
       for (const response of responses.rows) await reconcileResponse(client, response.id);
-      const guests = await client.query(`SELECT g.*, COALESCE(own.status, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
+      const guests = await client.query(`SELECT g.*, COALESCE(own.status, CASE WHEN g.group_id IS NOT NULL THEN g.rsvp_companion_status END, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
         proxy_owner.full_name AS proxy_of
         FROM guests g
         LEFT JOIN rsvp_responses own ON own.guest_id = g.id
@@ -56,16 +56,18 @@ router.post('/:eventId/guest-groups', async (req, res) => {
 
 router.post('/:eventId/guests', async (req, res) => {
   const { eventId } = req.params;
-  const { host_code: hostCode, full_name: fullName, email, phone, group_id: groupId, rsvp_plus_limit: plusLimit, rsvp_owner_id: ownerId } = req.body as { host_code?: string; full_name?: string; email?: string; phone?: string; group_id?: string | null; rsvp_plus_limit?: number | null; rsvp_owner_id?: string | null };
+  const { host_code: hostCode, full_name: fullName, email, phone, group_id: groupId, rsvp_plus_limit: plusLimit, rsvp_owner_id: ownerId, is_group_responder: isGroupResponder = false } = req.body as { host_code?: string; full_name?: string; email?: string; phone?: string; group_id?: string | null; rsvp_plus_limit?: number | null; rsvp_owner_id?: string | null; is_group_responder?: boolean };
   if (typeof fullName !== 'string' || !fullName.trim()) return res.status(400).json({ error: 'Guest name is required' });
   if (plusLimit != null && (!Number.isInteger(plusLimit) || plusLimit < 0 || plusLimit > 19)) return res.status(400).json({ error: 'Additional guests must be between 0 and 19' });
   if (ownerId && groupId) return res.status(400).json({ error: 'A named additional guest cannot also belong to a group' });
+  if (groupId && plusLimit != null && plusLimit > 0) return res.status(400).json({ error: 'Use the group allowance instead of an individual allowance' });
+  if (typeof isGroupResponder !== 'boolean' || (isGroupResponder && !groupId)) return res.status(400).json({ error: 'A group responder must belong to a group' });
   const client = await pool.connect();
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
     await client.query('BEGIN');
     if (ownerId) {
-      const owner = await client.query<{ rsvp_plus_limit: number | null }>('SELECT rsvp_plus_limit FROM guests WHERE id = $1 AND event_id = $2 AND rsvp_response_id IS NULL AND rsvp_owner_id IS NULL FOR UPDATE', [ownerId, eventId]);
+      const owner = await client.query<{ rsvp_plus_limit: number | null }>('SELECT rsvp_plus_limit FROM guests WHERE id = $1 AND event_id = $2 AND group_id IS NULL AND rsvp_response_id IS NULL AND rsvp_owner_id IS NULL FOR UPDATE', [ownerId, eventId]);
       if (!owner.rows[0]) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Choose an invited guest for this companion' }); }
       const count = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE rsvp_owner_id = $1', [ownerId]);
       if (Number(count.rows[0].count) >= (owner.rows[0].rsvp_plus_limit ?? 0)) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'Give this guest an additional-guest allowance before adding a named companion' }); }
@@ -78,10 +80,14 @@ router.post('/:eventId/guests', async (req, res) => {
         await client.query('ROLLBACK');
         return res.status(409).json({ error: 'This invitation group has reached its guest limit' });
       }
+      if (isGroupResponder) {
+        const responders = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE group_id = $1 AND is_group_responder = TRUE', [groupId]);
+        if (Number(responders.rows[0].count) >= 2) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'A group can have at most two RSVP responders' }); }
+      }
     }
     const result = await client.query(
-      'INSERT INTO guests (event_id, group_id, full_name, email, phone, rsvp_plus_limit, rsvp_owner_id, is_rsvp_companion) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [eventId, groupId ?? null, fullName.trim(), typeof email === 'string' ? email.trim() || null : null, typeof phone === 'string' ? phone.trim() || null : null, plusLimit ?? null, ownerId ?? null, Boolean(ownerId)],
+      'INSERT INTO guests (event_id, group_id, full_name, email, phone, rsvp_plus_limit, rsvp_owner_id, is_rsvp_companion, is_group_responder) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [eventId, groupId ?? null, fullName.trim(), typeof email === 'string' ? email.trim() || null : null, typeof phone === 'string' ? phone.trim() || null : null, plusLimit ?? null, ownerId ?? null, Boolean(ownerId), isGroupResponder],
     );
     await client.query('COMMIT');
     return res.status(201).json(result.rows[0]);
@@ -94,10 +100,12 @@ router.post('/:eventId/guests', async (req, res) => {
 
 router.patch('/:eventId/guests/:guestId', async (req, res) => {
   const { eventId, guestId } = req.params;
-  const { host_code: hostCode, full_name: fullName, email, phone, group_id: groupId, rsvp_plus_limit: plusLimit, rsvp_owner_id: ownerId } = req.body as { host_code?: string; full_name?: string; email?: string; phone?: string; group_id?: string | null; rsvp_plus_limit?: number | null; rsvp_owner_id?: string | null };
+  const { host_code: hostCode, full_name: fullName, email, phone, group_id: groupId, rsvp_plus_limit: plusLimit, rsvp_owner_id: ownerId, is_group_responder: isGroupResponder = false } = req.body as { host_code?: string; full_name?: string; email?: string; phone?: string; group_id?: string | null; rsvp_plus_limit?: number | null; rsvp_owner_id?: string | null; is_group_responder?: boolean };
   if (typeof fullName !== 'string' || !fullName.trim()) return res.status(400).json({ error: 'Guest name is required' });
   if (plusLimit != null && (!Number.isInteger(plusLimit) || plusLimit < 0 || plusLimit > 19)) return res.status(400).json({ error: 'Additional guests must be between 0 and 19' });
   if (ownerId && groupId) return res.status(400).json({ error: 'A named additional guest cannot also belong to a group' });
+  if (groupId && plusLimit != null && plusLimit > 0) return res.status(400).json({ error: 'Use the group allowance instead of an individual allowance' });
+  if (typeof isGroupResponder !== 'boolean' || (isGroupResponder && !groupId)) return res.status(400).json({ error: 'A group responder must belong to a group' });
   const client = await pool.connect();
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
@@ -117,9 +125,16 @@ router.patch('/:eventId/guests/:guestId', async (req, res) => {
       const groupGuestCount = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE group_id = $1', [groupId]);
       if (Number(groupGuestCount.rows[0].count) >= group.rows[0].invited_party_size) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'This invitation group has reached its guest limit' }); }
     }
+    if (groupId) {
+      await client.query('SELECT id FROM guest_groups WHERE id = $1 AND event_id = $2 FOR UPDATE', [groupId, eventId]);
+      if (isGroupResponder) {
+        const responders = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM guests WHERE group_id = $1 AND is_group_responder = TRUE AND id <> $2', [groupId, guestId]);
+        if (Number(responders.rows[0].count) >= 2) { await client.query('ROLLBACK'); return res.status(409).json({ error: 'A group can have at most two RSVP responders' }); }
+      }
+    }
     const result = await client.query(
-      'UPDATE guests SET full_name = $1, email = $2, phone = $3, group_id = $4, rsvp_plus_limit = $5 WHERE id = $6 AND event_id = $7 RETURNING *',
-      [fullName.trim(), typeof email === 'string' ? email.trim() || null : null, typeof phone === 'string' ? phone.trim() || null : null, groupId ?? null, plusLimit ?? null, guestId, eventId],
+      'UPDATE guests SET full_name = $1, email = $2, phone = $3, group_id = $4, rsvp_plus_limit = $5, is_group_responder = $6 WHERE id = $7 AND event_id = $8 RETURNING *',
+      [fullName.trim(), typeof email === 'string' ? email.trim() || null : null, typeof phone === 'string' ? phone.trim() || null : null, groupId ?? null, plusLimit ?? null, isGroupResponder, guestId, eventId],
     );
     if (existing.rows[0].rsvp_owner_id) await client.query('UPDATE rsvp_attendees SET full_name = $1 WHERE guest_id = $2', [fullName.trim(), guestId]);
     await client.query('COMMIT');

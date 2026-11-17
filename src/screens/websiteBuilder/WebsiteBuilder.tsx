@@ -9,7 +9,7 @@ import type { WebsiteAsset } from '../../services/websiteService';
 import type { WebsiteDocument, WebsiteTemplateId } from '../../services/websiteService';
 import { getHostCode } from '../../utils/hostAuth';
 import { copyTextToClipboard } from '../../utils/clipboard';
-import { showCopySuccessPopup } from '../../components/CopySuccessPopup';
+import { useInvitationNotice } from '../../components/useInvitationNotice';
 import templateSampleImage from '../../assets/images/pwa_camera_assets/example-filter-photo.jpg';
 import InvitationDocument from './InvitationDocument';
 import Modal from '../../components/Modal';
@@ -38,6 +38,7 @@ const entourageGroups = (content: Record<string, unknown> | undefined): Entourag
 
 const WebsiteBuilder = () => {
   const { eventId } = useParams<{ eventId: string }>();
+  const { success: notifySuccess, error: notifyError } = useInvitationNotice();
   const [event, setEvent] = useState<Event | null>(null);
   const [document, setDocument] = useState<WebsiteDocument | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +49,6 @@ const WebsiteBuilder = () => {
   const [hasEditedSlug, setHasEditedSlug] = useState(false);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [isEditorCollapsed, setIsEditorCollapsed] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [websiteAssets, setWebsiteAssets] = useState<WebsiteAsset[]>([]);
@@ -61,6 +61,14 @@ const WebsiteBuilder = () => {
   const navigate = useNavigate();
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
     isDirty && currentLocation.pathname !== nextLocation.pathname);
+
+  useEffect(() => {
+    if (error) notifyError(error);
+  }, [error, notifyError]);
+
+  useEffect(() => {
+    if (saveState === 'error') notifyError('Could not save invitation draft. Your edits are still here.');
+  }, [saveState, notifyError]);
 
   const markDirty = () => {
     revision.current += 1;
@@ -270,7 +278,7 @@ const WebsiteBuilder = () => {
 
   const toggleGalleryPhoto = (storagePath: string) => {
     if (!galleryPhotoPaths.includes(storagePath) && galleryPhotoPaths.length >= galleryLimit) {
-      setPublishError(`Choose up to ${galleryLimit} photos for this gallery layout.`);
+      notifyError(`Choose up to ${galleryLimit} photos for this gallery layout.`);
       return;
     }
     const paths = galleryPhotoPaths.includes(storagePath)
@@ -296,7 +304,7 @@ const WebsiteBuilder = () => {
       setWebsiteAssets(current => [asset, ...current]);
       if (!galleryPhotoPaths.includes(asset.storage_path)) toggleGalleryPhoto(asset.storage_path);
     } catch {
-      setPublishError('Could not upload the invitation image. Please try again.');
+      notifyError('Could not upload the invitation image. Please try again.');
     } finally {
       setIsUploadingGalleryImage(false);
     }
@@ -311,7 +319,7 @@ const WebsiteBuilder = () => {
       setWebsiteAssets(current => [asset, ...current]);
       updateHero('share_image_path', asset.storage_path);
     } catch {
-      setPublishError('Could not upload the link preview image. Please try again.');
+      notifyError('Could not upload the link preview image. Please try again.');
     } finally {
       setIsUploadingGalleryImage(false);
     }
@@ -332,7 +340,7 @@ const WebsiteBuilder = () => {
       markDirty();
       setPreviewedGalleryAsset(null);
     } catch {
-      setPublishError('Could not remove the invitation image. Please try again.');
+      notifyError('Could not remove the invitation image. Please try again.');
     }
   };
 
@@ -361,13 +369,12 @@ const WebsiteBuilder = () => {
     if (!file || !hostCode) return;
 
     setIsUploadingCover(true);
-    setPublishError(null);
     try {
       const updatedEvent = await uploadEventCover(event.id, hostCode, file);
       setEvent(updatedEvent);
       updateHero('cover_photo_path', updatedEvent.cover_photo_path ?? '');
     } catch {
-      setPublishError('Could not upload the cover photo. Please try again.');
+      notifyError('Could not upload the cover photo. Please try again.');
     } finally {
       setIsUploadingCover(false);
     }
@@ -382,7 +389,7 @@ const WebsiteBuilder = () => {
       updateHero('cover_photo_path', '');
       setIsCoverPreviewOpen(false);
     } catch {
-      setPublishError('Could not remove the cover photo. Please try again.');
+      notifyError('Could not remove the cover photo. Please try again.');
     }
   };
 
@@ -390,13 +397,13 @@ const WebsiteBuilder = () => {
     const hostCode = getHostCode();
     if (!hostCode || !document) return;
     setIsPublishing(true);
-    setPublishError(null);
     try {
       await saveDraft(document, revision.current);
       const published = await publishEventWebsite(event.id, hostCode, invitationSlug(event.id, slug));
       setSlug(published.public_slug ? invitationSlugTitle(event.id, published.public_slug) : slug);
+      notifySuccess('Invitation website published.');
     } catch (publishFailure) {
-      setPublishError(publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website');
+      notifyError(publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website');
     } finally {
       setIsPublishing(false);
     }
@@ -405,14 +412,14 @@ const WebsiteBuilder = () => {
   const copyInvitationUrl = async () => {
     const normalizedSlug = slugifyInvitationName(slug);
     if (!normalizedSlug) {
-      setPublishError('Add names or a valid invitation URL before copying.');
+      notifyError('Add names or a valid invitation URL before copying.');
       return;
     }
     try {
       await copyTextToClipboard(`${window.location.origin}/${invitationSlug(event.id, normalizedSlug)}`);
-      showCopySuccessPopup('Invitation URL copied.');
+      notifySuccess('Invitation URL copied.');
     } catch {
-      setPublishError('Could not copy the invitation URL. Please try again.');
+      notifyError('Could not copy the invitation URL. Please try again.');
     }
   };
 
@@ -634,7 +641,6 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-slug">Invitation URL
               <span className="website-slug-input"><span title={`${window.location.host}/${event.id}-`}>{window.location.host}/{event.id}-</span><input id="invitation-slug" value={slug} maxLength={83} onChange={(input) => { setSlug(slugifyInvitationName(input.target.value)); setHasEditedSlug(true); }} required /><button type="button" onClick={copyInvitationUrl} aria-label="Copy invitation URL" title="Copy invitation URL"><Copy size={16} aria-hidden="true" /></button></span>
             </label>
-            {publishError && <p className="website-publish-error" role="alert">{publishError}</p>}
             <button type="submit" className="website-publish-button" disabled={isPublishing}>
               <Globe2 size={17} aria-hidden="true" />
               {isPublishing ? 'Publishing...' : 'Publish invitation'}

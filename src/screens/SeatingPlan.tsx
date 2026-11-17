@@ -10,6 +10,7 @@ import {
 import type { SeatingGuest, SeatingPlan as SeatingPlanData, SeatingTable } from '../services/seatingService';
 import { seatingCsv } from '../utils/seatingExport';
 import { getHostCode } from '../utils/hostAuth';
+import { useInvitationNotice } from '../components/useInvitationNotice';
 import './SeatingPlan.css';
 
 const emptyPlan: SeatingPlanData = { tables: [], guests: [] };
@@ -17,6 +18,7 @@ const emptyPlan: SeatingPlanData = { tables: [], guests: [] };
 const SeatingPlan = () => {
   const { eventId } = useParams<{ eventId: string }>();
   const hostCode = getHostCode();
+  const { success: setNotice, error: setError } = useInvitationNotice();
   const [plan, setPlan] = useState<SeatingPlanData>(emptyPlan);
   const [groups, setGroups] = useState<GuestGroup[]>([]);
   const [search, setSearch] = useState('');
@@ -26,8 +28,6 @@ const SeatingPlan = () => {
   const [editing, setEditing] = useState<string | null>(null);
   const [tableName, setTableName] = useState('');
   const [tableCapacity, setTableCapacity] = useState(8);
-  const [error, setError] = useState(!eventId || !hostCode ? 'Host access and an event are required.' : '');
-  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(Boolean(eventId && hostCode));
   const [busy, setBusy] = useState(false);
 
@@ -40,7 +40,7 @@ const SeatingPlan = () => {
 
   useEffect(() => {
     let current = true;
-    if (!eventId || !hostCode) return;
+    if (!eventId || !hostCode) { setError('Host access and an event are required.'); return; }
     Promise.all([getSeatingPlan(eventId, hostCode), getGuestRoster(eventId, hostCode)])
       .then(([seating, roster]) => {
         if (current) { setPlan(seating); setGroups(roster.groups); }
@@ -48,13 +48,11 @@ const SeatingPlan = () => {
       .catch(cause => { if (current) setError(cause instanceof Error ? cause.message : 'Could not load seating plan.'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [eventId, hostCode]);
+  }, [eventId, hostCode, setError]);
 
   const perform = async (action: () => Promise<unknown>, message: string) => {
     if (busy) return;
     setBusy(true);
-    setError('');
-    setNotice('');
     try {
       await action();
       await reload();
@@ -145,8 +143,6 @@ const SeatingPlan = () => {
     </header>
     <div className="seating-content">
       <h1 className="seating-print-title">Seating plan</h1>
-      {error && <p className="seating-error" role="alert">{error}</p>}
-      {notice && <p className="seating-notice" role="status">{notice}</p>}
       {loading ? <p>Loading seating plan...</p> : <>
         <section className="seating-summary">
           <strong>{plan.guests.length} total guests</strong><span>{seatedCount} seated · {plan.guests.length - seatedCount} unassigned</span>
