@@ -20,11 +20,13 @@ router.get('/:eventId/guests', async (req, res) => {
       const groups = await client.query('SELECT * FROM guest_groups WHERE event_id = $1 ORDER BY created_at FOR UPDATE', [eventId]);
       const responses = await client.query<{ id: string }>('SELECT id FROM rsvp_responses WHERE event_id = $1 ORDER BY id', [eventId]);
       for (const response of responses.rows) await reconcileResponse(client, response.id);
-      const guests = await client.query(`SELECT g.*, COALESCE(own.status, grp.status, companion.status, g.rsvp_companion_status) AS rsvp_status
+      const guests = await client.query(`SELECT g.*, COALESCE(own.status, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
+        proxy_owner.full_name AS proxy_of
         FROM guests g
         LEFT JOIN rsvp_responses own ON own.guest_id = g.id
         LEFT JOIN rsvp_responses grp ON grp.group_id = g.group_id
         LEFT JOIN rsvp_responses companion ON companion.id = g.rsvp_response_id
+        LEFT JOIN guests proxy_owner ON proxy_owner.id = g.rsvp_proxy_for_id
         WHERE g.event_id = $1 ORDER BY g.full_name`, [eventId]);
       await client.query('COMMIT');
       return res.json({ groups: groups.rows, guests: guests.rows });

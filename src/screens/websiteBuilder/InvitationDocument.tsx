@@ -4,7 +4,7 @@ import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId } from '../../utils/invitationSections';
 import { submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
-import type { CompanionChoice, PublicGuestMatch, RsvpStatus } from '../../services/rsvpService';
+import type { CompanionChoice, PublicGuestMatch, ReservedSeatChoice, RsvpStatus } from '../../services/rsvpService';
 import CopyrightFooter from '../../components/CopyrightFooter';
 import Modal from '../../components/Modal';
 import './PublicInvitation.css';
@@ -49,8 +49,11 @@ const PublicRsvpLookup = ({ eventId, buttonLabel, preview, dietaryEnabled = true
   const [status, setStatus] = useState<RsvpStatus>('attending');
   const [needsResponse, setNeedsResponse] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [plusOneCount, setPlusOneCount] = useState(0);
-  const [additionalNames, setAdditionalNames] = useState<string[]>([]);
+  const [page, setPage] = useState<1 | 2>(1);
+  const [reservedSeats, setReservedSeats] = useState<ReservedSeatChoice[]>([]);
+  const [proxy, setProxy] = useState('');
+  const [declineWarningOpen, setDeclineWarningOpen] = useState(false);
+  const [proxyRequired, setProxyRequired] = useState(false);
   const [namedChoices, setNamedChoices] = useState<CompanionChoice[]>([]);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -62,7 +65,7 @@ const PublicRsvpLookup = ({ eventId, buttonLabel, preview, dietaryEnabled = true
     event.preventDefault();
     if (!eventId || !name.trim()) return;
     setIsSubmitting(true);
-    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(Boolean(result.needs_response)); setModalOpen(Boolean(result.needs_response)); setStatus('attending'); setPlusOneCount(0); setAdditionalNames([]); setMessage(''); }
+    try { const result = await submitPublicRsvpLookup(eventId, name); setMatches(result.matches); setSelectedGuest(null); setNeedsResponse(Boolean(result.needs_response)); setModalOpen(Boolean(result.needs_response)); setStatus('attending'); setPage(1); setReservedSeats([]); setProxy(''); setProxyRequired(false); setDeclineWarningOpen(false); setMessage(''); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Could not search invitations.'); }
     finally { setIsSubmitting(false); }
   };
@@ -70,8 +73,11 @@ const PublicRsvpLookup = ({ eventId, buttonLabel, preview, dietaryEnabled = true
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!eventId || !selectedGuest) return;
+    const attendingCount = namedChoices.filter(choice => choice.status === 'attending').length + reservedSeats.filter(seat => seat.status === 'attending').length;
+    if (status === 'declined' && proxyRequired && attendingCount === 0) { setMessage('Choose an additional guest to attend as your proxy.'); return; }
+    if (status === 'declined' && attendingCount > 0 && !proxy) { setMessage('Choose an attending additional guest as your proxy.'); return; }
     setIsSubmitting(true);
-    try { await submitPublicGuestRsvp(eventId, selectedGuest, { status, namedCompanions: namedChoices, attendeeNames: status === 'attending' ? additionalNames.slice(0, plusOneCount) : [], dietaryNotes: dietaryEnabled ? dietaryNotes : undefined }); setMessage('Your RSVP has been saved.'); setModalOpen(false); setMatches([]); }
+    try { await submitPublicGuestRsvp(eventId, selectedGuest, { status, namedCompanions: namedChoices, reservedSeats, proxy: status === 'declined' && proxy ? proxy.startsWith('named:') ? { id: proxy.slice(6) } : { index: Number(proxy.slice(5)) } : null, dietaryNotes: dietaryEnabled ? dietaryNotes : undefined }); setMessage('Your RSVP has been saved.'); setModalOpen(false); setMatches([]); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save RSVP.'); }
     finally { setIsSubmitting(false); }
   };
@@ -83,22 +89,77 @@ const PublicRsvpLookup = ({ eventId, buttonLabel, preview, dietaryEnabled = true
     catch (error) { setMessage(error instanceof Error ? error.message : 'Could not send RSVP.'); }
     finally { setIsSubmitting(false); }
   };
-  const openGuest = (guest: PublicGuestMatch) => { setSelectedGuest(guest); setNamedChoices(guest.companions.map(companion => ({ id: companion.id, status: companion.status ?? 'undecided' }))); setPlusOneCount(0); setAdditionalNames([]); setModalOpen(true); setMessage(''); };
-  const attendingNamed = namedChoices.filter(choice => choice.status === 'attending').length;
-  const limit = Math.max(0, Math.min(19, selectedGuest?.plus_limit ?? 0) - attendingNamed);
-  const chooseCount = (value: number) => { setPlusOneCount(value); setAdditionalNames(current => Array.from({ length: value }, (_, index) => current[index] ?? '')); };
-  const companionFields = status === 'attending' && limit > 0 && <>
-    <label>Additional guests<select value={Math.min(plusOneCount, limit)} onChange={input => chooseCount(Number(input.target.value))}>{Array.from({ length: limit + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}</select></label>
-    {Array.from({ length: Math.min(plusOneCount, limit) }, (_, index) => <label key={index}>Additional guest #{index + 1} name (optional)<input maxLength={255} value={additionalNames[index] ?? ''} placeholder={`${selectedGuest?.full_name ?? name.trim()} friend #${index + 1}`} onChange={input => setAdditionalNames(current => current.map((value, position) => position === index ? input.target.value : value))} /></label>)}
-  </>;
+  const openGuest = (guest: PublicGuestMatch) => {
+    setSelectedGuest(guest);
+    setStatus(guest.response_status ?? 'attending');
+    setDeclineWarningOpen(false);
+    setNamedChoices(guest.companions.map(companion => ({ id: companion.id, status: companion.status ?? 'undecided' })));
+    const count = Math.max(0, guest.plus_limit - guest.companions.length);
+    setReservedSeats(Array.from({ length: count }, (_, index) => guest.reserved_seats?.[index] ?? { name: '', status: 'undecided' }));
+    const proxyNamed = guest.companions.find(companion => companion.is_proxy);
+    const proxySeat = guest.reserved_seats?.findIndex(seat => seat.is_proxy) ?? -1;
+    setProxy(proxySeat >= 0 ? `seat:${proxySeat}` : proxyNamed ? `named:${proxyNamed.id}` : '');
+    setProxyRequired(guest.response_status === 'declined' && (proxySeat >= 0 || Boolean(proxyNamed)));
+    setPage(1); setModalOpen(true); setMessage('');
+  };
+  const declineAllSeats = () => {
+    setStatus('declined');
+    setNamedChoices(current => current.map(choice => ({ ...choice, status: 'declined' })));
+    setReservedSeats(current => current.map(seat => ({ ...seat, status: 'declined' })));
+    setProxy('');
+    setProxyRequired(false);
+    setDeclineWarningOpen(false);
+    setMessage('');
+    setPage(2);
+  };
+  const additionalCount = selectedGuest?.plus_limit ?? 0;
+  const attendingOptions = [
+    ...(selectedGuest?.companions ?? []).filter((_, index) => namedChoices[index]?.status === 'attending').map(companion => ({ value: `named:${companion.id}`, label: companion.full_name })),
+    ...reservedSeats.map((seat, index) => ({ value: `seat:${index}`, label: seat.name.trim() || `${selectedGuest?.full_name ?? name.trim()} friend #${index + 1}`, status: seat.status })).filter(seat => seat.status === 'attending'),
+  ];
   return <div className="public-rsvp-lookup">
-    <form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setModalOpen(false); }} placeholder="Enter your invitation name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>
-    {!preview && matches.length > 0 && <div className="public-rsvp-matches" aria-label="Matching invitations"><p>Select your name from the list</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => openGuest(guest)}>{guest.full_name}{guest.companions.length > 0 && <small> · {guest.companions.map(companion => companion.full_name).join(', ')}</small>}</button>)}</div>}
+    <form onSubmit={preview ? event => event.preventDefault() : submit}><label>Your name<input value={name} onChange={input => { setName(input.target.value); setMessage(''); setMatches([]); setModalOpen(false); setDeclineWarningOpen(false); }} placeholder="Enter your invitation name" readOnly={preview} required={!preview} /></label><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Searching...' : buttonLabel}</button></form>
+    {!preview && matches.length > 0 && <div className="public-rsvp-matches" aria-label="Matching invitations"><p>Select your name from the list</p>{matches.map(guest => <button key={guest.id} type="button" onClick={() => openGuest(guest)}>{guest.full_name}</button>)}</div>}
     {!preview && message && <p role="status">{message}</p>}
-    <Modal isOpen={!preview && modalOpen} onClose={() => setModalOpen(false)} className="public-rsvp-modal" ariaLabel="RSVP response">
-      <button type="button" className="public-rsvp-close" onClick={() => setModalOpen(false)} aria-label="Close RSVP"><X size={20} /></button>
-      {selectedGuest && <form className="public-rsvp-response" onSubmit={save}><h2>RSVP for {selectedGuest.full_name}</h2><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>{status === 'attending' && selectedGuest.companions.map((companion, index) => <label key={companion.id}>Will {companion.full_name} attend?<select value={namedChoices[index]?.status ?? 'undecided'} onChange={input => { const next = namedChoices.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice); setNamedChoices(next); const available = Math.max(0, selectedGuest.plus_limit - next.filter(choice => choice.status === 'attending').length); if (plusOneCount > available) chooseCount(available); }}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>)}{companionFields}{dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}{message && <p role="alert">{message}</p>}<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save RSVP'}</button></form>}
+    <Modal isOpen={!preview && modalOpen} onClose={() => { if (declineWarningOpen) setDeclineWarningOpen(false); else setModalOpen(false); }} className="public-rsvp-modal" ariaLabel="RSVP response">
+      <button type="button" className="public-rsvp-close" onClick={() => { setDeclineWarningOpen(false); setModalOpen(false); }} aria-label="Close RSVP"><X size={20} /></button>
+      {selectedGuest && !declineWarningOpen && <form className="public-rsvp-response" onSubmit={save}>
+        <h2>RSVP for {selectedGuest.full_name}</h2>
+        <p className="public-rsvp-step">Step {page} of {additionalCount > 0 ? 2 : 1}</p>
+        {page === 1 ? <>
+          <div className="public-rsvp-reserved"><span>Reserved for you</span><strong>{additionalCount + 1} {additionalCount === 0 ? 'seat' : 'seats'}</strong>{additionalCount > 0 && <p>Including {additionalCount} {additionalCount === 1 ? 'additional guest' : 'additional guests'}</p>}</div>
+          <label>Will you attend?<select value={status} onChange={input => { const next = input.target.value as RsvpStatus; if (next === 'declined' && additionalCount > 0 && status !== 'declined') { setDeclineWarningOpen(true); return; } setStatus(next); if (next !== 'declined') { setProxyRequired(false); setProxy(''); } }}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
+          {additionalCount > 0 ? <button type="button" onClick={() => { setMessage(''); setPage(2); }}>Next: additional guests</button> : <>
+            {dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}
+            <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save RSVP'}</button>
+          </>}
+        </> : <>
+          <p>Choose an attendance response for each additional seat.</p>
+          {selectedGuest.companions.map((companion, index) => <div className="public-rsvp-seat" key={companion.id}>
+            <strong>{companion.full_name}</strong><label>Attendance<select value={namedChoices[index]?.status ?? 'undecided'} onChange={input => setNamedChoices(current => current.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice))}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
+          </div>)}
+          {reservedSeats.map((seat, index) => <div className="public-rsvp-seat" key={index}>
+            <strong>Additional guest #{selectedGuest.companions.length + index + 1}</strong>
+            <label>Name (optional)<input maxLength={255} value={seat.name} placeholder={`${selectedGuest.full_name.slice(0, 230)} friend #${index + 1}`} onChange={input => setReservedSeats(current => current.map((choice, position) => position === index ? { ...choice, name: input.target.value } : choice))} /></label>
+            <label>Attendance<select value={seat.status} onChange={input => setReservedSeats(current => current.map((choice, position) => position === index ? { ...choice, status: input.target.value as RsvpStatus } : choice))}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label>
+          </div>)}
+          {status === 'declined' && attendingOptions.length > 0 && <label>Who will be your proxy?<select value={attendingOptions.some(option => option.value === proxy) ? proxy : ''} onChange={input => setProxy(input.target.value)} required><option value="">Choose an attending additional guest</option>{attendingOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}
+          {status === 'declined' && !proxyRequired && <button type="button" className="public-rsvp-decline-all" onClick={declineAllSeats}>Decline all reserved additional seats</button>}
+          {dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}
+          <div className="public-rsvp-actions"><button type="button" onClick={() => { setMessage(''); setPage(1); }}>Back</button><button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save RSVP'}</button></div>
+        </>}
+        {message && <p role="alert">{message}</p>}
+      </form>}
       {needsResponse && <form className="public-rsvp-response" onSubmit={submitUnmatchedResponse}><h2>Name not found</h2><p>We couldn't find {name.trim()} on the guest list. You can still send an RSVP request; the host will review it before your attendance is confirmed. Additional guests are not available for unlisted names.</p><label>Your name<input value={name} onChange={input => setName(input.target.value)} required maxLength={255} /></label><label>Will you attend?<select value={status} onChange={input => setStatus(input.target.value as RsvpStatus)}><option value="attending">Attending</option><option value="declined">Not attending</option><option value="undecided">Still deciding</option></select></label><label>Email<input type="email" value={email} onChange={input => setEmail(input.target.value)} /></label><label>Contact number<input type="tel" value={phone} onChange={input => setPhone(input.target.value)} /></label>{dietaryEnabled && <label>Dietary notes<textarea value={dietaryNotes} onChange={input => setDietaryNotes(input.target.value)} rows={3} /></label>}{message && <p role="alert">{message}</p>}<button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Sending...' : 'Send RSVP to host'}</button></form>}
+      {selectedGuest && declineWarningOpen && <div className="public-rsvp-warning-backdrop">
+        <div className="public-rsvp-warning" role="alertdialog" aria-modal="true" aria-labelledby="public-rsvp-warning-title" aria-describedby="public-rsvp-warning-description">
+          <h3 id="public-rsvp-warning-title">You won't be attending?</h3>
+          <p id="public-rsvp-warning-description">You have {additionalCount} reserved additional {additionalCount === 1 ? 'seat' : 'seats'}. Choose an attending additional guest as your proxy, or decline every reserved additional seat. Nothing will be saved until you submit your RSVP.</p>
+          <button type="button" autoFocus onClick={() => { setStatus('declined'); setProxyRequired(true); setDeclineWarningOpen(false); setMessage(''); setPage(2); }}>Choose a proxy</button>
+          <button type="button" onClick={declineAllSeats}>Decline all additional seats</button>
+          <button type="button" onClick={() => setDeclineWarningOpen(false)}>Keep my response</button>
+        </div>
+      </div>}
     </Modal>
   </div>;
 };

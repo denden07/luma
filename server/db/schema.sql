@@ -95,6 +95,7 @@ ALTER TABLE guests ADD COLUMN IF NOT EXISTS phone VARCHAR(40);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_owner_id UUID REFERENCES guests(id) ON DELETE CASCADE;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_companion_status VARCHAR(12) CHECK (rsvp_companion_status IN ('attending', 'declined', 'undecided'));
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_proxy_for_id UUID REFERENCES guests(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_guests_rsvp_owner ON guests(rsvp_owner_id);
 ALTER TABLE guests DROP CONSTRAINT IF EXISTS guests_rsvp_plus_limit_check;
 ALTER TABLE guests ADD CONSTRAINT guests_rsvp_plus_limit_check CHECK (rsvp_plus_limit BETWEEN 0 AND 19);
@@ -156,6 +157,16 @@ CREATE TABLE IF NOT EXISTS rsvp_attendees (
 );
 ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS ordinal INTEGER;
 ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS guest_id UUID REFERENCES guests(id) ON DELETE SET NULL;
+ALTER TABLE rsvp_attendees ADD COLUMN IF NOT EXISTS reserved_slot_index INTEGER;
+
+CREATE TABLE IF NOT EXISTS rsvp_reserved_seats (
+  response_id UUID NOT NULL REFERENCES rsvp_responses(id) ON DELETE CASCADE,
+  slot_index INTEGER NOT NULL CHECK (slot_index BETWEEN 0 AND 18),
+  full_name VARCHAR(255) NOT NULL,
+  status VARCHAR(12) NOT NULL CHECK (status IN ('attending', 'declined', 'undecided')),
+  is_proxy BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (response_id, slot_index)
+);
 
 CREATE TABLE IF NOT EXISTS rsvp_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

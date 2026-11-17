@@ -1,8 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export type RsvpStatus = 'attending' | 'declined' | 'undecided';
-export interface NamedCompanion { id: string; full_name: string; status: RsvpStatus | null }
+export interface NamedCompanion { id: string; full_name: string; status: RsvpStatus | null; is_proxy?: boolean }
 export interface CompanionChoice { id: string; status: RsvpStatus }
+export interface ReservedSeatChoice { name: string; status: RsvpStatus; is_proxy?: boolean }
+export type RsvpProxy = { id: string } | { index: number };
 
 export interface RsvpResponse {
   id: string;
@@ -32,7 +34,7 @@ export interface RsvpVerificationRequest {
   attendee_names: string[] | null;
 }
 
-export interface PublicGuestMatch { id: string; full_name: string; plus_limit: number; companions: NamedCompanion[] }
+export interface PublicGuestMatch { id: string; full_name: string; plus_limit: number; companions: NamedCompanion[]; response_status?: RsvpStatus | null; reserved_seats?: ReservedSeatChoice[] }
 
 export async function searchPublicRsvpGuests(eventId: string, name: string): Promise<PublicGuestMatch[]> {
   const response = await fetch(`${API_BASE_URL}/api/rsvp/search`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name }) });
@@ -97,11 +99,12 @@ export async function submitPrivateRsvp(token: string, responseData: { status: R
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
 }
 
-export async function submitPublicGuestRsvp(eventId: string, guest: PublicGuestMatch, responseData: { status: RsvpStatus; namedCompanions: CompanionChoice[]; attendeeNames: string[]; dietaryNotes?: string }): Promise<void> {
+export async function submitPublicGuestRsvp(eventId: string, guest: PublicGuestMatch, responseData: { status: RsvpStatus; namedCompanions: CompanionChoice[]; reservedSeats: ReservedSeatChoice[]; proxy: RsvpProxy | null; dietaryNotes?: string }): Promise<void> {
   const named = guest.companions.filter((companion, index) => responseData.namedCompanions[index]?.id === companion.id && responseData.namedCompanions[index].status === 'attending').map(companion => companion.full_name);
-  const attendeeNames = responseData.status === 'attending' ? [guest.full_name, ...named, ...responseData.attendeeNames.map((name, index) => name.trim() || `${guest.full_name.slice(0, 230)} friend #${index + 1}`)] : [];
-  const plusOneCount = responseData.status === 'attending' ? named.length + responseData.attendeeNames.length : 0;
-  const response = await fetch(`${API_BASE_URL}/api/rsvp/guest/${guest.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, status: responseData.status, party_count: responseData.status === 'attending' ? 1 : 0, plus_one_count: plusOneCount, named_companions: responseData.status === 'attending' ? responseData.namedCompanions : undefined, attendees: attendeeNames, dietary_notes: responseData.dietaryNotes }) });
+  const seats = responseData.reservedSeats.map((seat, index) => ({ name: seat.name.trim() || `${guest.full_name.slice(0, 230)} friend #${index + 1}`, status: seat.status }));
+  const attendeeNames = [...(responseData.status === 'attending' ? [guest.full_name] : []), ...named, ...seats.filter(seat => seat.status === 'attending').map(seat => seat.name)];
+  const plusOneCount = named.length + seats.filter(seat => seat.status === 'attending').length;
+  const response = await fetch(`${API_BASE_URL}/api/rsvp/guest/${guest.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, status: responseData.status, party_count: responseData.status === 'attending' ? 1 : 0, plus_one_count: plusOneCount, named_companions: responseData.namedCompanions, reserved_seats: seats, proxy: responseData.proxy, attendees: attendeeNames, dietary_notes: responseData.dietaryNotes }) });
   if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Could not save RSVP'); }
 }
 

@@ -25,16 +25,20 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
   );
   const response = result.rows[0];
   if (!response) return;
-  const old = await client.query<{ id: string; rsvp_ordinal: number; full_name: string; companion_label: string | null; is_rsvp_companion: boolean; group_id: string | null }>(
-    'SELECT id, rsvp_ordinal, full_name, companion_label, is_rsvp_companion, group_id FROM guests WHERE rsvp_response_id = $1 ORDER BY rsvp_ordinal FOR UPDATE',
+  const old = await client.query<{ id: string; rsvp_ordinal: number; full_name: string; companion_label: string | null; is_rsvp_companion: boolean; group_id: string | null; rsvp_companion_status: string | null; rsvp_proxy_for_id: string | null }>(
+    'SELECT id, rsvp_ordinal, full_name, companion_label, is_rsvp_companion, group_id, rsvp_companion_status, rsvp_proxy_for_id FROM guests WHERE rsvp_response_id = $1 ORDER BY rsvp_ordinal FOR UPDATE',
     [responseId],
   );
-  if (response.status !== 'attending') {
+  const reserved = await client.query<{ slot_index: number; full_name: string; status: string; is_proxy: boolean }>(
+    'SELECT slot_index, full_name, status, is_proxy FROM rsvp_reserved_seats WHERE response_id = $1 ORDER BY slot_index',
+    [responseId],
+  );
+  if (response.status !== 'attending' && response.party_count === 0 && reserved.rows.length === 0) {
     await client.query('DELETE FROM guests WHERE rsvp_response_id = $1', [responseId]);
     return;
   }
-  const attendees = await client.query<{ full_name: string; guest_id: string | null }>(
-    'SELECT full_name, guest_id FROM rsvp_attendees WHERE response_id = $1 ORDER BY ordinal NULLS LAST, created_at, id',
+  const attendees = await client.query<{ full_name: string; guest_id: string | null; reserved_slot_index: number | null }>(
+    'SELECT full_name, guest_id, reserved_slot_index FROM rsvp_attendees WHERE response_id = $1 ORDER BY ordinal NULLS LAST, created_at, id',
     [responseId],
   );
   const roster = await client.query<{ id: string; full_name: string; rsvp_owner_id: string | null }>(
@@ -58,6 +62,7 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
     }
   }
   for (let index = 0; index < response.party_count; index++) {
+    if (attendees.rows[index]?.reserved_slot_index !== null && attendees.rows[index]?.reserved_slot_index !== undefined) continue;
     const name = attendees.rows[index]?.full_name?.trim() || '';
     const generic = !name || /^(additional guest|plus[\s-]*one|guest|companion|friend)(?:\s*#?\d+)?$/i.test(name);
     const isCompanion = index >= response.party_count - response.plus_one_count;
@@ -92,6 +97,26 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
       );
     }
   }
+  for (const seat of reserved.rows) {
+    const ordinal = 20 + seat.slot_index;
+    kept.add(ordinal);
+    const label = `${owner} friend #${seat.slot_index + 1}`.slice(0, 255);
+    const proxyFor = seat.is_proxy ? response.guest_id : null;
+    const previous = old.rows.find(guest => guest.rsvp_ordinal === ordinal);
+    if (previous) {
+      if (previous.full_name !== seat.full_name || previous.companion_label !== label ||
+        previous.rsvp_companion_status !== seat.status || previous.rsvp_proxy_for_id !== proxyFor)
+        await client.query(`UPDATE guests SET full_name = $1, companion_label = $2, rsvp_companion_status = $3,
+          rsvp_proxy_for_id = $4, table_id = CASE WHEN $3::varchar = 'attending' THEN table_id ELSE NULL END WHERE id = $5`,
+          [seat.full_name, label, seat.status, proxyFor, previous.id]);
+    } else {
+      await client.query(
+        `INSERT INTO guests (event_id, full_name, companion_label, is_rsvp_companion, rsvp_response_id, rsvp_ordinal, rsvp_companion_status, rsvp_proxy_for_id)
+         VALUES ($1, $2, $3, TRUE, $4, $5, $6, $7)`,
+        [response.event_id, seat.full_name, label, responseId, ordinal, seat.status, proxyFor],
+      );
+    }
+  }
   for (const guest of old.rows) {
     if (!kept.has(guest.rsvp_ordinal)) await client.query('DELETE FROM guests WHERE id = $1', [guest.id]);
   }
@@ -104,11 +129,13 @@ async function authorized(eventId: string, code: unknown): Promise<boolean> {
 }
 
 const guestQuery = `SELECT g.id, g.event_id, g.group_id, g.full_name, g.email, g.phone,
-  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, grp.status, companion.status, g.rsvp_companion_status) AS rsvp_status, g.table_id
+  g.companion_label, g.is_rsvp_companion, COALESCE(own.status, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
+  proxy_owner.full_name AS proxy_of, g.table_id
   FROM guests g
   LEFT JOIN rsvp_responses own ON own.guest_id = g.id
   LEFT JOIN rsvp_responses grp ON grp.group_id = g.group_id
-  LEFT JOIN rsvp_responses companion ON companion.id = g.rsvp_response_id`;
+  LEFT JOIN rsvp_responses companion ON companion.id = g.rsvp_response_id
+  LEFT JOIN guests proxy_owner ON proxy_owner.id = g.rsvp_proxy_for_id`;
 
 router.get('/:eventId/seating', async (req, res) => {
   const { eventId } = req.params;

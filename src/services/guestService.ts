@@ -22,6 +22,7 @@ export interface InvitationGuest {
   rsvp_owner_id: string | null;
   rsvp_response_id: string | null;
   rsvp_status: 'attending' | 'declined' | 'undecided' | null;
+  proxy_of: string | null;
 }
 
 export interface GuestRoster {

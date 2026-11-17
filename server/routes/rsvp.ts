@@ -8,12 +8,17 @@ export const publicRsvpRouter = Router();
 
 type RsvpStatus = 'attending' | 'declined' | 'undecided';
 type RsvpTarget = { event_id: string; guest_id: string | null; group_id: string | null; invited_party_size: number; plus_limit: number; dietary_enabled: boolean; display_name: string };
+type ReservedSeat = { name: string; status: RsvpStatus };
 
 const isStatus = (value: unknown): value is RsvpStatus => value === 'attending' || value === 'declined' || value === 'undecided';
 const publicMatchQuery = `SELECT guest.id, guest.full_name, COALESCE(guest.rsvp_plus_limit, 0) AS plus_limit,
-  COALESCE((SELECT json_agg(json_build_object('id', companion.id, 'full_name', companion.full_name, 'status', companion.rsvp_companion_status) ORDER BY companion.created_at, companion.id)
+  response.status AS response_status,
+  COALESCE((SELECT json_agg(json_build_object('id', companion.id, 'full_name', companion.full_name, 'status', companion.rsvp_companion_status, 'is_proxy', companion.rsvp_proxy_for_id = guest.id) ORDER BY companion.created_at, companion.id)
     FROM guests companion WHERE companion.rsvp_owner_id = guest.id), '[]'::json) AS companions
-  FROM guests guest WHERE guest.event_id = $1 AND guest.rsvp_response_id IS NULL AND guest.rsvp_owner_id IS NULL
+  , COALESCE((SELECT json_agg(json_build_object('name', seat.full_name, 'status', seat.status, 'is_proxy', seat.is_proxy) ORDER BY seat.slot_index)
+    FROM rsvp_reserved_seats seat WHERE seat.response_id = response.id), '[]'::json) AS reserved_seats
+  FROM guests guest LEFT JOIN rsvp_responses response ON response.guest_id = guest.id
+  WHERE guest.event_id = $1 AND guest.rsvp_response_id IS NULL AND guest.rsvp_owner_id IS NULL
   AND (guest.full_name ILIKE $2 OR EXISTS (SELECT 1 FROM guests companion WHERE companion.rsvp_owner_id = guest.id AND companion.full_name ILIKE $2))
   ORDER BY guest.full_name LIMIT 10`;
 
@@ -50,14 +55,25 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
   const status = payload.status;
   const partyCount = Number(payload.party_count ?? 0);
   const plusOneCount = Number(payload.plus_one_count ?? 0);
+  const reserved = payload.reserved_seats;
+  const hasReservedSeats = reserved !== undefined;
+  if (hasReservedSeats && (!target.guest_id || !Array.isArray(reserved))) throw new Error('Reserved seats require an individual invitation');
+  const seats: ReservedSeat[] = Array.isArray(reserved) ? reserved.map((seat: unknown) => {
+    if (!seat || typeof seat !== 'object' || !('name' in seat) || !('status' in seat) ||
+      typeof seat.name !== 'string' || seat.name.trim().length > 255 || !isStatus(seat.status))
+      throw new Error('Enter a valid name and attendance for every reserved seat');
+    return { name: seat.name.trim(), status: seat.status };
+  }) : [];
   const attendeeNames = Array.isArray(payload.attendees) ? payload.attendees.filter((name): name is string => typeof name === 'string' && Boolean(name.trim())).map(name => name.trim()) : [];
   if (attendeeNames.some(name => name.length > 255)) throw new Error('Attendee names must be 255 characters or fewer');
   if (!isStatus(status)) throw new Error('Choose an RSVP status');
   if (!Number.isInteger(partyCount) || partyCount < 0 || partyCount > target.invited_party_size) throw new Error(`Party count cannot exceed ${target.invited_party_size}`);
   if (!Number.isInteger(plusOneCount) || plusOneCount < 0 || plusOneCount > target.plus_limit) throw new Error(`Additional guests cannot exceed ${target.plus_limit}`);
   if (!target.dietary_enabled && typeof payload.dietary_notes === 'string' && payload.dietary_notes.trim()) throw new Error('Dietary notes are disabled for this event');
-  if (status === 'attending' && (partyCount < 1 || partyCount + plusOneCount > 20 || attendeeNames.length !== partyCount + plusOneCount)) throw new Error('Provide names for up to 20 attending guests');
-  if (status !== 'attending' && (partyCount !== 0 || plusOneCount !== 0)) throw new Error('Only attending invitations can include guests');
+  if (hasReservedSeats
+    ? (partyCount !== (status === 'attending' ? 1 : 0) || partyCount + plusOneCount > 20 || attendeeNames.length !== partyCount + plusOneCount)
+    : (status === 'attending' ? partyCount < 1 || partyCount + plusOneCount > 20 || attendeeNames.length !== partyCount + plusOneCount : partyCount !== 0 || plusOneCount !== 0))
+    throw new Error('Provide names for up to 20 attending guests');
 
   const client = transactionClient ?? await pool.connect();
   const ownsTransaction = !transactionClient;
@@ -71,6 +87,8 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
     const companions = target.guest_id
       ? await client.query<{ id: string; full_name: string }>('SELECT id, full_name FROM guests WHERE rsvp_owner_id = $1 ORDER BY created_at, id FOR UPDATE', [target.guest_id])
       : { rows: [] as { id: string; full_name: string }[] };
+    if (hasReservedSeats && (companions.rows.length > target.plus_limit || seats.length !== target.plus_limit - companions.rows.length))
+      throw new Error('The reserved seats have changed. Search for your invitation again.');
     const selections = payload.named_companions;
     if (selections !== undefined && (!Array.isArray(selections) || selections.length !== companions.rows.length)) throw new Error('Select an RSVP for every named companion');
     const selected = Array.isArray(selections) ? selections as { id?: unknown; status?: unknown }[] : companions.rows.map(companion => ({
@@ -78,11 +96,26 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
       status: status === 'attending' && attendeeNames.slice(1).some(name => name.toLowerCase() === companion.full_name.toLowerCase()) ? 'attending' : 'undecided',
     }));
     if (selected.some((item, index) => !item || item.id !== companions.rows[index].id || !isStatus(item.status))) throw new Error('Select an RSVP for every named companion');
-    if (status === 'attending' && selected.length && selected.filter(item => item.status === 'attending').some((item, index) => attendeeNames[index + 1] !== companions.rows.find(guest => guest.id === item.id)?.full_name)) throw new Error('Named companions must be included in the RSVP');
-    if (status === 'attending' && selected.filter(item => item.status === 'attending').length > plusOneCount) throw new Error('Additional guest count is too small');
+    const attendingNamed = selected.filter(item => item.status === 'attending');
+    if (hasReservedSeats && (attendingNamed.length + seats.filter(seat => seat.status === 'attending').length !== plusOneCount ||
+      partyCount > 0 && attendeeNames[0] !== target.display_name))
+      throw new Error('Additional guest count does not match the reserved seats');
+    if (attendingNamed.some((item, index) => attendeeNames[partyCount + index] !== companions.rows.find(guest => guest.id === item.id)?.full_name)) throw new Error('Named companions must be included in the RSVP');
+    if (attendingNamed.length > plusOneCount) throw new Error('Additional guest count is too small');
+    if (hasReservedSeats && seats.filter(seat => seat.status === 'attending').some((seat, index) =>
+      attendeeNames[partyCount + attendingNamed.length + index] !== (seat.name || `${target.display_name.slice(0, 230)} friend #${seats.indexOf(seat) + 1}`)))
+      throw new Error('Reserved guest names must match the RSVP');
+    const proxy = payload.proxy;
+    const proxyId = proxy && typeof proxy === 'object' && 'id' in proxy ? proxy.id : null;
+    const proxyIndex = proxy && typeof proxy === 'object' && 'index' in proxy ? proxy.index : null;
+    const proxyValid = (proxyId === null && Number.isInteger(proxyIndex) && typeof proxyIndex === 'number' && seats[proxyIndex]?.status === 'attending') ||
+      (proxyIndex === null && typeof proxyId === 'string' && attendingNamed.some(item => item.id === proxyId));
+    if (hasReservedSeats && (status === 'declined' && plusOneCount > 0 ? !proxyValid : proxy !== undefined && proxy !== null))
+      throw new Error('Choose an attending additional guest as the proxy when the invited guest declines');
+    if (!hasReservedSeats && proxy !== undefined) throw new Error('Proxy selection requires reserved seats');
     for (const companion of companions.rows) {
-      const companionStatus = status === 'attending' ? selected.find(item => item.id === companion.id)?.status : status;
-      await client.query('UPDATE guests SET rsvp_companion_status = $1 WHERE id = $2', [companionStatus, companion.id]);
+      const companionStatus = hasReservedSeats || status === 'attending' ? selected.find(item => item.id === companion.id)?.status : status;
+      await client.query('UPDATE guests SET rsvp_companion_status = $1, rsvp_proxy_for_id = $2 WHERE id = $3', [companionStatus, hasReservedSeats && proxyId === companion.id ? target.guest_id : null, companion.id]);
     }
     const existing = await client.query<{ id: string }>(
       'SELECT id FROM rsvp_responses WHERE (guest_id = $1 AND $1::uuid IS NOT NULL) OR (group_id = $2 AND $2::uuid IS NOT NULL) FOR UPDATE',
@@ -101,9 +134,14 @@ async function saveResponse(target: RsvpTarget, payload: Record<string, unknown>
       );
     const responseId = responseResult.rows[0].id;
     await client.query('DELETE FROM rsvp_attendees WHERE response_id = $1', [responseId]);
-    const attendingCompanions = status === 'attending' ? selected.filter(item => item.status === 'attending') : [];
+    await client.query('DELETE FROM rsvp_reserved_seats WHERE response_id = $1', [responseId]);
+    if (hasReservedSeats) for (const [index, seat] of seats.entries())
+      await client.query('INSERT INTO rsvp_reserved_seats (response_id, slot_index, full_name, status, is_proxy) VALUES ($1, $2, $3, $4, $5)',
+        [responseId, index, seat.name || `${target.display_name.slice(0, 230)} friend #${index + 1}`, seat.status, proxyIndex === index]);
+    const attendingCompanions = hasReservedSeats || status === 'attending' ? attendingNamed : [];
+    const attendingSeats = seats.map((seat, index) => ({ ...seat, index })).filter(seat => seat.status === 'attending');
     for (const [index, fullName] of attendeeNames.entries())
-      await client.query('INSERT INTO rsvp_attendees (response_id, full_name, ordinal, guest_id) VALUES ($1, $2, $3, $4)', [responseId, fullName, index, target.guest_id && index >= partyCount && index < partyCount + attendingCompanions.length ? attendingCompanions[index - partyCount].id : null]);
+      await client.query('INSERT INTO rsvp_attendees (response_id, full_name, ordinal, guest_id, reserved_slot_index) VALUES ($1, $2, $3, $4, $5)', [responseId, fullName, index, target.guest_id && index >= partyCount && index < partyCount + attendingCompanions.length ? attendingCompanions[index - partyCount].id : null, index >= partyCount + attendingCompanions.length ? attendingSeats[index - partyCount - attendingCompanions.length]?.index ?? null : null]);
     await reconcileResponse(client, responseId);
     if (ownsTransaction) await client.query('COMMIT');
     return responseResult.rows[0];

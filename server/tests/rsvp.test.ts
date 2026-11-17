@@ -74,6 +74,53 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     assert.equal(edited.status, 409);
     assert.equal((await request(`/api/events/${eventId}/guests/${guestId}`, 'PATCH', { host_code: hostCode, full_name: 'Alex Example', rsvp_plus_limit: 1 })).data.rsvp_plus_limit, 1);
     assert.equal((await reply(['Jordan'], 1)).status, 400);
+    const reservedReply = (status: string, seats: { name: string; status: string }[], proxy: { id?: string; index?: number } | null, namedStatus = 'attending') => request(`/api/rsvp/guest/${guestId}`, 'POST', {
+      event_id: eventId, status, party_count: status === 'attending' ? 1 : 0,
+      plus_one_count: (namedStatus === 'attending' ? 1 : 0) + seats.filter(seat => seat.status === 'attending').length,
+      named_companions: [{ id: named.data.id, status: namedStatus }],
+      reserved_seats: seats, proxy,
+      attendees: [...(status === 'attending' ? ['Alex Example'] : []), ...(namedStatus === 'attending' ? ['Jordan Updated'] : []), ...seats.filter(seat => seat.status === 'attending').map(seat => seat.name || 'Alex Example friend #1')],
+    });
+    assert.equal((await reservedReply('declined', [], { id: named.data.id })).status, 200);
+    let proxyRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    assert.equal(proxyRoster.data.guests.find((guest: { id: string }) => guest.id === named.data.id).proxy_of, 'Alex Example');
+    assert.equal(proxyRoster.data.guests.find((guest: { id: string }) => guest.id === named.data.id).rsvp_status, 'attending');
+    assert.equal(proxyRoster.data.guests.find((guest: { id: string }) => guest.id === guestId).rsvp_status, 'declined');
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches[0].companions[0].is_proxy, true);
+    assert.equal((await reservedReply('declined', [], null)).status, 400);
+    assert.equal((await reservedReply('attending', [], null, 'declined')).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === named.data.id).proxy_of, null);
+    assert.equal((await request(`/api/events/${eventId}/guests/${guestId}`, 'PATCH', { host_code: hostCode, full_name: 'Alex Example', rsvp_plus_limit: 2 })).status, 200);
+    assert.equal((await reservedReply('declined', [{ name: 'Taylor Proxy', status: 'attending' }], { index: 0 }, 'declined')).status, 200);
+    proxyRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    const proxyGuest = proxyRoster.data.guests.find((guest: { full_name: string }) => guest.full_name === 'Taylor Proxy');
+    assert.equal(proxyGuest.proxy_of, 'Alex Example');
+    assert.equal(proxyGuest.rsvp_status, 'attending');
+    const attendingResponse = (await request(`/api/events/${eventId}/rsvp?host_code=${hostCode}`)).data.find((response: { guest_id: string }) => response.guest_id === guestId);
+    assert.equal(attendingResponse.party_count, 1);
+    assert.equal(attendingResponse.plus_one_count, 1);
+    const table = await request(`/api/events/${eventId}/seating/tables`, 'POST', { host_code: hostCode, name: 'Proxy table', capacity: 2 });
+    assert.equal(table.status, 201);
+    assert.equal((await request(`/api/events/${eventId}/seating/assignments/${proxyGuest.id}`, 'PUT', { host_code: hostCode, table_id: table.data.id })).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/seating?host_code=${hostCode}`)).data.tables[0].occupancy, 1);
+    const undecidedReply = await reservedReply('attending', [{ name: '', status: 'undecided' }], null, 'declined');
+    assert.equal(undecidedReply.status, 200, JSON.stringify(undecidedReply.data));
+    const undecidedRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
+    assert.equal(undecidedRoster.data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).rsvp_status, 'undecided');
+    assert.equal(undecidedRoster.data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).full_name, 'Alex Example friend #1');
+    assert.equal(undecidedRoster.data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).proxy_of, null);
+    assert.equal((await request(`/api/events/${eventId}/seating?host_code=${hostCode}`)).data.tables[0].occupancy, 0);
+    assert.equal((await reservedReply('attending', [{ name: 'Taylor Proxy', status: 'declined' }], null, 'undecided')).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).rsvp_status, 'declined');
+    assert.equal((await reservedReply('attending', [{ name: 'Taylor Proxy', status: 'attending' }, { name: 'Extra', status: 'attending' }], null)).status, 400);
+    const savedMatch = (await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches[0];
+    assert.equal(savedMatch.response_status, 'attending');
+    assert.equal(savedMatch.reserved_seats[0].status, 'declined');
+    assert.equal((await reservedReply('declined', [{ name: 'Taylor Proxy', status: 'declined' }], null, 'declined')).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).rsvp_status, 'declined');
+    assert.equal((await request(`/api/events/${eventId}/guests/${guestId}`, 'PATCH', { host_code: hostCode, full_name: 'Alex Example', rsvp_plus_limit: 1 })).status, 200);
+    assert.equal((await reservedReply('attending', [], null, 'undecided')).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.some((guest: { id: string }) => guest.id === proxyGuest.id), false);
     assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Unknown Example' })).data.needs_response, true);
     assert.equal((await request(`/api/events/${eventId}/rsvp-settings`, 'PATCH', { host_code: hostCode, dietary_notes_enabled: false })).status, 200);
     assert.equal((await request(`/api/rsvp/guest/${guestId}`, 'POST', { event_id: eventId, status: 'declined', party_count: 0, plus_one_count: 0, dietary_notes: 'test' })).status, 400);

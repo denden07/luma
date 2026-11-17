@@ -68,6 +68,18 @@
 .public-rsvp-modal input, .public-rsvp-modal select, .public-rsvp-modal textarea { background: #fff; border: 1px solid #bdc5b9; box-sizing: border-box; color: #202820; font: inherit; padding: 10px; width: 100%; }
 .public-rsvp-modal button:not(.public-rsvp-close) { background: #263a32; border: 0; color: #fffdf7; cursor: pointer; font: inherit; font-weight: 700; padding: 12px 16px; text-align: left; }
 .public-rsvp-modal button:disabled { opacity: .55; }
+.public-rsvp-modal .public-rsvp-step { color: #64736a; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.public-rsvp-reserved { background: #e9eee5; border: 1px solid #aebfa8; display: grid; gap: 5px; padding: 22px; text-align: center; }
+.public-rsvp-reserved span { color: #425f49; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.public-rsvp-reserved strong { color: #263a32; font-family: var(--font-editorial); font-size: clamp(32px, 8vw, 46px); line-height: 1.1; }
+.public-rsvp-modal .public-rsvp-reserved p { margin: 4px 0 0; }
+.public-rsvp-warning-backdrop { background: #fffdf7; }
+.public-rsvp-warning { display: grid; gap: 12px; }
+.public-rsvp-warning h3 { font-family: var(--font-editorial); font-size: 30px; margin: 0 24px 0 0; }
+.public-rsvp-modal .public-rsvp-warning button:last-child, .public-rsvp-modal button.public-rsvp-decline-all { background: #e7dfd1; color: #263a32; }
+.public-rsvp-seat { border: 1px solid #d9dfd4; display: grid; gap: 10px; padding: 14px; }
+.public-rsvp-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.public-rsvp-modal .public-rsvp-actions button:first-child { background: #e7dfd1; color: #263a32; }
 .public-invitation-section { box-sizing: border-box; min-height: 240px; padding: 72px max(24px, calc((100vw - 680px) / 2)); text-align: center; }.public-invitation-section p { font-size: 18px; line-height: 1.7; margin: 0 auto; max-width: 620px; }.public-invitation-section-kicker { font-family: var(--font-editorial); font-size: clamp(30px, 7vw, 54px); line-height: 1; margin-bottom: 22px !important; }.public-invitation-story { background: #fffdf7; }.public-invitation-details { background: #e7dfd1; }.public-invitation-details p + p { margin-top: 8px; }.public-invitation-closing { background: #1d211c; color: #fffdf7; display: grid; font-family: var(--font-editorial); font-size: clamp(30px, 7vw, 56px); line-height: 1.05; }
 .public-invitation-gallery { background: #fffdf7; }.public-gallery-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin: 28px auto 0; max-width: 720px; }.public-gallery-grid img { aspect-ratio: 1; }.public-gallery-strip { display: flex; gap: 12px; margin: 28px auto 0; max-width: 720px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }.public-gallery-strip img { flex: 0 0 min(72vw, 360px); scroll-snap-align: center; }.public-invitation-gallery img { display: block; object-fit: cover; width: 100%; }.public-invitation-entourage { background: #e7dfd1; }.public-invitation-entourage > div { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 28px auto 0; max-width: 720px; }.public-invitation-entourage h2 { font-family: var(--font-editorial); font-size: 28px; margin: 0 0 14px; }.public-invitation-entourage ul { list-style: none; margin: 0; padding: 0; }.public-invitation-entourage li { line-height: 1.7; }
 
