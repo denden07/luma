@@ -1,15 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
-export function slugifyInvitationName(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' and ')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 export type WebsiteTemplateId = 'garden' | 'modern' | 'classic';
 export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
 

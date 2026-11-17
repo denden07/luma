@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Menu, X } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { getPublishedWebsite } from '../../services/websiteService';
+import { getPhotoUrl } from '../../services/dataService';
 import type { PublishedWebsite, WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId, invitationSectionLabel, visibleInvitationSections } from '../../utils/invitationSections';
 import InvitationDocument from './InvitationDocument';
@@ -98,16 +99,46 @@ const PublicInvitation = () => {
       .finally(() => setIsLoading(false));
   }, [slug]);
 
-  const metadataName = website?.published_document.sections.find(section => section.type === 'hero')?.content.couple_names;
+  const heroContent = website?.published_document.sections.find(section => section.type === 'hero')?.content;
   useEffect(() => {
-    if (typeof metadataName !== 'string' || !metadataName) return;
+    if (!website) return;
+    const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
+    const title = text(heroContent?.share_title) || text(heroContent?.couple_names) || website.event_name;
+    const description = text(heroContent?.share_description) || text(heroContent?.message) || `Join us to celebrate ${website.event_name}.`;
+    const imagePath = text(heroContent?.share_image_path) || text(heroContent?.cover_photo_path);
+    const image = imagePath ? new URL(getPhotoUrl(imagePath), window.location.origin).href : new URL('/invitation-share-default.jpg', window.location.origin).href;
     const previousTitle = document.title;
-    const canonical = document.querySelector<HTMLLinkElement>('link[rel="canonical"]') ?? document.head.appendChild(document.createElement('link'));
+    const updates: Array<[string, string, string]> = [
+      ['meta[property="og:title"]', 'property', 'og:title'],
+      ['meta[property="og:description"]', 'property', 'og:description'],
+      ['meta[property="og:image"]', 'property', 'og:image'],
+      ['meta[property="og:url"]', 'property', 'og:url'],
+      ['meta[name="description"]', 'name', 'description'],
+      ['meta[name="twitter:title"]', 'name', 'twitter:title'],
+      ['meta[name="twitter:description"]', 'name', 'twitter:description'],
+      ['meta[name="twitter:image"]', 'name', 'twitter:image'],
+    ];
+    const values = [title, description, image, window.location.href, description, title, description, image];
+    const changed = updates.map(([selector, attribute, name], index) => {
+      const existing = document.head.querySelector<HTMLMetaElement>(selector);
+      const element = existing ?? document.head.appendChild(document.createElement('meta'));
+      element.setAttribute(attribute, name);
+      const previous = existing?.content;
+      element.content = values[index];
+      return () => { if (previous === undefined) element.remove(); else element.content = previous; };
+    });
+    const existingCanonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    const canonical = existingCanonical ?? document.head.appendChild(document.createElement('link'));
+    const previousCanonical = existingCanonical?.href;
     canonical.rel = 'canonical';
     canonical.href = window.location.href;
-    document.title = `${metadataName} | madeTogether`;
-    return () => { document.title = previousTitle; };
-  }, [metadataName]);
+    document.title = `${title} | madeTogether`;
+    return () => {
+      document.title = previousTitle;
+      changed.forEach(restore => restore());
+      if (previousCanonical === undefined) canonical.remove(); else canonical.href = previousCanonical;
+    };
+  }, [website, heroContent]);
 
   if (isLoading) return <main className="public-invitation-state">Loading invitation...</main>;
   if (!website) return <main className="public-invitation-state"><h1>Invitation not found</h1><p>This invitation is unavailable or has not been published yet.</p></main>;

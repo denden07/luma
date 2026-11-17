@@ -3,6 +3,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { existsSync, mkdirSync } from 'fs';
+import { readFile } from 'fs/promises';
+import { resolve } from 'path';
+import pool from './db/index.js';
+import type { WebsiteDocument } from './types.js';
+import { invitationHtml } from './invitationHtml.js';
 import eventsRouter from './routes/events.js';
 import participantsRouter from './routes/participants.js';
 import photosRouter from './routes/photos.js';
@@ -60,6 +65,28 @@ app.use((req, _res, next) => {
     contentLength: req.headers['content-length'],
   });
   next();
+});
+
+app.use(async (req, res, next) => {
+  const slug = req.query.invitation_slug;
+  if (req.method !== 'GET' || typeof slug !== 'string') return next();
+  try {
+    const template = await readFile(resolve(process.cwd(), 'dist', 'index.html'), 'utf8');
+    if (!/^[a-z0-9-]{3,120}$/.test(slug)) return res.type('html').send(template);
+    const result = await pool.query<{ event_id: string; event_name: string; published_document: WebsiteDocument }>(
+      `SELECT website.event_id, event.name AS event_name, website.published_document
+       FROM event_websites website JOIN events event ON event.id = website.event_id
+       WHERE website.public_slug = $1 AND website.published_at IS NOT NULL AND event.is_active = TRUE`,
+      [slug],
+    );
+    if (!result.rows.length) return res.type('html').send(template);
+    const url = `${req.protocol}://${req.get('host')}/${slug}`;
+    res.set('Cache-Control', 'no-store');
+    return res.type('html').send(invitationHtml(template, result.rows[0].published_document, result.rows[0].event_name, result.rows[0].event_id, url));
+  } catch (error) {
+    console.error('Error rendering invitation link preview:', error);
+    return res.status(500).send('Could not load invitation');
+  }
 });
 
 app.use('/api/hosts', hostsRouter);

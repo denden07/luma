@@ -157,7 +157,8 @@ router.post('/:eventId/website/publish', async (req, res) => {
   const { host_code: hostCode, slug } = req.body as { host_code?: string; slug?: string };
   const publicSlug = normalizeSlug(slug);
 
-  if (!publicSlug) return res.status(400).json({ error: 'Choose a unique URL using at least three letters or numbers' });
+  if (!publicSlug || !publicSlug.startsWith(`${eventId}-`) || publicSlug.length <= eventId.length + 1)
+    return res.status(400).json({ error: 'Invitation URL must start with this event ID followed by a title' });
 
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });

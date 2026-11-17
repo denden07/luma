@@ -55,11 +55,22 @@ layout as the published invitation. Cover photos, palette, and heading style
 remain editable after choosing a look. Each template includes entrance and
 scroll motion, with ambient details where appropriate; motion is disabled
 when the visitor requests reduced motion.
+The preview shows the current draft; publish again after edits to update the
+public invitation. The RSVP search button uses the editor's Button label in
+both views, and the closing message stays visible at the end of the page.
 
 On a published invitation, a circular section menu appears at the bottom right
 after the opening section scrolls out of view. It links to the published,
 visible sections and **Back to top**; the editor preview does not show this
 menu.
+
+Invitation URLs begin with the event's unique ID, followed by an editable title;
+republishing an older invitation changes its previous URL, so share the new link.
+The **Shared link preview** fields in the website editor set a separate title,
+description, and image for the card shown when the published URL is shared.
+Blank fields use the invitation names, message, and cover photo. Changes to the
+shared card go live only after publishing again. Messaging apps may cache a
+previous card and need time or their link debugger to refresh it.
 
 In **Seating plan**, create tables with a seat
 count, search the unassigned guest roster, and choose a table for each guest.
@@ -83,6 +94,8 @@ earlier responses.
 Create one Vercel project with `luma` as its Root Directory. Vercel builds the PWA,
 serves it from `dist`, and routes `/api/*` to `api/index.ts`, which exports the same
 Express app used locally. Configure `DATABASE_URL` in Vercel environment variables.
+Published invitation paths are also routed through this app to inject per-event
+Open Graph and Twitter metadata into the HTML before sharing crawlers read it.
 
 The current filesystem upload adapter is for local development only. Move uploads to
 private object storage before production; Vercel function storage is not durable.

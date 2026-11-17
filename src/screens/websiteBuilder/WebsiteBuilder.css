@@ -318,19 +318,20 @@
 .invitation-preview-device.tablet { box-sizing: border-box; max-width: 100%; }
 
 .invitation-document-preview .public-invitation-hero { animation: preview-hero-enter 650ms cubic-bezier(.2, .8, .2, 1) both; }
-.invitation-document-preview .public-invitation-section { animation: preview-section-enter 550ms 120ms ease-out both; }
+.invitation-document-preview .public-invitation-section:not(.public-invitation-closing) { animation: preview-section-enter 550ms 120ms ease-out both; }
 .invitation-document-preview .public-invitation-rsvp { animation: preview-section-enter 550ms 180ms ease-out both; }
 @keyframes preview-hero-enter { from { opacity: .35; transform: scale(.985); } to { opacity: 1; transform: scale(1); } }
 @keyframes preview-section-enter { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
 
 /* Let the full responsive document size naturally inside the editor preview. */
 .invitation-preview-device { max-height: none; overflow: visible; width: min(100%, 920px); }
-.invitation-preview-device.mobile { width: min(100%, 360px); }
-.invitation-preview-device.tablet { width: min(100%, 700px); }
+.invitation-preview-device.mobile { width: min(100%, 376px); }
+.invitation-preview-device.tablet { width: min(100%, 716px); }
 .invitation-preview-device .public-invitation { min-height: 0; }
 
 /* Live previews behave like their selected device viewport instead of exposing the full page at once. */
-.invitation-preview-device { max-height: min(760px, calc(100dvh - 150px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.invitation-preview-device { max-height: min(760px, calc(100dvh - 150px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.invitation-preview-device::-webkit-scrollbar { display: none; }
 .invitation-preview-device.desktop { height: min(680px, calc(100dvh - 150px)); }
 .invitation-preview-device.tablet { height: min(720px, calc(100dvh - 150px)); }
 .invitation-preview-device.mobile { height: min(680px, calc(100dvh - 150px)); }
@@ -346,6 +347,7 @@
 .website-editor-panel, .website-live-preview, .template-option { min-width: 0; }
 .website-slug-input input { flex: 1; }
 .website-slug-input > span { max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+.website-share-image { display: block; max-height: 180px; max-width: 100%; object-fit: cover; }
 
 @media (min-width: 761px) and (max-width: 1160px) {
   .template-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -3,7 +3,8 @@ import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, 
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { deleteEventCover, getEventsByHostCode, getPhotoUrl, uploadEventCover } from '../../services/dataService';
 import type { Event } from '../../services/dataService';
-import { createWebsiteDraft, deleteWebsiteAsset, ensureWebsiteSections, getEventWebsite, getWebsiteAssets, publishEventWebsite, saveEventWebsite, slugifyInvitationName, uploadWebsiteAsset } from '../../services/websiteService';
+import { createWebsiteDraft, deleteWebsiteAsset, ensureWebsiteSections, getEventWebsite, getWebsiteAssets, publishEventWebsite, saveEventWebsite, uploadWebsiteAsset } from '../../services/websiteService';
+import { invitationSlug, invitationSlugTitle, slugifyInvitationName } from '../../utils/invitationSlug';
 import type { WebsiteAsset } from '../../services/websiteService';
 import type { WebsiteDocument, WebsiteTemplateId } from '../../services/websiteService';
 import { getHostCode } from '../../utils/hostAuth';
@@ -130,7 +131,7 @@ const WebsiteBuilder = () => {
         if (isCurrent) {
           setDocument(ensureWebsiteSections(website?.draft_document ?? createWebsiteDraft(ownedEvent.name, ownedEvent.date, 'garden', ownedEvent.cover_photo_path)));
           setWebsiteAssets(assets);
-          setSlug(website?.public_slug ?? slugifyInvitationName(ownedEvent.name));
+          setSlug(website?.public_slug ? invitationSlugTitle(ownedEvent.id, website.public_slug) : slugifyInvitationName(ownedEvent.name));
           setHasEditedSlug(Boolean(website?.public_slug));
         }
       })
@@ -220,6 +221,9 @@ const WebsiteBuilder = () => {
   const heroNames = typeof heroContent.couple_names === 'string' ? heroContent.couple_names : event.name;
   const heroDate = typeof heroContent.date === 'string' ? heroContent.date : '';
   const heroMessage = typeof heroContent.message === 'string' ? heroContent.message : '';
+  const shareTitle = typeof heroContent.share_title === 'string' ? heroContent.share_title : '';
+  const shareDescription = typeof heroContent.share_description === 'string' ? heroContent.share_description : '';
+  const shareImagePath = typeof heroContent.share_image_path === 'string' ? heroContent.share_image_path : '';
   const coverPhotoPath = typeof heroContent.cover_photo_path === 'string' ? heroContent.cover_photo_path : event.cover_photo_path;
   const coverPhotoUrl = coverPhotoPath ? getPhotoUrl(coverPhotoPath) : undefined;
   const coverPosition = typeof heroContent.cover_position === 'string' ? heroContent.cover_position : 'center';
@@ -235,7 +239,7 @@ const WebsiteBuilder = () => {
   const galleryLimit = galleryLayout === 'strip' || galleryLayout === 'carousel' ? 5 : 6;
   const currentEntourageGroups = entourageGroups(entourage?.content);
 
-  const updateHero = (field: 'couple_names' | 'date' | 'message' | 'cover_photo_path' | 'cover_position', value: string) => {
+  const updateHero = (field: 'couple_names' | 'date' | 'message' | 'cover_photo_path' | 'cover_position' | 'share_title' | 'share_description' | 'share_image_path', value: string) => {
     if (!document) return;
     setDocument({
       ...document,
@@ -298,6 +302,21 @@ const WebsiteBuilder = () => {
     }
   };
 
+  const uploadShareImage = async (file: File | null) => {
+    const hostCode = getHostCode();
+    if (!file || !hostCode) return;
+    setIsUploadingGalleryImage(true);
+    try {
+      const asset = await uploadWebsiteAsset(event.id, hostCode, file);
+      setWebsiteAssets(current => [asset, ...current]);
+      updateHero('share_image_path', asset.storage_path);
+    } catch {
+      setPublishError('Could not upload the link preview image. Please try again.');
+    } finally {
+      setIsUploadingGalleryImage(false);
+    }
+  };
+
   const deleteGalleryImage = async (asset: WebsiteAsset) => {
     const hostCode = getHostCode();
     if (!hostCode || !document || !gallery?.id) return;
@@ -305,7 +324,11 @@ const WebsiteBuilder = () => {
       await deleteWebsiteAsset(event.id, hostCode, asset.id);
       const paths = galleryPhotoPaths.filter(path => path !== asset.storage_path);
       setWebsiteAssets(current => current.filter(current => current.id !== asset.id));
-      setDocument({ ...document, sections: document.sections.map(section => section.id === gallery.id ? { ...section, content: { ...section.content, photo_paths: paths } } : section) });
+      setDocument({ ...document, sections: document.sections.map(section => {
+        if (section.id === gallery.id) return { ...section, content: { ...section.content, photo_paths: paths } };
+        if (section.type === 'hero' && shareImagePath === asset.storage_path) return { ...section, content: { ...section.content, share_image_path: '' } };
+        return section;
+      }) });
       markDirty();
       setPreviewedGalleryAsset(null);
     } catch {
@@ -370,8 +393,8 @@ const WebsiteBuilder = () => {
     setPublishError(null);
     try {
       await saveDraft(document, revision.current);
-      const published = await publishEventWebsite(event.id, hostCode, slug);
-      setSlug(published.public_slug ?? slug);
+      const published = await publishEventWebsite(event.id, hostCode, invitationSlug(event.id, slug));
+      setSlug(published.public_slug ? invitationSlugTitle(event.id, published.public_slug) : slug);
     } catch (publishFailure) {
       setPublishError(publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website');
     } finally {
@@ -386,7 +409,7 @@ const WebsiteBuilder = () => {
       return;
     }
     try {
-      await copyTextToClipboard(`${window.location.origin}/${normalizedSlug}`);
+      await copyTextToClipboard(`${window.location.origin}/${invitationSlug(event.id, normalizedSlug)}`);
       showCopySuccessPopup('Invitation URL copied.');
     } catch {
       setPublishError('Could not copy the invitation URL. Please try again.');
@@ -477,6 +500,27 @@ const WebsiteBuilder = () => {
               <option value="right center">Right</option>
             </select>
           </label>}
+          <fieldset className="website-section-fields">
+            <legend>Shared link preview</legend>
+            <p>Set the card shown when guests share the published invitation. Blank text uses your invitation names and message.</p>
+            <label htmlFor="invitation-share-title">Preview title
+              <input id="invitation-share-title" value={shareTitle} onChange={input => updateHero('share_title', input.target.value)} maxLength={120} placeholder={heroNames} />
+            </label>
+            <label htmlFor="invitation-share-description">Preview description
+              <textarea id="invitation-share-description" value={shareDescription} onChange={input => updateHero('share_description', input.target.value)} maxLength={280} rows={3} placeholder={heroMessage} />
+            </label>
+            <label htmlFor="invitation-share-image">Preview image
+              <select id="invitation-share-image" value={shareImagePath} onChange={input => updateHero('share_image_path', input.target.value)}>
+                <option value="">Use cover photo</option>
+                {websiteAssets.map(asset => <option key={asset.id} value={asset.storage_path}>{asset.original_filename}</option>)}
+              </select>
+            </label>
+            <label className="website-gallery-upload" htmlFor="invitation-share-upload">
+              <span>{isUploadingGalleryImage ? 'Uploading image...' : 'Upload link preview image'}</span>
+              <input id="invitation-share-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingGalleryImage} onChange={input => { void uploadShareImage(input.target.files?.[0] ?? null); input.target.value = ''; }} />
+            </label>
+            {(shareImagePath || coverPhotoUrl) && <img className="website-share-image" src={getPhotoUrl(shareImagePath || coverPhotoPath || '')} alt="Selected link preview" />}
+          </fieldset>
           <fieldset className="website-section-fields">
             <legend>Our Story</legend>
             <label htmlFor="invitation-story-title">Section title
@@ -588,7 +632,7 @@ const WebsiteBuilder = () => {
           </fieldset>
           <div className="website-publish-fields">
             <label htmlFor="invitation-slug">Invitation URL
-              <span className="website-slug-input"><span>{window.location.host}/</span><input id="invitation-slug" value={slug} onChange={(input) => { setSlug(slugifyInvitationName(input.target.value)); setHasEditedSlug(true); }} required /><button type="button" onClick={copyInvitationUrl} aria-label="Copy invitation URL" title="Copy invitation URL"><Copy size={16} aria-hidden="true" /></button></span>
+              <span className="website-slug-input"><span title={`${window.location.host}/${event.id}-`}>{window.location.host}/{event.id}-</span><input id="invitation-slug" value={slug} maxLength={83} onChange={(input) => { setSlug(slugifyInvitationName(input.target.value)); setHasEditedSlug(true); }} required /><button type="button" onClick={copyInvitationUrl} aria-label="Copy invitation URL" title="Copy invitation URL"><Copy size={16} aria-hidden="true" /></button></span>
             </label>
             {publishError && <p className="website-publish-error" role="alert">{publishError}</p>}
             <button type="submit" className="website-publish-button" disabled={isPublishing}>
@@ -601,7 +645,7 @@ const WebsiteBuilder = () => {
 
         <div className="website-live-preview" aria-label="Live invitation preview">
           <div className="website-preview-toolbar"><span className="website-preview-label"><Eye size={16} aria-hidden="true" /> Live preview</span><span><button type="button" className={previewMode === 'desktop' ? 'active' : ''} onClick={() => setPreviewMode('desktop')} aria-label="Desktop preview" title="Desktop preview"><Monitor size={17} aria-hidden="true" /></button><button type="button" className={previewMode === 'tablet' ? 'active' : ''} onClick={() => setPreviewMode('tablet')} aria-label="Tablet preview" title="Tablet preview"><Tablet size={17} aria-hidden="true" /></button><button type="button" className={previewMode === 'mobile' ? 'active' : ''} onClick={() => setPreviewMode('mobile')} aria-label="Mobile preview" title="Mobile preview"><Smartphone size={17} aria-hidden="true" /></button></span></div>
-          <div className={`invitation-preview-device ${previewMode}`}>{document && <InvitationDocument document={document} eventName={event.name} preview />}</div>
+          <div className={`invitation-preview-device ${previewMode}`} tabIndex={0} aria-label={`${previewMode} invitation preview; scroll to see all sections`}>{document && <InvitationDocument document={document} eventName={event.name} preview />}</div>
         </div>
       </section>
       <Modal isOpen={Boolean(previewedGalleryAsset)} onClose={() => setPreviewedGalleryAsset(null)} className="website-image-preview-modal">
