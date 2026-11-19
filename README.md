@@ -62,6 +62,8 @@ timeline events with a time, name, and optional details, pick and display up to 
 names (unnamed colors display as swatches without hex codes), and share
 gift preferences. Empty optional sections stay hidden until filled in, and
 each section can be reordered or hidden from **Section order**.
+The invitation alternates light and muted section backgrounds in the visible
+order, while RSVP and Closing retain their accent colors.
 The preview shows the current draft; publish again after edits to update the
 public invitation. The RSVP search button uses the editor's Button label in
 both views, and the closing message stays visible at the end of the page.
