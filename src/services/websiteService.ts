@@ -1,7 +1,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export type WebsiteTemplateId = 'garden' | 'modern' | 'classic';
-export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
+export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'timeline' | 'attire' | 'gifts' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
 
 export interface WebsiteSection {
   id: string;
@@ -52,7 +52,14 @@ export function createWebsiteDraft(eventName: string, eventDate: string, templat
         },
       },
       { id: 'story', type: 'story', visible: true, content: { title: 'Our Story', body: 'A little more about the people and moments that brought us here.' } },
-      { id: 'details', type: 'details', visible: true, content: { title: 'Event Details', venue: '', venue_time: '', venue_directions_url: '', ceremony_place: '', ceremony_time: '', ceremony_directions_url: '' } },
+      { id: 'details', type: 'details', visible: true, content: {
+        title: 'Event Details',
+        ceremony_place: '', ceremony_time: '', ceremony_directions_url: '',
+        venue: '', venue_time: '', venue_directions_url: '',
+      } },
+      { id: 'timeline', type: 'timeline', visible: true, content: { title: 'Timeline', timeline: [] } },
+      { id: 'attire', type: 'attire', visible: true, content: { title: 'Attire', motif: '', color_note: '', colors: [] } },
+      { id: 'gifts', type: 'gifts', visible: true, content: { title: 'Gifts', instructions: '' } },
       { id: 'gallery', type: 'gallery', visible: true, content: { title: 'Photo Gallery', photo_paths: [], layout: 'grid' } },
       { id: 'entourage', type: 'entourage', visible: true, content: { title: 'Our Entourage', groups: [
         { id: 'sponsors', title: 'Sponsors', members: [] },
@@ -111,13 +118,24 @@ export async function getPublishedWebsite(slug: string): Promise<PublishedWebsit
 }
 
 export function ensureWebsiteSections(document: WebsiteDocument): WebsiteDocument {
+  const details = document.sections.find(section => section.type === 'details');
   const requiredSections: WebsiteSection[] = [
+    { id: 'timeline', type: 'timeline', visible: details?.visible ?? true, content: { title: 'Timeline', timeline: details?.content.timeline ?? [] } },
+    { id: 'attire', type: 'attire', visible: details?.visible ?? true, content: {
+      title: 'Attire', motif: details?.content.attire_motif ?? '', color_note: details?.content.attire_colors ?? '', colors: [],
+    } },
+    { id: 'gifts', type: 'gifts', visible: true, content: { title: 'Gifts', instructions: '' } },
     { id: 'gallery', type: 'gallery', visible: true, content: { title: 'Photo Gallery', photo_paths: [], layout: 'grid' } },
     { id: 'entourage', type: 'entourage', visible: true, content: { title: 'Our Entourage', category: 'Wedding Party', members: '' } },
     { id: 'rsvp', type: 'rsvp', visible: true, content: { title: 'RSVP', button_label: 'Respond' } },
   ];
   const missing = requiredSections.filter(required => !document.sections.some(section => section.type === required.type));
-  return missing.length === 0 ? document : { ...document, sections: [...document.sections, ...missing] };
+  if (missing.length === 0) return document;
+  const sections = [...document.sections];
+  const detailsIndex = sections.findIndex(section => section.type === 'details');
+  sections.splice(detailsIndex < 0 ? sections.length : detailsIndex + 1, 0, ...missing.filter(section => ['timeline', 'attire', 'gifts'].includes(section.type)));
+  sections.push(...missing.filter(section => !['timeline', 'attire', 'gifts'].includes(section.type)));
+  return { ...document, sections };
 }
 
 export interface WebsiteAsset {

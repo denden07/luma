@@ -149,6 +149,24 @@
 .public-invitation-directions { align-items: center; border: 1px solid currentColor; color: inherit; display: inline-flex; font-size: 13px; font-weight: 700; gap: 8px; margin-top: 24px; padding: 11px 16px; text-decoration: none; transition: background 180ms ease, color 180ms ease, transform 180ms ease; }.public-invitation-directions:hover { background: var(--invitation-ink); color: var(--invitation-surface); transform: translateY(-2px); }.public-invitation-directions:active { transform: translateY(1px) scale(.98); }
 .public-invitation-map { border: 0; display: block; height: clamp(220px, 32cqw, 330px); margin: 28px auto 0; max-width: 720px; width: 100%; }
 .public-invitation-locations { display: grid; gap: 28px; margin: 30px auto 0; max-width: 780px; text-align: left; }.public-invitation-locations article { background: color-mix(in srgb, var(--invitation-surface) 82%, transparent); box-shadow: 0 10px 24px rgba(18, 25, 20, .08); padding: 24px; }.public-invitation-locations .public-location-label { color: var(--invitation-accent); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }.public-invitation-locations .public-location-place { font-family: var(--font-editorial); font-size: 30px; line-height: 1.1; margin-top: 8px; }.public-invitation-locations .public-invitation-map { max-width: none; }.public-invitation-locations .public-invitation-directions { margin-top: 18px; }
+.public-invitation .public-invitation-timeline-section,
+.public-invitation .public-invitation-gifts { background: var(--invitation-surface); color: var(--invitation-ink); }
+.public-invitation .public-invitation-attire { background: var(--invitation-muted-surface); color: var(--invitation-ink); }
+.public-invitation-timeline { display: grid; gap: 20px 44px; grid-template-columns: repeat(2, minmax(0, 1fr)); list-style: none; margin: 36px auto 0; max-width: 780px; padding: 0; position: relative; text-align: left; }
+.public-invitation-timeline::before { background: var(--invitation-accent); bottom: 0; content: ''; left: 50%; opacity: .6; position: absolute; top: 0; width: 1px; }
+.public-invitation-timeline li { background: var(--invitation-muted-surface); border: 1px solid color-mix(in srgb, var(--invitation-accent) 24%, transparent); display: grid; gap: 4px; grid-column: 1; min-width: 0; overflow-wrap: anywhere; padding: 18px 20px; position: relative; }
+.public-invitation-timeline li:nth-child(even) { grid-column: 2; text-align: left; }
+.public-invitation-timeline li:nth-child(odd) { text-align: right; }
+.public-invitation-timeline li::before { background: var(--invitation-accent); border: 3px solid var(--invitation-surface); border-radius: 50%; content: ''; height: 10px; position: absolute; right: -31px; top: 24px; width: 10px; z-index: 1; }
+.public-invitation-timeline li:nth-child(even)::before { left: -30px; right: auto; }
+.public-invitation-timeline span { color: var(--invitation-accent); font-size: 14px; font-weight: 700; }
+.public-invitation-timeline strong { font-family: var(--font-editorial); font-size: 24px; font-weight: 400; line-height: 1.2; }
+.public-invitation-attire .public-attire-motif { font-family: var(--font-editorial); font-size: 28px; }
+.public-attire-palette { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 28px auto 0; }
+.public-attire-palette > div { display: grid; gap: 6px; justify-items: center; }
+.public-attire-palette span { border: 1px solid rgba(0, 0, 0, .15); border-radius: 50%; display: block; height: 52px; width: 52px; }
+.public-attire-palette small { color: var(--invitation-ink); font-size: 12px; }
+.public-invitation-gifts > p:last-child { white-space: pre-line; }
 .public-gallery-grid { grid-auto-rows: minmax(100px, 1fr); }.public-gallery-grid button:nth-child(5n) { grid-row: span 2; }
 .public-gallery-carousel { aspect-ratio: 16 / 10; margin: 0 auto; max-width: 860px; overflow: hidden; position: relative; }.gallery-carousel-image { background: transparent; border: 0; height: 100%; padding: 0; width: 100%; }.gallery-carousel-image img { height: 100%; object-fit: cover; transition: opacity 220ms ease, transform 350ms ease; width: 100%; }.public-gallery-carousel > button:not(.gallery-carousel-image) { align-items: center; background: rgba(17, 24, 18, .68); border: 1px solid rgba(255, 253, 247, .6); color: #fffdf7; display: grid; height: 42px; justify-content: center; position: absolute; top: calc(50% - 21px); width: 42px; }.gallery-carousel-previous { left: 14px; }.gallery-carousel-next { right: 14px; }.gallery-carousel-dots { bottom: 14px; display: flex; gap: 7px; left: 50%; position: absolute; transform: translateX(-50%); }.gallery-carousel-dots button { background: rgba(255, 253, 247, .56); border: 0; border-radius: 50%; height: 8px; padding: 0; position: static; width: 8px; }.gallery-carousel-dots button.active { background: #fffdf7; transform: scale(1.35); }
 .invitation-gallery-lightbox { align-items: center; background: rgba(10, 14, 11, .92); display: grid; inset: 0; justify-items: center; padding: 28px; position: fixed; z-index: 30; }.invitation-gallery-lightbox > img { max-height: min(82vh, 920px); max-width: min(88vw, 1100px); object-fit: contain; }.invitation-gallery-lightbox > button { align-items: center; background: rgba(255, 253, 247, .13); border: 1px solid rgba(255, 253, 247, .6); color: #fffdf7; display: grid; height: 46px; justify-content: center; position: fixed; width: 46px; }.gallery-lightbox-close { right: 20px; top: 20px; }.gallery-lightbox-previous { left: 20px; top: calc(50% - 23px); }.gallery-lightbox-next { right: 20px; top: calc(50% - 23px); }.invitation-gallery-lightbox > p { bottom: 18px; color: #fffdf7; font-size: 14px; margin: 0; position: fixed; }
@@ -160,6 +178,13 @@
   .public-invitation-hero { min-height: min(680px, 100svh); padding-inline: 20px; }
   .public-invitation-hero h1 { font-size: clamp(46px, 15cqw, 72px); }
   .public-invitation-section { min-height: 0; padding: 56px 20px; }
+  .public-invitation-timeline { gap: 16px; grid-template-columns: minmax(0, 1fr); margin: 28px auto 0; max-width: 440px; padding-left: 26px; }
+  .public-invitation-timeline::before { left: 6px; }
+  .public-invitation-timeline li,
+  .public-invitation-timeline li:nth-child(even),
+  .public-invitation-timeline li:nth-child(odd) { grid-column: 1; text-align: left; }
+  .public-invitation-timeline li::before,
+  .public-invitation-timeline li:nth-child(even)::before { left: -28px; right: auto; }
   .public-gallery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .public-gallery-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .public-gallery-strip img:first-child { grid-column: span 2; grid-row: auto; }

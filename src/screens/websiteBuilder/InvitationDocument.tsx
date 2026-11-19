@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, CircleAlert, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
-import { invitationSectionId } from '../../utils/invitationSections';
+import { invitationSectionId, withLegacyInvitationSections } from '../../utils/invitationSections';
+import { invitationTimeline } from '../../utils/invitationTimeline';
+import { invitationColors } from '../../utils/invitationColors';
 import { submitPublicGroupRsvp, submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { CompanionChoice, PublicGuestMatch, ReservedSeatChoice, RsvpStatus } from '../../services/rsvpService';
 import { downloadRsvpReceiptPdf, prepareRsvpReceiptPdf, rsvpStatusLabel } from '../../utils/rsvpReceiptPdf';
@@ -310,6 +312,7 @@ const InvitationGallery = ({ paths, layout }: { paths: string[]; layout: 'grid' 
 };
 
 const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = true, preview = false }: InvitationDocumentProps) => {
+  const sections = withLegacyInvitationSections(document).sections;
   const hero = document.sections.find(section => section.type === 'hero');
   const heroContent = hero?.content ?? {};
   const names = contentText(heroContent, 'couple_names') || eventName;
@@ -326,7 +329,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         <span className="public-invitation-ornament" aria-hidden="true" />
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
-      {document.sections.filter(section => section.visible && section.type !== 'hero').map(section => {
+      {sections.filter(section => section.visible && section.type !== 'hero').map(section => {
         if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} eventName={names} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
         if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
         if (section.type === 'details') {
@@ -335,10 +338,50 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           const venueDirections = safeDirectionsUrl(contentText(section.content, 'venue_directions_url') || contentText(section.content, 'directions_url'));
           const ceremonyDirections = safeDirectionsUrl(contentText(section.content, 'ceremony_directions_url'));
           const locations = [
-            { label: 'Venue', place: venue, time: contentText(section.content, 'venue_time'), directions: venueDirections },
             { label: 'Ceremony', place: ceremonyPlace, time: contentText(section.content, 'ceremony_time'), directions: ceremonyDirections },
+            { label: 'Venue', place: venue, time: contentText(section.content, 'venue_time'), directions: venueDirections },
           ].filter(location => location.place || location.time);
-          return <section className="public-invitation-section public-invitation-details" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div className="public-invitation-locations">{locations.map(location => { const mapEmbedUrl = googleMapsEmbedUrl(location.place); return <article key={location.label}><p className="public-location-label">{location.label}</p>{location.place && <p className="public-location-place">{location.place}</p>}{location.time && <p>{location.time}</p>}{mapEmbedUrl && <iframe className="public-invitation-map" title={`Map for ${location.place}`} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />}{location.directions && <a className="public-invitation-directions" href={location.directions} target="_blank" rel="noreferrer"><MapPinned size={18} aria-hidden="true" /> Get directions</a>}</article>; })}</div></section>;
+          return <section className="public-invitation-section public-invitation-details" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            {locations.length > 0 && <div className="public-invitation-locations">{locations.map(location => {
+              const mapEmbedUrl = googleMapsEmbedUrl(location.place);
+              return <article key={location.label}>
+                <p className="public-location-label">{location.label}</p>
+                {location.place && <p className="public-location-place">{location.place}</p>}
+                {location.time && <p>{location.time}</p>}
+                {mapEmbedUrl && <iframe className="public-invitation-map" title={`Map for ${location.place}`} src={mapEmbedUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />}
+                {location.directions && <a className="public-invitation-directions" href={location.directions} target="_blank" rel="noreferrer"><MapPinned size={18} aria-hidden="true" /> Get directions</a>}
+              </article>;
+            })}</div>}
+          </section>;
+        }
+        if (section.type === 'timeline') {
+          const entries = invitationTimeline(section.content).filter(entry => entry.time.trim() || entry.title.trim());
+          if (entries.length === 0) return null;
+          return <section className="public-invitation-section public-invitation-timeline-section" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            <ol className="public-invitation-timeline">{entries.map(entry => <li key={entry.id}><span>{entry.time}</span><strong>{entry.title}</strong></li>)}</ol>
+          </section>;
+        }
+        if (section.type === 'attire') {
+          const motif = contentText(section.content, 'motif');
+          const note = contentText(section.content, 'color_note');
+          const colors = invitationColors(section.content);
+          if (!motif.trim() && !note.trim() && colors.length === 0) return null;
+          return <section className="public-invitation-section public-invitation-attire" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            {motif && <p className="public-attire-motif">{motif}</p>}
+            {note && <p>{note}</p>}
+            {colors.length > 0 && <div className="public-attire-palette" aria-label="Clothing color palette">{colors.map((color, index) => <div key={index}><span style={{ backgroundColor: color.hex }} role="img" aria-label={color.name.trim() || `Clothing color ${index + 1}`} />{color.name.trim() && <small>{color.name.trim()}</small>}</div>)}</div>}
+          </section>;
+        }
+        if (section.type === 'gifts') {
+          const instructions = contentText(section.content, 'instructions');
+          if (!instructions.trim()) return null;
+          return <section className="public-invitation-section public-invitation-gifts" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            <p>{instructions}</p>
+          </section>;
         }
         if (section.type === 'gallery') {
           const paths = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];

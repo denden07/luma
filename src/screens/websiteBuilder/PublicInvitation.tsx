@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 import { getPublishedWebsite } from '../../services/websiteService';
 import { getPhotoUrl } from '../../services/dataService';
 import type { PublishedWebsite, WebsiteDocument } from '../../services/websiteService';
-import { invitationSectionId, invitationSectionLabel, visibleInvitationSections } from '../../utils/invitationSections';
+import { invitationSectionId, invitationSectionLabel, visibleInvitationSections, withLegacyInvitationSections } from '../../utils/invitationSections';
 import InvitationDocument from './InvitationDocument';
 
 const PublishedSectionMenu = ({ publishedDocument }: { publishedDocument: WebsiteDocument }) => {
@@ -12,7 +12,7 @@ const PublishedSectionMenu = ({ publishedDocument }: { publishedDocument: Websit
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const sections = visibleInvitationSections(publishedDocument);
+  const sections = visibleInvitationSections(withLegacyInvitationSections(publishedDocument));
 
   useEffect(() => {
     const hero = document.querySelector<HTMLElement>('#published-invitation .public-invitation-hero');

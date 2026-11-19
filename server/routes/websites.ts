@@ -9,7 +9,7 @@ import { deleteImage, saveImage } from '../storage.js';
 const router = Router();
 export const publicWebsitesRouter = Router();
 const templateIds = new Set(['garden', 'modern', 'classic']);
-const sectionTypes = new Set<WebsiteSectionType>(['hero', 'story', 'details', 'gallery', 'entourage', 'rsvp', 'closing']);
+const sectionTypes = new Set<WebsiteSectionType>(['hero', 'story', 'details', 'timeline', 'attire', 'gifts', 'gallery', 'entourage', 'rsvp', 'closing']);
 const paletteIds = new Set(['garden', 'modern', 'classic']);
 const fontPairIds = new Set(['modern', 'editorial', 'classic']);
 const websiteAssetUpload = multer({

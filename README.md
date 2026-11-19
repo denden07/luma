@@ -55,6 +55,13 @@ layout as the published invitation. Cover photos, palette, and heading style
 remain editable after choosing a look. Each template includes entrance and
 scroll motion, with ambient details where appropriate; motion is disabled
 when the visitor requests reduced motion.
+In **Event details**, enter the ceremony first, followed by the venue or
+reception; both locations support a map link. Separate **Timeline**, **Clothing
+motif & colors**, and **Gift instructions** sections let you add and reorder
+activities, pick and display up to six clothing palette colors with optional
+names (unnamed colors display as swatches without hex codes), and share
+gift preferences. Empty optional sections stay hidden until filled in, and
+each section can be reordered or hidden from **Section order**.
 The preview shows the current draft; publish again after edits to update the
 public invitation. The RSVP search button uses the editor's Button label in
 both views, and the closing message stays visible at the end of the page.

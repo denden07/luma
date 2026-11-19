@@ -5,6 +5,10 @@ import { deleteEventCover, getEventsByHostCode, getPhotoUrl, uploadEventCover } 
 import type { Event } from '../../services/dataService';
 import { createWebsiteDraft, deleteWebsiteAsset, ensureWebsiteSections, getEventWebsite, getWebsiteAssets, publishEventWebsite, saveEventWebsite, uploadWebsiteAsset } from '../../services/websiteService';
 import { invitationSlug, invitationSlugTitle, slugifyInvitationName } from '../../utils/invitationSlug';
+import { invitationTimeline } from '../../utils/invitationTimeline';
+import type { TimelineEntry } from '../../utils/invitationTimeline';
+import { invitationColors } from '../../utils/invitationColors';
+import type { InvitationColor } from '../../utils/invitationColors';
 import type { WebsiteAsset } from '../../services/websiteService';
 import type { WebsiteDocument, WebsiteTemplateId } from '../../services/websiteService';
 import { getHostCode } from '../../utils/hostAuth';
@@ -237,6 +241,9 @@ const WebsiteBuilder = () => {
   const coverPosition = typeof heroContent.cover_position === 'string' ? heroContent.cover_position : 'center';
   const story = document?.sections.find(section => section.type === 'story');
   const details = document?.sections.find(section => section.type === 'details');
+  const timelineSection = document?.sections.find(section => section.type === 'timeline');
+  const attire = document?.sections.find(section => section.type === 'attire');
+  const gifts = document?.sections.find(section => section.type === 'gifts');
   const closing = document?.sections.find(section => section.type === 'closing');
   const gallery = document?.sections.find(section => section.type === 'gallery');
   const entourage = document?.sections.find(section => section.type === 'entourage');
@@ -246,6 +253,8 @@ const WebsiteBuilder = () => {
   const galleryLayout = contentText(gallery?.content, 'layout') || 'grid';
   const galleryLimit = galleryLayout === 'strip' || galleryLayout === 'carousel' ? 5 : 6;
   const currentEntourageGroups = entourageGroups(entourage?.content);
+  const timeline = invitationTimeline(timelineSection?.content);
+  const attireColors = invitationColors(attire?.content);
 
   const updateHero = (field: 'couple_names' | 'date' | 'message' | 'cover_photo_path' | 'cover_position' | 'share_title' | 'share_description' | 'share_image_path', value: string) => {
     if (!document) return;
@@ -292,6 +301,22 @@ const WebsiteBuilder = () => {
   const updateEntourageGroups = (groups: EntourageGroup[]) => {
     if (!document || !entourage?.id) return;
     setDocument({ ...document, sections: document.sections.map(section => section.id === entourage.id ? { ...section, content: { ...section.content, groups } } : section) });
+    markDirty();
+  };
+
+  const updateTimeline = (entries: TimelineEntry[]) => {
+    if (!document || !timelineSection?.id) return;
+    setDocument({ ...document, sections: document.sections.map(section => section.id === timelineSection.id
+      ? { ...section, content: { ...section.content, timeline: entries } }
+      : section) });
+    markDirty();
+  };
+
+  const updateAttireColors = (colors: InvitationColor[]) => {
+    if (!document || !attire?.id) return;
+    setDocument({ ...document, sections: document.sections.map(section => section.id === attire.id
+      ? { ...section, content: { ...section.content, colors } }
+      : section) });
     markDirty();
   };
 
@@ -574,6 +599,15 @@ const WebsiteBuilder = () => {
           </fieldset>
           <fieldset className="website-section-fields">
             <legend>Event details</legend>
+            <label htmlFor="invitation-ceremony-place">Ceremony place
+              <input id="invitation-ceremony-place" value={contentText(details?.content, 'ceremony_place')} onChange={(input) => updateSection(details?.id, 'ceremony_place', input.target.value)} maxLength={160} />
+            </label>
+            <label htmlFor="invitation-ceremony-time">Ceremony time
+              <input id="invitation-ceremony-time" value={contentText(details?.content, 'ceremony_time')} onChange={(input) => updateSection(details?.id, 'ceremony_time', input.target.value)} maxLength={80} />
+            </label>
+            <label htmlFor="invitation-ceremony-directions-url">Ceremony Google Maps link
+              <input id="invitation-ceremony-directions-url" type="url" inputMode="url" value={contentText(details?.content, 'ceremony_directions_url')} onChange={(input) => updateSection(details?.id, 'ceremony_directions_url', input.target.value)} placeholder="https://maps.google.com/..." maxLength={500} />
+            </label>
             <label htmlFor="invitation-venue">Venue or reception place
               <input id="invitation-venue" value={contentText(details?.content, 'venue')} onChange={(input) => updateSection(details?.id, 'venue', input.target.value)} maxLength={160} />
             </label>
@@ -583,14 +617,61 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-venue-directions-url">Venue Google Maps link
               <input id="invitation-venue-directions-url" type="url" inputMode="url" value={contentText(details?.content, 'venue_directions_url')} onChange={(input) => updateSection(details?.id, 'venue_directions_url', input.target.value)} placeholder="https://maps.google.com/..." maxLength={500} />
             </label>
-            <label htmlFor="invitation-ceremony-place">Ceremony place
-              <input id="invitation-ceremony-place" value={contentText(details?.content, 'ceremony_place')} onChange={(input) => updateSection(details?.id, 'ceremony_place', input.target.value)} maxLength={160} />
+          </fieldset>
+          <fieldset className="website-section-fields">
+            <legend>Timeline</legend>
+            <label htmlFor="invitation-timeline-title">Section title
+              <input id="invitation-timeline-title" value={contentText(timelineSection?.content, 'title')} onChange={input => updateSection(timelineSection?.id, 'title', input.target.value)} maxLength={80} />
             </label>
-            <label htmlFor="invitation-ceremony-time">Ceremony time
-              <input id="invitation-ceremony-time" value={contentText(details?.content, 'ceremony_time')} onChange={(input) => updateSection(details?.id, 'ceremony_time', input.target.value)} maxLength={80} />
+            <div className="website-detail-group">
+              {timeline.map((entry, index) => <div className="website-timeline-entry" key={entry.id}>
+                <label htmlFor={`timeline-time-${entry.id}`}>Time
+                  <input id={`timeline-time-${entry.id}`} value={entry.time} onChange={input => updateTimeline(timeline.map(item => item.id === entry.id ? { ...item, time: input.target.value } : item))} maxLength={80} placeholder="e.g. 3:00 PM" />
+                </label>
+                <label htmlFor={`timeline-title-${entry.id}`}>Activity
+                  <input id={`timeline-title-${entry.id}`} value={entry.title} onChange={input => updateTimeline(timeline.map(item => item.id === entry.id ? { ...item, title: input.target.value } : item))} maxLength={120} placeholder="e.g. Ceremony" />
+                </label>
+                <div className="website-timeline-actions">
+                  <button type="button" disabled={index === 0} onClick={() => { const entries = [...timeline]; [entries[index - 1], entries[index]] = [entries[index], entries[index - 1]]; updateTimeline(entries); }} aria-label={`Move timeline item ${index + 1} up`}><ArrowUp size={16} aria-hidden="true" /></button>
+                  <button type="button" disabled={index === timeline.length - 1} onClick={() => { const entries = [...timeline]; [entries[index + 1], entries[index]] = [entries[index], entries[index + 1]]; updateTimeline(entries); }} aria-label={`Move timeline item ${index + 1} down`}><ArrowDown size={16} aria-hidden="true" /></button>
+                  <button type="button" onClick={() => updateTimeline(timeline.filter(item => item.id !== entry.id))} aria-label={`Remove timeline item ${index + 1}`}><Trash2 size={16} aria-hidden="true" /> Remove</button>
+                </div>
+              </div>)}
+              <button type="button" className="add-entourage-group" onClick={() => updateTimeline([...timeline, { id: crypto.randomUUID(), time: '', title: '' }])}><Plus size={16} aria-hidden="true" /> Add timeline item</button>
+            </div>
+          </fieldset>
+          <fieldset className="website-section-fields">
+            <legend>Clothing motif &amp; colors</legend>
+            <label htmlFor="invitation-attire-title">Section title
+              <input id="invitation-attire-title" value={contentText(attire?.content, 'title')} onChange={input => updateSection(attire?.id, 'title', input.target.value)} maxLength={80} />
             </label>
-            <label htmlFor="invitation-ceremony-directions-url">Ceremony Google Maps link
-              <input id="invitation-ceremony-directions-url" type="url" inputMode="url" value={contentText(details?.content, 'ceremony_directions_url')} onChange={(input) => updateSection(details?.id, 'ceremony_directions_url', input.target.value)} placeholder="https://maps.google.com/..." maxLength={500} />
+            <label htmlFor="invitation-attire-motif">Clothing motif or dress code
+              <input id="invitation-attire-motif" value={contentText(attire?.content, 'motif')} onChange={input => updateSection(attire?.id, 'motif', input.target.value)} maxLength={160} placeholder="e.g. Garden formal" />
+            </label>
+            <label htmlFor="invitation-attire-colors">Color guidance (optional)
+              <input id="invitation-attire-colors" value={contentText(attire?.content, 'color_note')} onChange={input => updateSection(attire?.id, 'color_note', input.target.value)} maxLength={160} placeholder="e.g. Sage, cream, and blush" />
+            </label>
+            <div className="website-attire-palette">
+              <span className="website-detail-heading">Clothing color palette</span>
+              {attireColors.map((color, index) => <div className="website-attire-color" key={index}>
+                <label htmlFor={`attire-color-${index}`}>Color {index + 1}
+                  <input id={`attire-color-${index}`} type="color" value={color.hex} onChange={input => updateAttireColors(attireColors.map((current, position) => position === index ? { ...current, hex: input.target.value } : current))} />
+                </label>
+                <label htmlFor={`attire-color-name-${index}`}>Name (optional)
+                  <input id={`attire-color-name-${index}`} value={color.name} onChange={input => updateAttireColors(attireColors.map((current, position) => position === index ? { ...current, name: input.target.value } : current))} maxLength={40} placeholder="e.g. Sage" />
+                </label>
+                <button type="button" onClick={() => updateAttireColors(attireColors.filter((_, position) => position !== index))} aria-label={`Remove color ${index + 1}`}><Trash2 size={16} aria-hidden="true" /></button>
+              </div>)}
+              <button type="button" className="add-entourage-group" disabled={attireColors.length >= 6} onClick={() => updateAttireColors([...attireColors, { hex: '#8a9b79', name: '' }])}><Plus size={16} aria-hidden="true" /> Add color</button>
+            </div>
+          </fieldset>
+          <fieldset className="website-section-fields">
+            <legend>Gift instructions</legend>
+            <label htmlFor="invitation-gifts-title">Section title
+              <input id="invitation-gifts-title" value={contentText(gifts?.content, 'title')} onChange={input => updateSection(gifts?.id, 'title', input.target.value)} maxLength={80} />
+            </label>
+            <label htmlFor="invitation-gifts-instructions">Gift direction or instructions
+              <textarea id="invitation-gifts-instructions" value={contentText(gifts?.content, 'instructions')} onChange={input => updateSection(gifts?.id, 'instructions', input.target.value)} maxLength={800} rows={4} placeholder="Share your gift preferences with guests" />
             </label>
           </fieldset>
           <fieldset className="website-section-fields">
@@ -625,7 +706,7 @@ const WebsiteBuilder = () => {
             <div>
               {document?.sections.map((section, index) => (
                 <div className="website-section-row" key={section.id}>
-                  <span>{section.type === 'hero' ? 'Cover' : section.type === 'rsvp' ? 'RSVP' : section.type}</span>
+                  <span>{section.type === 'hero' ? 'Cover' : section.type === 'rsvp' ? 'RSVP' : section.type === 'attire' ? 'Clothing motif & colors' : section.type === 'gifts' ? 'Gift instructions' : section.type === 'timeline' ? 'Timeline' : section.type}</span>
                   <div>
                     <button type="button" onClick={() => toggleSection(section.id)} aria-label={`${section.visible ? 'Hide' : 'Show'} ${section.type}`} title={section.visible ? 'Hide section' : 'Show section'}>
                       {section.visible ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}

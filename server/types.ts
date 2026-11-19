@@ -43,7 +43,7 @@ export interface Message {
   created_at: Date;
 }
 
-export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
+export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'timeline' | 'attire' | 'gifts' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
 
 export interface WebsiteSection {
   id: string;
