@@ -73,10 +73,6 @@ const WebsiteBuilder = () => {
     if (error) notifyError(error);
   }, [error, notifyError]);
 
-  useEffect(() => {
-    if (saveState === 'error') notifyError('Could not save invitation draft. Your edits are still here.');
-  }, [saveState, notifyError]);
-
   const markDirty = () => {
     revision.current += 1;
     setIsDirty(true);
@@ -161,32 +157,14 @@ const WebsiteBuilder = () => {
   }, [eventId]);
 
   useEffect(() => {
-    if (!isDirty || !document || !event) return;
-    if (blocker.state === 'blocked') return;
-    const timeout = window.setTimeout(() => {
-      void saveDraft(document, revision.current).catch(saveError => {
-        console.error('Could not autosave invitation draft:', saveError);
-      });
-    }, 700);
-
-    return () => window.clearTimeout(timeout);
-  }, [document, event, isDirty, blocker.state, saveDraft]);
-
-  useEffect(() => {
-    if (blocker.state !== 'blocked') return;
-    let current = true;
-    if (!document) {
-      blocker.reset();
-      return;
-    }
-    void saveDraft(document, revision.current).then(() => {
-      if (current) blocker.proceed();
-    }).catch(saveError => {
-      console.error('Could not save invitation before leaving:', saveError);
-      if (current) blocker.reset();
-    });
-    return () => { current = false; };
-  }, [blocker, document, saveDraft]);
+    if (!isDirty) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [isDirty]);
 
   if (isLoading) {
     return <main className="website-builder-state"><p>Loading invitation workspace...</p></main>;
@@ -201,10 +179,7 @@ const WebsiteBuilder = () => {
     );
   }
 
-  const selectTemplate = async (templateId: WebsiteTemplateId) => {
-    const hostCode = getHostCode();
-    if (!hostCode) return;
-
+  const selectTemplate = (templateId: WebsiteTemplateId) => {
     const nextDocument: WebsiteDocument = document
       ? {
         ...document,
@@ -218,11 +193,6 @@ const WebsiteBuilder = () => {
       : createWebsiteDraft(event.name, event.date, templateId, event.cover_photo_path, event.start_time);
     setDocument(nextDocument);
     markDirty();
-    try {
-      await saveDraft(nextDocument, revision.current);
-    } catch {
-      setSaveState('error');
-    }
   };
 
   const templates: Array<{ id: WebsiteTemplateId; name: string; description: string }> = [
@@ -468,18 +438,33 @@ const WebsiteBuilder = () => {
 
   const publishWebsite = async () => {
     const hostCode = getHostCode();
-    if (!hostCode || !document) return;
+    if (!hostCode || !document) {
+      notifyError('Host access is required to publish this invitation.');
+      return;
+    }
     setIsPublishing(true);
+    let draftSaved = false;
     try {
       await saveDraft(document, revision.current);
+      draftSaved = true;
       const published = await publishEventWebsite(event.id, hostCode, invitationSlug(event.id, slug));
       setSlug(published.public_slug ? invitationSlugTitle(event.id, published.public_slug) : slug);
       notifySuccess('Invitation website published.');
     } catch (publishFailure) {
-      notifyError(publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website');
+      notifyError(draftSaved
+        ? publishFailure instanceof Error ? publishFailure.message : 'Could not publish invitation website'
+        : 'Could not save invitation draft. Your edits are still here.');
     } finally {
       setIsPublishing(false);
     }
+  };
+
+  const saveCurrentDraft = () => {
+    if (!document || !isDirty) return;
+    const snapshot = revision.current;
+    void saveDraft(document, snapshot)
+      .then(() => { if (revision.current === snapshot) notifySuccess('Invitation draft saved.'); })
+      .catch(() => notifyError('Could not save invitation draft. Your edits are still here.'));
   };
 
   const copyInvitationUrl = async () => {
@@ -512,9 +497,10 @@ const WebsiteBuilder = () => {
           <p>Every detail stays editable. Start with the invitation feeling that fits your day.</p>
         </div>
         <div className={`website-builder-save-state ${saveState}`} role="status">
+          {isDirty && saveState === 'idle' && <>Unsaved changes</>}
           {saveState === 'saving' && <><LoaderCircle size={15} aria-hidden="true" /> Saving draft</>}
           {saveState === 'saved' && <><Check size={15} aria-hidden="true" /> Draft saved</>}
-          {saveState === 'error' && <>Could not save invitation draft. Your edits are still here. <button type="button" onClick={() => { if (document) void saveDraft(document, revision.current).catch(saveError => console.error('Could not retry invitation save:', saveError)); }}>Retry save</button></>}
+          {saveState === 'error' && <>Could not save invitation draft. Your edits are still here. <button type="button" onClick={saveCurrentDraft}>Retry save</button></>}
         </div>
       </section>
 
@@ -802,6 +788,7 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-slug">Invitation URL
               <span className="website-slug-input"><span title={`${window.location.host}/${event.id}-`}>{window.location.host}/{event.id}-</span><input id="invitation-slug" value={slug} maxLength={83} onChange={(input) => { setSlug(slugifyInvitationName(input.target.value)); setHasEditedSlug(true); }} required /><button type="button" onClick={copyInvitationUrl} aria-label="Copy invitation URL" title="Copy invitation URL"><Copy size={16} aria-hidden="true" /></button></span>
             </label>
+            <button type="button" className="website-save-draft-button" disabled={!isDirty || saveState === 'saving' || isPublishing} onClick={saveCurrentDraft}><Check size={17} aria-hidden="true" /> Save Draft</button>
             <button type="submit" className="website-publish-button" disabled={isPublishing}>
               <Globe2 size={17} aria-hidden="true" />
               {isPublishing ? 'Publishing...' : 'Publish invitation'}
@@ -820,6 +807,14 @@ const WebsiteBuilder = () => {
       </Modal>
       <Modal isOpen={isCoverPreviewOpen} onClose={() => setIsCoverPreviewOpen(false)} className="website-image-preview-modal">
         {coverPhotoUrl && <div className="website-image-preview"><img src={coverPhotoUrl} alt="Invitation cover preview" /><div><p>Cover photo</p><button type="button" onClick={() => setIsCoverPreviewOpen(false)}><X size={16} aria-hidden="true" /> Close preview</button><button type="button" className="delete-preview-image" onClick={removeCover}><Trash2 size={16} aria-hidden="true" /> Remove cover</button></div></div>}
+      </Modal>
+      <Modal isOpen={blocker.state === 'blocked'} onClose={() => { if (blocker.state === 'blocked') blocker.reset(); }} className="website-unsaved-modal" ariaLabel="Unsaved invitation changes">
+        <h2>Leave without saving?</h2>
+        <p>Your invitation draft has unsaved changes. Save Draft before leaving to keep them.</p>
+        <div>
+          <button type="button" onClick={() => { if (blocker.state === 'blocked') blocker.reset(); }}>Keep editing</button>
+          <button type="button" onClick={() => { if (blocker.state === 'blocked') blocker.proceed(); }}>Leave without saving</button>
+        </div>
       </Modal>
     </main>
   );

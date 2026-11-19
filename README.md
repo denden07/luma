@@ -44,9 +44,13 @@ From an event card on **My Events** (`/host`), open **Manage invitation** beneat
 **View Dashboard**. This opens the
 website builder; the invitation sidebar switches between **Website**, **Guest
 list**, and **Seating plan** for the same event. On phones, open the menu at the
-top to access these sections. Draft website edits are saved before leaving
-the builder, including when using Back; if saving fails, the builder stays
-open with a retry option.
+top to access these sections. Edits remain in the live preview until you click
+**Save Draft** or **Publish invitation**. Publishing saves the current draft
+before updating the public invitation. Leaving the builder or closing the tab
+with unsaved changes shows a warning; leaving without saving discards those
+edits. Photo uploads and cover changes still call the API immediately so images
+can appear in the preview. Saving and publishing show a dismissible confirmation
+banner; failures show an error banner while keeping unsaved edits available.
 
 The builder offers three invitation looks: **Photo Letter** (botanical and
 photo-forward), **City Vow** (bold editorial), and **Sunday Heirloom** (warm

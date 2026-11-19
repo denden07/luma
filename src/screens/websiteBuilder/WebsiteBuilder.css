@@ -253,6 +253,15 @@
 .website-slug-input button { background: transparent; border: 0; color: #49604b; display: grid; height: 36px; place-items: center; width: 36px; }.website-slug-input button:hover { background: #e7dfd1; }
 .website-publish-button { align-items: center; background: #1d211c; border: 0; border-radius: 3px; color: #fffdf7; display: flex; font: inherit; font-weight: 700; gap: 8px; justify-content: center; padding: 13px 16px; transition: background 180ms ease, transform 180ms ease; }.website-publish-button:hover:not(:disabled) { background: #b64f37; transform: translateY(-2px); }.website-publish-button:active:not(:disabled) { transform: translateY(1px) scale(.98); }
 .website-publish-button:disabled { cursor: wait; opacity: .65; }
+.website-save-draft-button { align-items: center; background: #fffdf7; border: 1px solid #49604b; border-radius: 3px; color: #264333; display: flex; font: inherit; font-weight: 700; gap: 8px; justify-content: center; padding: 12px 16px; }
+.website-save-draft-button:hover:not(:disabled) { background: #e5eee2; }
+.website-save-draft-button:disabled { cursor: not-allowed; opacity: .55; }
+.modal-content.website-unsaved-modal { background: #fffdf7; border: 1px solid #d8d1c2; box-shadow: 0 16px 48px rgba(0, 0, 0, .2); box-sizing: border-box; color: #1d211c; padding: 28px; width: min(440px, calc(100vw - 40px)); }
+.website-unsaved-modal h2 { font-family: var(--font-editorial); font-size: 30px; margin: 0 0 12px; }
+.website-unsaved-modal p { line-height: 1.6; margin: 0 0 24px; }
+.website-unsaved-modal > div { display: flex; flex-wrap: wrap; gap: 10px; }
+.website-unsaved-modal button { background: #fffdf7; border: 1px solid #49604b; color: #264333; flex: 1 1 150px; font: inherit; padding: 12px; }
+.website-unsaved-modal button:last-child { background: #1d211c; border-color: #1d211c; color: #fffdf7; }
 .website-live-preview { background: #e5eee2; min-height: 620px; padding: 24px; }
 .website-preview-label { align-items: center; color: #49604b; display: flex; font-size: 12px; font-weight: 700; gap: 6px; letter-spacing: .08em; text-transform: uppercase; }
 .invitation-preview { align-content: center; display: grid; justify-items: center; margin: 24px auto 0; min-height: 420px; overflow: hidden; padding: 32px; position: relative; text-align: center; }
