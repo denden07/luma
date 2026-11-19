@@ -1,9 +1,11 @@
 import type { WebsiteDocument, WebsiteSection, WebsiteSectionType } from '../services/websiteService';
 import { invitationTimeline } from './invitationTimeline';
 import { invitationColors } from './invitationColors';
+import { countdownRemaining } from './invitationCountdown';
 
 const sectionNames: Record<WebsiteSectionType, string> = {
   hero: 'Welcome',
+  countdown: 'Countdown',
   story: 'Our story',
   details: 'Event details',
   timeline: 'Timeline',
@@ -48,6 +50,7 @@ export const visibleInvitationSections = (document: WebsiteDocument): WebsiteSec
   return [
     ...(hero?.visible ? [hero] : []),
     ...document.sections.filter(section => section.visible && section.type !== 'hero' && (
+      section.type === 'countdown' ? typeof section.content.target_at === 'string' && countdownRemaining(section.content.target_at, 0) !== null :
       section.type === 'timeline' ? invitationTimeline(section.content).some(entry => entry.time.trim() || entry.title.trim() || entry.details?.trim()) :
       section.type === 'attire' ? Boolean(
         (typeof section.content.motif === 'string' && section.content.motif.trim()) ||

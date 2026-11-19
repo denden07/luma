@@ -8,6 +8,7 @@ import { invitationSlug, invitationSlugTitle, slugifyInvitationName } from '../.
 import { invitationTimeline } from '../../utils/invitationTimeline';
 import type { TimelineEntry } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
+import { countdownInputValue, countdownTarget } from '../../utils/invitationCountdown';
 import type { InvitationColor } from '../../utils/invitationColors';
 import type { WebsiteAsset } from '../../services/websiteService';
 import type { WebsiteDocument, WebsiteTemplateId } from '../../services/websiteService';
@@ -141,7 +142,7 @@ const WebsiteBuilder = () => {
           getWebsiteAssets(ownedEvent.id, hostCode),
         ]);
         if (isCurrent) {
-          setDocument(ensureWebsiteSections(website?.draft_document ?? createWebsiteDraft(ownedEvent.name, ownedEvent.date, 'garden', ownedEvent.cover_photo_path)));
+          setDocument(ensureWebsiteSections(website?.draft_document ?? createWebsiteDraft(ownedEvent.name, ownedEvent.date, 'garden', ownedEvent.cover_photo_path, ownedEvent.start_time), ownedEvent.date, ownedEvent.start_time));
           setWebsiteAssets(assets);
           setSlug(website?.public_slug ? invitationSlugTitle(ownedEvent.id, website.public_slug) : slugifyInvitationName(ownedEvent.name));
           setHasEditedSlug(Boolean(website?.public_slug));
@@ -212,7 +213,7 @@ const WebsiteBuilder = () => {
           font_pair_id: templateId === 'modern' ? 'modern' : 'editorial',
         },
       }
-      : createWebsiteDraft(event.name, event.date, templateId, event.cover_photo_path);
+      : createWebsiteDraft(event.name, event.date, templateId, event.cover_photo_path, event.start_time);
     setDocument(nextDocument);
     markDirty();
     try {
@@ -240,6 +241,7 @@ const WebsiteBuilder = () => {
   const coverPhotoUrl = coverPhotoPath ? getPhotoUrl(coverPhotoPath) : undefined;
   const coverPosition = typeof heroContent.cover_position === 'string' ? heroContent.cover_position : 'center';
   const story = document?.sections.find(section => section.type === 'story');
+  const countdown = document?.sections.find(section => section.type === 'countdown');
   const details = document?.sections.find(section => section.type === 'details');
   const timelineSection = document?.sections.find(section => section.type === 'timeline');
   const attire = document?.sections.find(section => section.type === 'attire');
@@ -390,7 +392,8 @@ const WebsiteBuilder = () => {
     if (!document) return;
     const index = document.sections.findIndex(section => section.id === sectionId);
     const destination = index + direction;
-    if (index < 0 || destination < 0 || destination >= document.sections.length) return;
+    if (index < 0 || destination < 0 || destination >= document.sections.length ||
+      document.sections[index].type === 'hero' || document.sections[destination].type === 'hero') return;
     const sections = [...document.sections];
     [sections[index], sections[destination]] = [sections[destination], sections[index]];
     setDocument({ ...document, sections });
@@ -562,6 +565,16 @@ const WebsiteBuilder = () => {
             {(shareImagePath || coverPhotoUrl) && <img className="website-share-image" src={getPhotoUrl(shareImagePath || coverPhotoPath || '')} alt="Selected link preview" />}
           </fieldset>
           <fieldset className="website-section-fields">
+            <legend>Countdown</legend>
+            <p>Counts down to the event start, or the event date if no start time was set. Set the exact date and time for guests here.</p>
+            <label htmlFor="invitation-countdown-title">Section title
+              <input id="invitation-countdown-title" value={contentText(countdown?.content, 'title')} onChange={input => updateSection(countdown?.id, 'title', input.target.value)} maxLength={80} />
+            </label>
+            <label htmlFor="invitation-countdown-target">Date and time
+              <input id="invitation-countdown-target" type="datetime-local" value={countdownInputValue(contentText(countdown?.content, 'target_at'))} onChange={input => updateSection(countdown?.id, 'target_at', countdownTarget(input.target.value))} />
+            </label>
+          </fieldset>
+          <fieldset className="website-section-fields">
             <legend>Our Story</legend>
             <label htmlFor="invitation-story-title">Section title
               <input id="invitation-story-title" value={contentText(story?.content, 'title')} onChange={(input) => updateSection(story?.id, 'title', input.target.value)} maxLength={80} />
@@ -726,13 +739,13 @@ const WebsiteBuilder = () => {
             <div>
               {document?.sections.map((section, index) => (
                 <div className="website-section-row" key={section.id}>
-                  <span>{section.type === 'hero' ? 'Cover' : section.type === 'rsvp' ? 'RSVP' : section.type === 'attire' ? 'Clothing motif & colors' : section.type === 'gifts' ? 'Gift instructions' : section.type === 'timeline' ? 'Timeline' : section.type}</span>
+                  <span>{section.type === 'hero' ? 'Cover' : section.type === 'countdown' ? 'Countdown' : section.type === 'rsvp' ? 'RSVP' : section.type === 'attire' ? 'Clothing motif & colors' : section.type === 'gifts' ? 'Gift instructions' : section.type === 'timeline' ? 'Timeline' : section.type}</span>
                   <div>
                     <button type="button" onClick={() => toggleSection(section.id)} aria-label={`${section.visible ? 'Hide' : 'Show'} ${section.type}`} title={section.visible ? 'Hide section' : 'Show section'}>
                       {section.visible ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
                     </button>
-                    <button type="button" onClick={() => moveSection(section.id, -1)} disabled={index === 0} aria-label={`Move ${section.type} up`} title="Move up"><ArrowUp size={16} aria-hidden="true" /></button>
-                    <button type="button" onClick={() => moveSection(section.id, 1)} disabled={index === document.sections.length - 1} aria-label={`Move ${section.type} down`} title="Move down"><ArrowDown size={16} aria-hidden="true" /></button>
+                    <button type="button" onClick={() => moveSection(section.id, -1)} disabled={index === 0 || section.type === 'hero' || document.sections[index - 1]?.type === 'hero'} aria-label={`Move ${section.type} up`} title="Move up"><ArrowUp size={16} aria-hidden="true" /></button>
+                    <button type="button" onClick={() => moveSection(section.id, 1)} disabled={index === document.sections.length - 1 || section.type === 'hero' || document.sections[index + 1]?.type === 'hero'} aria-label={`Move ${section.type} down`} title="Move down"><ArrowDown size={16} aria-hidden="true" /></button>
                   </div>
                 </div>
               ))}

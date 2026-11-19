@@ -129,6 +129,16 @@
 .public-invitation-footer { background: var(--invitation-strong); }
 .public-invitation .public-invitation-rsvp { background: var(--invitation-accent); color: #fffdf7; }
 .public-invitation.palette-modern .public-invitation-rsvp { color: #1d211c; }
+.public-countdown-units { display: grid; gap: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 30px auto 0; max-width: 600px; }
+.public-countdown-units > div { display: grid; gap: 8px; min-width: 0; padding: 8px; }
+.public-countdown-units > div + div { border-left: 1px solid color-mix(in srgb, var(--invitation-accent) 35%, transparent); }
+.public-countdown-units strong { font-family: var(--font-editorial); font-size: clamp(29px, 7cqw, 60px); font-weight: 400; font-variant-numeric: tabular-nums; line-height: 1; }
+.public-countdown-units span { color: var(--invitation-accent); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.public-invitation-countdown .public-countdown-date { font-size: 14px; margin-top: 24px; }
+@container (max-width: 360px) {
+  .public-countdown-units > div { padding-inline: 3px; }
+  .public-countdown-units span { font-size: 10px; letter-spacing: .06em; }
+}
 
 /* Each template adds a reliable image treatment when a cover is present. */
 .public-invitation .public-invitation-hero.has-cover { background-color: var(--invitation-strong); background-blend-mode: multiply; }

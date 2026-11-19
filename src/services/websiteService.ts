@@ -1,7 +1,9 @@
+import { countdownTarget } from '../utils/invitationCountdown';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export type WebsiteTemplateId = 'garden' | 'modern' | 'classic';
-export type WebsiteSectionType = 'hero' | 'story' | 'details' | 'timeline' | 'attire' | 'gifts' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
+export type WebsiteSectionType = 'hero' | 'countdown' | 'story' | 'details' | 'timeline' | 'attire' | 'gifts' | 'gallery' | 'entourage' | 'rsvp' | 'closing';
 
 export interface WebsiteSection {
   id: string;
@@ -30,7 +32,7 @@ export interface EventWebsite {
   published_at: string | null;
 }
 
-export function createWebsiteDraft(eventName: string, eventDate: string, templateId: WebsiteTemplateId, coverPhotoPath?: string | null): WebsiteDocument {
+export function createWebsiteDraft(eventName: string, eventDate: string, templateId: WebsiteTemplateId, coverPhotoPath?: string | null, eventStartTime?: string | null): WebsiteDocument {
   return {
     schema_version: 1,
     template_id: templateId,
@@ -51,6 +53,7 @@ export function createWebsiteDraft(eventName: string, eventDate: string, templat
           ...(coverPhotoPath ? { cover_photo_path: coverPhotoPath } : {}),
         },
       },
+      { id: 'countdown', type: 'countdown', visible: true, content: { title: 'Until our day', target_at: countdownTarget(eventStartTime || eventDate) } },
       { id: 'story', type: 'story', visible: true, content: { title: 'Our Story', body: 'A little more about the people and moments that brought us here.' } },
       { id: 'details', type: 'details', visible: true, content: {
         title: 'Event Details',
@@ -117,9 +120,10 @@ export async function getPublishedWebsite(slug: string): Promise<PublishedWebsit
   return response.json();
 }
 
-export function ensureWebsiteSections(document: WebsiteDocument): WebsiteDocument {
+export function ensureWebsiteSections(document: WebsiteDocument, eventDate?: string, eventStartTime?: string | null): WebsiteDocument {
   const details = document.sections.find(section => section.type === 'details');
   const requiredSections: WebsiteSection[] = [
+    { id: 'countdown', type: 'countdown', visible: true, content: { title: 'Until our day', target_at: countdownTarget(eventStartTime || eventDate || '') } },
     { id: 'timeline', type: 'timeline', visible: details?.visible ?? true, content: { title: 'Timeline', timeline: details?.content.timeline ?? [] } },
     { id: 'attire', type: 'attire', visible: details?.visible ?? true, content: {
       title: 'Attire', motif: details?.content.attire_motif ?? '', color_note: details?.content.attire_colors ?? '', colors: [],
@@ -132,9 +136,12 @@ export function ensureWebsiteSections(document: WebsiteDocument): WebsiteDocumen
   const missing = requiredSections.filter(required => !document.sections.some(section => section.type === required.type));
   if (missing.length === 0) return document;
   const sections = [...document.sections];
+  const countdown = missing.find(section => section.type === 'countdown');
+  const heroIndex = sections.findIndex(section => section.type === 'hero');
+  if (countdown) sections.splice(heroIndex < 0 ? 0 : heroIndex + 1, 0, countdown);
   const detailsIndex = sections.findIndex(section => section.type === 'details');
   sections.splice(detailsIndex < 0 ? sections.length : detailsIndex + 1, 0, ...missing.filter(section => ['timeline', 'attire', 'gifts'].includes(section.type)));
-  sections.push(...missing.filter(section => !['timeline', 'attire', 'gifts'].includes(section.type)));
+  sections.push(...missing.filter(section => !['countdown', 'timeline', 'attire', 'gifts'].includes(section.type)));
   return { ...document, sections };
 }
 

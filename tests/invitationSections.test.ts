@@ -65,3 +65,13 @@ test('previously published detail content renders as separate sections without c
   assert.deepEqual(visibleInvitationSections(withLegacyInvitationSections(legacy)).map(section => section.type), ['details', 'timeline', 'attire']);
   assert.equal(legacy.sections.length, 1);
 });
+
+test('countdown navigation follows its position and excludes an unset target', () => {
+  const countdown = { id: 'countdown', type: 'countdown' as const, visible: true, content: { title: 'Our big day', target_at: '2030-01-01T12:00:00.000Z' } };
+  const sections = [document.sections[2], document.sections[0], countdown];
+  assert.deepEqual(visibleInvitationSections({ ...document, sections }).map(section => section.type), ['hero', 'story', 'countdown']);
+  assert.deepEqual(visibleInvitationSections({ ...document, sections: [document.sections[2], countdown, document.sections[0]] }).map(section => section.type), ['hero', 'countdown', 'story']);
+  assert.deepEqual(visibleInvitationSections({ ...document, sections: [{ ...countdown, content: { ...countdown.content, target_at: '' } }] }), []);
+  assert.equal(invitationSectionId(countdown), 'invitation-countdown');
+  assert.equal(invitationSectionLabel(countdown), 'Our big day');
+});

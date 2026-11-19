@@ -6,6 +6,7 @@ import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId, withLegacyInvitationSections } from '../../utils/invitationSections';
 import { invitationTimeline } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
+import { countdownRemaining } from '../../utils/invitationCountdown';
 import attireIllustration from '../../assets/images/attire-illustration.svg';
 import { submitPublicGroupRsvp, submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { CompanionChoice, PublicGuestMatch, ReservedSeatChoice, RsvpStatus } from '../../services/rsvpService';
@@ -47,6 +48,29 @@ interface InvitationDocumentProps {
   dietaryEnabled?: boolean;
   preview?: boolean;
 }
+
+const InvitationCountdown = ({ targetAt, title, id }: { targetAt: string; title: string; id: string }) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const remaining = countdownRemaining(targetAt, now);
+  if (!remaining) return null;
+  const units = [
+    { label: 'Days', value: remaining.days },
+    { label: 'Hours', value: remaining.hours },
+    { label: 'Minutes', value: remaining.minutes },
+    { label: 'Seconds', value: remaining.seconds },
+  ];
+  return <section className="public-invitation-section public-invitation-countdown" id={id} tabIndex={-1}>
+    <p className="public-invitation-section-kicker">{title}</p>
+    <div className="public-countdown-units" role="timer" aria-label={`${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, ${remaining.seconds} seconds remaining`}>
+      {units.map(unit => <div key={unit.label}><strong>{String(unit.value).padStart(2, '0')}</strong><span>{unit.label}</span></div>)}
+    </div>
+    <p className="public-countdown-date">{new Date(targetAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+  </section>;
+};
 
 const PublicRsvpLookup = ({ eventId, eventName, buttonLabel, preview, dietaryEnabled = true }: { eventId?: string; eventName: string; buttonLabel: string; preview: boolean; dietaryEnabled?: boolean }) => {
   const [name, setName] = useState('');
@@ -331,6 +355,10 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {sections.filter(section => section.visible && section.type !== 'hero').map(section => {
+        if (section.type === 'countdown') {
+          const targetAt = contentText(section.content, 'target_at');
+          return countdownRemaining(targetAt, 0) ? <InvitationCountdown key={section.id} id={invitationSectionId(section)} targetAt={targetAt} title={contentText(section.content, 'title') || 'Counting down'} /> : null;
+        }
         if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} eventName={names} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
         if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
         if (section.type === 'details') {
