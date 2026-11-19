@@ -58,7 +58,7 @@ when the visitor requests reduced motion.
 In **Event details**, enter the ceremony first, followed by the venue or
 reception; both locations support a map link. Separate **Timeline**, **Clothing
 motif & colors**, and **Gift instructions** sections let you add and reorder
-activities, pick and display up to six clothing palette colors with optional
+timeline events with a time, name, and optional details, pick and display up to six clothing palette colors with optional
 names (unnamed colors display as swatches without hex codes), and share
 gift preferences. Empty optional sections stay hidden until filled in, and
 each section can be reordered or hidden from **Section order**.

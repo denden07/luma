@@ -48,7 +48,7 @@ export const visibleInvitationSections = (document: WebsiteDocument): WebsiteSec
   return [
     ...(hero?.visible ? [hero] : []),
     ...document.sections.filter(section => section.visible && section.type !== 'hero' && (
-      section.type === 'timeline' ? invitationTimeline(section.content).some(entry => entry.time.trim() || entry.title.trim()) :
+      section.type === 'timeline' ? invitationTimeline(section.content).some(entry => entry.time.trim() || entry.title.trim() || entry.details?.trim()) :
       section.type === 'attire' ? Boolean(
         (typeof section.content.motif === 'string' && section.content.motif.trim()) ||
         (typeof section.content.color_note === 'string' && section.content.color_note.trim()) ||

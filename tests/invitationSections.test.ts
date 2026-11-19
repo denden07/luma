@@ -45,6 +45,11 @@ test('optional invitation sections only appear in navigation when they contain g
   ] };
   assert.deepEqual(visibleInvitationSections(filled).map(invitationSectionLabel), ['The day', 'Attire', 'Gifts']);
   assert.deepEqual(visibleInvitationSections(filled).map(invitationSectionId), ['invitation-timeline', 'invitation-attire', 'invitation-gifts']);
+  const detailsOnly = { ...optional, sections: [
+    { ...optional.sections[0], content: { timeline: [{ id: 'one', time: '', title: '', details: 'Arrive early' }] } },
+    ...optional.sections.slice(1),
+  ] };
+  assert.deepEqual(visibleInvitationSections(detailsOnly).map(section => section.type), ['timeline']);
 });
 
 test('previously published detail content renders as separate sections without changing the saved document', () => {

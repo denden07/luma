@@ -356,11 +356,15 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           </section>;
         }
         if (section.type === 'timeline') {
-          const entries = invitationTimeline(section.content).filter(entry => entry.time.trim() || entry.title.trim());
+          const entries = invitationTimeline(section.content).filter(entry => entry.time.trim() || entry.title.trim() || entry.details?.trim());
           if (entries.length === 0) return null;
           return <section className="public-invitation-section public-invitation-timeline-section" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
-            <ol className="public-invitation-timeline">{entries.map(entry => <li key={entry.id}><span>{entry.time}</span><strong>{entry.title}</strong></li>)}</ol>
+            <ol className="public-invitation-timeline">{entries.map(entry => <li key={entry.id}><div>
+              {entry.time.trim() && <span className="public-timeline-time">{entry.time}</span>}
+              {entry.title.trim() && <strong>{entry.title}</strong>}
+              {entry.details?.trim() && <p className="public-timeline-details">{entry.details}</p>}
+            </div></li>)}</ol>
           </section>;
         }
         if (section.type === 'attire') {

@@ -628,8 +628,11 @@ const WebsiteBuilder = () => {
                 <label htmlFor={`timeline-time-${entry.id}`}>Time
                   <input id={`timeline-time-${entry.id}`} value={entry.time} onChange={input => updateTimeline(timeline.map(item => item.id === entry.id ? { ...item, time: input.target.value } : item))} maxLength={80} placeholder="e.g. 3:00 PM" />
                 </label>
-                <label htmlFor={`timeline-title-${entry.id}`}>Activity
+                <label htmlFor={`timeline-title-${entry.id}`}>Event name
                   <input id={`timeline-title-${entry.id}`} value={entry.title} onChange={input => updateTimeline(timeline.map(item => item.id === entry.id ? { ...item, title: input.target.value } : item))} maxLength={120} placeholder="e.g. Ceremony" />
+                </label>
+                <label htmlFor={`timeline-details-${entry.id}`}>Details (optional)
+                  <textarea id={`timeline-details-${entry.id}`} value={entry.details ?? ''} onChange={input => updateTimeline(timeline.map(item => item.id === entry.id ? { ...item, details: input.target.value } : item))} maxLength={400} rows={2} placeholder="e.g. Please arrive 15 minutes early" />
                 </label>
                 <div className="website-timeline-actions">
                   <button type="button" disabled={index === 0} onClick={() => { const entries = [...timeline]; [entries[index - 1], entries[index]] = [entries[index], entries[index - 1]]; updateTimeline(entries); }} aria-label={`Move timeline item ${index + 1} up`}><ArrowUp size={16} aria-hidden="true" /></button>
@@ -637,7 +640,7 @@ const WebsiteBuilder = () => {
                   <button type="button" onClick={() => updateTimeline(timeline.filter(item => item.id !== entry.id))} aria-label={`Remove timeline item ${index + 1}`}><Trash2 size={16} aria-hidden="true" /> Remove</button>
                 </div>
               </div>)}
-              <button type="button" className="add-entourage-group" onClick={() => updateTimeline([...timeline, { id: crypto.randomUUID(), time: '', title: '' }])}><Plus size={16} aria-hidden="true" /> Add timeline item</button>
+              <button type="button" className="add-entourage-group" onClick={() => updateTimeline([...timeline, { id: crypto.randomUUID(), time: '', title: '', details: '' }])}><Plus size={16} aria-hidden="true" /> Add timeline item</button>
             </div>
           </fieldset>
           <fieldset className="website-section-fields">
