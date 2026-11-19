@@ -60,7 +60,8 @@ reception; both locations support a map link. Separate **Timeline**, **Clothing
 motif & colors**, and **Gift instructions** sections let you add and reorder
 timeline events with a time, name, and optional details, pick and display up to six clothing palette colors with optional
 names (unnamed colors display as swatches without hex codes), and share
-gift preferences. Empty optional sections stay hidden until filled in, and
+gift preferences. A decorative clothing illustration appears automatically
+when the Attire section has content. Empty optional sections stay hidden until filled in, and
 each section can be reordered or hidden from **Section order**.
 The invitation alternates light and muted section backgrounds in the visible
 order, while RSVP and Closing retain their accent colors.

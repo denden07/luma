@@ -6,6 +6,7 @@ import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId, withLegacyInvitationSections } from '../../utils/invitationSections';
 import { invitationTimeline } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
+import attireIllustration from '../../assets/images/attire-illustration.svg';
 import { submitPublicGroupRsvp, submitPublicGuestRsvp, submitPublicRsvpLookup } from '../../services/rsvpService';
 import type { CompanionChoice, PublicGuestMatch, ReservedSeatChoice, RsvpStatus } from '../../services/rsvpService';
 import { downloadRsvpReceiptPdf, prepareRsvpReceiptPdf, rsvpStatusLabel } from '../../utils/rsvpReceiptPdf';
@@ -374,6 +375,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           if (!motif.trim() && !note.trim() && colors.length === 0) return null;
           return <section className="public-invitation-section public-invitation-attire" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            <span className="public-attire-illustration" aria-hidden="true" style={{ maskImage: `url("${attireIllustration}")` }} />
             {motif && <p className="public-attire-motif">{motif}</p>}
             {note && <p>{note}</p>}
             {colors.length > 0 && <div className="public-attire-palette" aria-label="Clothing color palette">{colors.map((color, index) => <div key={index}><span style={{ backgroundColor: color.hex }} role="img" aria-label={color.name.trim() || `Clothing color ${index + 1}`} />{color.name.trim() && <small>{color.name.trim()}</small>}</div>)}</div>}

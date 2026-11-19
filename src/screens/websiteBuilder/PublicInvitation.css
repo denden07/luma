@@ -164,6 +164,7 @@
 .public-invitation-timeline strong { display: block; font-family: var(--font-editorial); font-size: clamp(21px, 4cqw, 28px); font-weight: 400; line-height: 1.2; margin-top: 4px; }
 .public-invitation-timeline .public-timeline-details { font-size: 15px; line-height: 1.5; margin: 8px 0 0; white-space: pre-line; }
 .public-invitation-attire .public-attire-motif { font-family: var(--font-editorial); font-size: 28px; }
+.public-invitation-attire .public-attire-illustration { background: var(--invitation-accent); display: block; height: clamp(125px, 25cqw, 150px); margin: 0 auto 24px; mask-position: center; mask-repeat: no-repeat; mask-size: contain; max-width: 100%; width: 340px; }
 .public-attire-palette { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin: 28px auto 0; }
 .public-attire-palette > div { display: grid; gap: 6px; justify-items: center; }
 .public-attire-palette span { border: 1px solid rgba(0, 0, 0, .15); border-radius: 50%; display: block; height: 52px; width: 52px; }
