@@ -661,6 +661,9 @@ const WebsiteBuilder = () => {
           </fieldset>
           <fieldset className="website-section-fields">
             <legend>Event details</legend>
+            <label htmlFor="invitation-details-title">Section title
+              <input id="invitation-details-title" value={contentText(details?.content, 'title')} onChange={input => updateSection(details?.id, 'title', input.target.value)} maxLength={80} />
+            </label>
             <label htmlFor="invitation-ceremony-place">Ceremony place
               <input id="invitation-ceremony-place" value={contentText(details?.content, 'ceremony_place')} onChange={(input) => updateSection(details?.id, 'ceremony_place', input.target.value)} maxLength={160} />
             </label>

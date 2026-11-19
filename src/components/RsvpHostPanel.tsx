@@ -1,6 +1,6 @@
 import { Check, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getRsvpResponses, getRsvpVerificationRequests, reviewRsvpVerificationRequest, updateRsvpDietaryEnabled } from '../services/rsvpService';
+import { getRsvpResponses, getRsvpVerificationRequests, reviewRsvpVerificationRequest, updateRsvpDietaryEnabled, updateRsvpUnlistedEnabled } from '../services/rsvpService';
 import type { RsvpResponse, RsvpStatus, RsvpVerificationRequest } from '../services/rsvpService';
 import type { GuestGroup, InvitationGuest } from '../services/guestService';
 import { getEvent } from '../services/dataService';
@@ -22,6 +22,7 @@ const RsvpHostPanel = ({ eventId, hostCode, guests, groups, onSuccess, onError, 
   const [selectedGuests, setSelectedGuests] = useState<Record<string, string>>({});
   const [selectedGroups, setSelectedGroups] = useState<Record<string, string>>({});
   const [dietaryEnabled, setDietaryEnabled] = useState(true);
+  const [unlistedEnabled, setUnlistedEnabled] = useState(true);
   const [requestFilter, setRequestFilter] = useState<'pending' | 'all'>('pending');
 
   const load = async () => {
@@ -34,7 +35,7 @@ const RsvpHostPanel = ({ eventId, hostCode, guests, groups, onSuccess, onError, 
 
   useEffect(() => {
     load();
-    getEvent(eventId).then(event => setDietaryEnabled(event.rsvp_dietary_notes_enabled)).catch(() => onError('Could not load RSVP settings.'));
+    getEvent(eventId).then(event => { setDietaryEnabled(event.rsvp_dietary_notes_enabled); setUnlistedEnabled(event.rsvp_unlisted_requests_enabled); }).catch(() => onError('Could not load RSVP settings.'));
   }, [eventId, hostCode]);
 
   const count = (status: RsvpStatus) => responses.filter(response => response.status === status).length;
@@ -45,6 +46,10 @@ const RsvpHostPanel = ({ eventId, hostCode, guests, groups, onSuccess, onError, 
   const setDietary = async (enabled: boolean) => {
     try { await updateRsvpDietaryEnabled(eventId, hostCode, enabled); setDietaryEnabled(enabled); onSuccess(enabled ? 'Dietary notes enabled.' : 'Dietary notes disabled.'); } catch { onError('Could not update dietary notes setting.'); }
   };
+  const setUnlisted = async (enabled: boolean) => {
+    try { await updateRsvpUnlistedEnabled(eventId, hostCode, enabled); setUnlistedEnabled(enabled); onSuccess(enabled ? 'Unlisted RSVP requests allowed.' : 'Unlisted RSVP requests blocked.'); }
+    catch (error) { onError(error instanceof Error ? error.message : 'Could not update unlisted RSVP setting.'); }
+  };
   const review = async (request: RsvpVerificationRequest, status: 'approved' | 'rejected', createGuest = false) => {
     const guestId = selectedGuests[request.id];
     const groupId = selectedGroups[request.id];
@@ -54,7 +59,7 @@ const RsvpHostPanel = ({ eventId, hostCode, guests, groups, onSuccess, onError, 
 
   return <section className="rsvp-host-panel">
     <div className="rsvp-host-heading"><div><p>RSVP</p><h2>Responses</h2></div><div className="rsvp-status-summary"><span className="rsvp-total-confirmed"><b>{totalConfirmed}</b> Total confirmed</span><span><b>{confirmedGuestTotal}</b> Confirmed guests</span><span><b>{plusTotal}</b> Pluses</span><span><b>{count('declined')}</b> Declined</span><span><b>{guests.filter(guest => !guest.rsvp_status).length}</b> Awaiting</span></div></div>
-    <section className="rsvp-plus-settings"><div><p>RSVP settings</p><span>Additional guests are available only when you set an allowance for that guest in the roster. Giving an allowance lets them add people to your guest list when they RSVP.</span></div><label>Dietary notes<select value={dietaryEnabled ? 'on' : 'off'} onChange={input => void setDietary(input.target.value === 'on')}><option value="on">Enabled</option><option value="off">Disabled</option></select></label></section>
+    <section className="rsvp-plus-settings"><div><p>RSVP settings</p><span>Additional guests are available only when you set an allowance for that guest in the roster. Giving an allowance lets them add people to your guest list when they RSVP.</span></div><label>Unlisted RSVP requests<select value={unlistedEnabled ? 'on' : 'off'} onChange={input => void setUnlisted(input.target.value === 'on')}><option value="on">Allow host-review requests</option><option value="off">Guest list only</option></select></label><label>Dietary notes<select value={dietaryEnabled ? 'on' : 'off'} onChange={input => void setDietary(input.target.value === 'on')}><option value="on">Enabled</option><option value="off">Disabled</option></select></label></section>
     <div className="rsvp-request-queue"><div className="rsvp-request-heading"><div><h3>Verification requests</h3><p>Review names not found on the guest list. Requests are not confirmed until approved.</p></div><label>Show<select value={requestFilter} onChange={input => setRequestFilter(input.target.value as 'pending' | 'all')}><option value="pending">Pending ({requests.filter(request => request.status === 'pending').length})</option><option value="all">All requests</option></select></label></div>
       {requests.filter(request => requestFilter === 'all' || request.status === 'pending').length === 0 && <p className="rsvp-request-empty">No {requestFilter === 'pending' ? 'pending' : ''} verification requests.</p>}
       {requests.filter(request => requestFilter === 'all' || request.status === 'pending').map(request => <article className="rsvp-request-card" key={request.id}>

@@ -24,10 +24,13 @@ const SeatingPlan = () => {
   const [search, setSearch] = useState('');
   const [name, setName] = useState('');
   const [capacity, setCapacity] = useState(8);
+  const [numberedSeats, setNumberedSeats] = useState(false);
   const [newGuest, setNewGuest] = useState({ fullName: '', email: '', phone: '', groupId: '', tableId: '' });
   const [editing, setEditing] = useState<string | null>(null);
   const [tableName, setTableName] = useState('');
   const [tableCapacity, setTableCapacity] = useState(8);
+  const [tableNumberedSeats, setTableNumberedSeats] = useState(false);
+  const [seatNumbers, setSeatNumbers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(Boolean(eventId && hostCode));
   const [busy, setBusy] = useState(false);
 
@@ -68,8 +71,8 @@ const SeatingPlan = () => {
     event.preventDefault();
     if (!eventId || !hostCode) return;
     await perform(async () => {
-      await createSeatingTable(eventId, hostCode, name, capacity);
-      setName('');
+      await createSeatingTable(eventId, hostCode, name, capacity, numberedSeats);
+      setName(''); setNumberedSeats(false);
     }, 'Table added.');
   };
 
@@ -77,7 +80,7 @@ const SeatingPlan = () => {
     event.preventDefault();
     if (!eventId || !hostCode) return;
     await perform(async () => {
-      await updateSeatingTable(eventId, hostCode, tableId, tableName, tableCapacity);
+      await updateSeatingTable(eventId, hostCode, tableId, tableName, tableCapacity, tableNumberedSeats);
       setEditing(null);
     }, 'Table updated.');
   };
@@ -89,7 +92,20 @@ const SeatingPlan = () => {
 
   const assign = (guest: SeatingGuest, tableId: string) => {
     if (!eventId || !hostCode) return;
-    void perform(() => assignSeatingGuest(eventId, hostCode, guest.id, tableId || null), `${guest.full_name} ${tableId ? 'seated' : 'unassigned'}.`);
+    void perform(async () => {
+      await assignSeatingGuest(eventId, hostCode, guest.id, tableId || null);
+      setSeatNumbers(current => { const next = { ...current }; delete next[guest.id]; return next; });
+    }, `${guest.full_name} ${tableId ? 'seated' : 'unassigned'}.`);
+  };
+
+  const saveSeat = (event: React.FormEvent, guest: SeatingGuest) => {
+    event.preventDefault();
+    if (!eventId || !hostCode || !guest.table_id) return;
+    const value = seatNumbers[guest.id] ?? String(guest.seat_number ?? '');
+    void perform(async () => {
+      await assignSeatingGuest(eventId, hostCode, guest.id, guest.table_id, value === '' ? null : Number(value));
+      setSeatNumbers(current => { const next = { ...current }; delete next[guest.id]; return next; });
+    }, value === '' ? `Seat number cleared for ${guest.full_name}.` : `${guest.full_name} assigned seat ${value}.`);
   };
 
   const addGuest = async (event: React.FormEvent) => {
@@ -119,11 +135,16 @@ const SeatingPlan = () => {
   const unassigned = plan.guests.filter(guest => !guest.table_id && matches(guest));
   const seatedCount = plan.guests.filter(guest => guest.table_id).length;
   const groupName = (groupId: string | null) => groups.find(group => group.id === groupId)?.name;
+  const sortedSeated = (guests: SeatingGuest[]) => guests.sort((a, b) =>
+    (a.seat_number ?? Number.POSITIVE_INFINITY) - (b.seat_number ?? Number.POSITIVE_INFINITY) || a.full_name.localeCompare(b.full_name));
 
-  const guestRow = (guest: SeatingGuest) => (
+  const guestRow = (guest: SeatingGuest) => {
+    const table = plan.tables.find(item => item.id === guest.table_id);
+    return (
     <li key={guest.id}>
       <div className="seating-person">
         <strong>{guest.full_name}</strong>
+        {guest.seat_number !== null && <span className="seating-seat-label">Seat {guest.seat_number}</span>}
         {guest.companion_label && <span className="seating-origin">{guest.companion_label}</span>}
         <small>{groupName(guest.group_id) ?? 'Individual'} · {guest.rsvp_status ?? 'Awaiting RSVP'}</small>
       </div>
@@ -134,8 +155,13 @@ const SeatingPlan = () => {
           {plan.tables.map(table => <option key={table.id} value={table.id}>{table.name}</option>)}
         </select>
       </label>
+      {table?.numbered_seats && <form className="seating-seat-form" onSubmit={event => saveSeat(event, guest)}>
+        <label><span className="sr-only">Seat number for {guest.full_name}</span><input type="number" min="1" max={table.capacity} placeholder="Seat #" value={seatNumbers[guest.id] ?? String(guest.seat_number ?? '')} onChange={event => setSeatNumbers(current => ({ ...current, [guest.id]: event.target.value }))} disabled={busy} /></label>
+        <button type="submit" disabled={busy || (seatNumbers[guest.id] ?? String(guest.seat_number ?? '')) === String(guest.seat_number ?? '')}>Save</button>
+      </form>}
     </li>
   );
+  };
 
   return <main className="seating-plan">
     <header className="seating-header">
@@ -154,6 +180,7 @@ const SeatingPlan = () => {
           <form onSubmit={addTable}>
             <label>Table name<input value={name} onChange={event => setName(event.target.value)} maxLength={255} required /></label>
             <label>Seats<input type="number" min="1" max="1000" value={capacity} onChange={event => setCapacity(Number(event.target.value))} required /></label>
+            <label className="seating-numbered-option"><input type="checkbox" checked={numberedSeats} onChange={event => setNumberedSeats(event.target.checked)} /> Numbered seats (optional)</label>
             <button type="submit" disabled={busy}><Plus size={16} /> Add table</button>
           </form>
         </section>
@@ -174,20 +201,20 @@ const SeatingPlan = () => {
         <label className="seating-search"><Search size={18} /><span className="sr-only">Search guests</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search guests or companion labels" /></label>
 
         <div className="seating-grid">
+          {plan.tables.map(table => {
+            const seated = sortedSeated(plan.guests.filter(guest => guest.table_id === table.id && matches(guest)));
+            const overCapacity = table.occupancy > table.capacity;
+            return <section className={`seating-table${overCapacity ? ' seating-over-capacity' : ''}`} key={table.id}>
+              <div className="seating-table-heading"><div><h2>{table.name}</h2><span>{table.occupancy} / {table.capacity} seats{table.numbered_seats ? ' · numbered' : ''}</span></div><div className="seating-table-actions"><button type="button" disabled={busy} onClick={() => { setEditing(table.id); setTableName(table.name); setTableCapacity(table.capacity); setTableNumberedSeats(table.numbered_seats); }}>Edit</button><button type="button" aria-label={`Remove ${table.name}`} disabled={busy} onClick={() => removeTable(table)}><Trash2 size={16} /></button></div></div>
+              {overCapacity && <p className="seating-warning" role="status">Over capacity by {table.occupancy - table.capacity}. Move guests or increase seats.</p>}
+              {editing === table.id && <form className="seating-edit" onSubmit={event => saveTable(event, table.id)}><label>Name<input value={tableName} onChange={event => setTableName(event.target.value)} required maxLength={255} /></label><label>Seats<input type="number" min="1" max="1000" value={tableCapacity} onChange={event => setTableCapacity(Number(event.target.value))} required /></label><label className="seating-numbered-option"><input type="checkbox" checked={tableNumberedSeats} onChange={event => setTableNumberedSeats(event.target.checked)} /> Numbered seats (turning off clears seat numbers)</label><button disabled={busy} type="submit">Save</button><button type="button" onClick={() => setEditing(null)}>Cancel</button></form>}
+              {seated.length ? <ul>{seated.map(guestRow)}</ul> : <p>{search ? 'No matching guests.' : 'No guests seated yet.'}</p>}
+            </section>;
+          })}
           <section className="seating-table seating-unassigned">
             <h2>Unassigned <small>{plan.guests.filter(guest => !guest.table_id).length}</small></h2>
             {unassigned.length ? <ul>{unassigned.map(guestRow)}</ul> : <p>{search ? 'No matching unassigned guests.' : 'Everyone has a table.'}</p>}
           </section>
-          {plan.tables.map(table => {
-            const seated = plan.guests.filter(guest => guest.table_id === table.id && matches(guest));
-            const overCapacity = table.occupancy > table.capacity;
-            return <section className={`seating-table${overCapacity ? ' seating-over-capacity' : ''}`} key={table.id}>
-              <div className="seating-table-heading"><div><h2>{table.name}</h2><span>{table.occupancy} / {table.capacity} seats</span></div><div className="seating-table-actions"><button type="button" disabled={busy} onClick={() => { setEditing(table.id); setTableName(table.name); setTableCapacity(table.capacity); }}>Edit</button><button type="button" aria-label={`Remove ${table.name}`} disabled={busy} onClick={() => removeTable(table)}><Trash2 size={16} /></button></div></div>
-              {overCapacity && <p className="seating-warning" role="status">Over capacity by {table.occupancy - table.capacity}. Move guests or increase seats.</p>}
-              {editing === table.id && <form className="seating-edit" onSubmit={event => saveTable(event, table.id)}><label>Name<input value={tableName} onChange={event => setTableName(event.target.value)} required maxLength={255} /></label><label>Seats<input type="number" min="1" max="1000" value={tableCapacity} onChange={event => setTableCapacity(Number(event.target.value))} required /></label><button disabled={busy} type="submit">Save</button><button type="button" onClick={() => setEditing(null)}>Cancel</button></form>}
-              {seated.length ? <ul>{seated.map(guestRow)}</ul> : <p>{search ? 'No matching guests.' : 'No guests seated yet.'}</p>}
-            </section>;
-          })}
         </div>
       </>}
     </div>

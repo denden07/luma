@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import './Modal.css';
 
@@ -8,10 +8,15 @@ interface ModalProps {
   children: React.ReactNode;
   className?: string;
   ariaLabel?: string;
+  contentRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, className = '', ariaLabel = 'Dialog' }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, className = '', ariaLabel = 'Dialog', contentRef: externalContentRef }) => {
   const contentRef = useRef<HTMLDivElement>(null);
+  const setContentRef = useCallback((node: HTMLDivElement | null) => {
+    contentRef.current = node;
+    if (externalContentRef) externalContentRef.current = node;
+  }, [externalContentRef]);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   useEffect(() => {
@@ -55,7 +60,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, className = ''
 
   return createPortal(
     <div className="modal-backdrop" onClick={handleBackdropClick}>
-      <div ref={contentRef} className={`modal-content ${className}`} role="dialog" aria-modal="true" aria-label={ariaLabel} tabIndex={-1}>
+      <div ref={setContentRef} className={`modal-content ${className}`} role="dialog" aria-modal="true" aria-label={ariaLabel} tabIndex={-1}>
         {children}
       </div>
     </div>,

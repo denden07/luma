@@ -12,21 +12,34 @@ type ReservedSeat = { name: string; status: RsvpStatus };
 
 const isStatus = (value: unknown): value is RsvpStatus => value === 'attending' || value === 'declined' || value === 'undecided';
 const publicMatchQuery = `SELECT guest.id, guest.full_name, COALESCE(guest.rsvp_plus_limit, 0) AS plus_limit,
-  response.status AS response_status,
-  COALESCE((SELECT json_agg(json_build_object('id', companion.id, 'full_name', companion.full_name, 'status', companion.rsvp_companion_status, 'is_proxy', companion.rsvp_proxy_for_id = guest.id) ORDER BY companion.created_at, companion.id)
-    FROM guests companion WHERE companion.rsvp_owner_id = guest.id), '[]'::json) AS companions
-  , COALESCE((SELECT json_agg(json_build_object('name', seat.full_name, 'status', seat.status, 'is_proxy', seat.is_proxy) ORDER BY seat.slot_index)
-    FROM rsvp_reserved_seats seat WHERE seat.response_id = response.id), '[]'::json) AS reserved_seats
-  FROM guests guest LEFT JOIN rsvp_responses response ON response.guest_id = guest.id
+  response.status AS response_status, guest_table.name AS table_name, guest.seat_number,
+  COALESCE((SELECT json_agg(json_build_object('id', companion.id, 'full_name', companion.full_name,
+    'status', companion.rsvp_companion_status, 'is_proxy', companion.rsvp_proxy_for_id = guest.id,
+    'table_name', companion_table.name, 'seat_number', companion.seat_number) ORDER BY companion.created_at, companion.id)
+    FROM guests companion LEFT JOIN seating_tables companion_table ON companion_table.id = companion.table_id
+    WHERE companion.rsvp_owner_id = guest.id), '[]'::json) AS companions
+  , COALESCE((SELECT json_agg(json_build_object('name', seat.full_name, 'status', seat.status,
+    'is_proxy', seat.is_proxy, 'table_name', seat_table.name, 'seat_number', seated_guest.seat_number)
+    ORDER BY seat.slot_index)
+    FROM rsvp_reserved_seats seat
+    LEFT JOIN guests seated_guest ON seated_guest.rsvp_response_id = response.id AND seated_guest.rsvp_ordinal = 20 + seat.slot_index
+    LEFT JOIN seating_tables seat_table ON seat_table.id = seated_guest.table_id
+    WHERE seat.response_id = response.id), '[]'::json) AS reserved_seats
+  FROM guests guest
+  LEFT JOIN seating_tables guest_table ON guest_table.id = guest.table_id
+  LEFT JOIN rsvp_responses response ON response.guest_id = guest.id
   WHERE guest.event_id = $1 AND guest.group_id IS NULL AND guest.rsvp_response_id IS NULL AND guest.rsvp_owner_id IS NULL
   AND (guest.full_name ILIKE $2 OR EXISTS (SELECT 1 FROM guests companion WHERE companion.rsvp_owner_id = guest.id AND companion.full_name ILIKE $2))
   ORDER BY guest.full_name LIMIT 10`;
 const publicGroupMatchQuery = `SELECT group_record.id, group_record.name AS full_name, group_record.id AS group_id,
-  0 AS plus_limit, response.status AS response_status, '[]'::json AS companions, '[]'::json AS reserved_seats,
+  0 AS plus_limit, response.status AS response_status, NULL::text AS table_name, NULL::integer AS seat_number,
+  '[]'::json AS companions, '[]'::json AS reserved_seats,
   COALESCE((SELECT json_agg(json_build_object('id', member.id, 'full_name', member.full_name,
-    'status', COALESCE(member.rsvp_companion_status, CASE WHEN response.id IS NOT NULL THEN response.status END))
+    'status', COALESCE(member.rsvp_companion_status, CASE WHEN response.id IS NOT NULL THEN response.status END),
+    'table_name', member_table.name, 'seat_number', member.seat_number)
     ORDER BY member.created_at, member.id)
-    FROM guests member WHERE member.group_id = group_record.id AND member.rsvp_response_id IS NULL), '[]'::json) AS members
+    FROM guests member LEFT JOIN seating_tables member_table ON member_table.id = member.table_id
+    WHERE member.group_id = group_record.id AND member.rsvp_response_id IS NULL), '[]'::json) AS members
   FROM guest_groups group_record
   LEFT JOIN rsvp_responses response ON response.group_id = group_record.id
   WHERE group_record.event_id = $1 AND
@@ -193,11 +206,19 @@ hostRouter.get('/:eventId/rsvp', async (req, res) => {
 
 hostRouter.patch('/:eventId/rsvp-settings', async (req, res) => {
   const { eventId } = req.params;
-  const { host_code: hostCode, dietary_notes_enabled: dietaryEnabled } = req.body as { host_code?: string; dietary_notes_enabled?: boolean };
-  if (typeof dietaryEnabled !== 'boolean') return res.status(400).json({ error: 'Choose whether dietary notes are enabled' });
+  const { host_code: hostCode, dietary_notes_enabled: dietaryEnabled, unlisted_requests_enabled: unlistedEnabled } = req.body as { host_code?: string; dietary_notes_enabled?: boolean; unlisted_requests_enabled?: boolean };
+  if ((dietaryEnabled === undefined && unlistedEnabled === undefined) ||
+      (dietaryEnabled !== undefined && typeof dietaryEnabled !== 'boolean') ||
+      (unlistedEnabled !== undefined && typeof unlistedEnabled !== 'boolean'))
+    return res.status(400).json({ error: 'Choose valid RSVP settings' });
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
-    const result = await pool.query('UPDATE events SET rsvp_dietary_notes_enabled = $1 WHERE id = $2 RETURNING rsvp_dietary_notes_enabled', [dietaryEnabled, eventId]);
+    const result = await pool.query(
+      `UPDATE events SET rsvp_dietary_notes_enabled = COALESCE($1, rsvp_dietary_notes_enabled),
+       rsvp_unlisted_requests_enabled = COALESCE($2, rsvp_unlisted_requests_enabled)
+       WHERE id = $3 RETURNING rsvp_dietary_notes_enabled, rsvp_unlisted_requests_enabled`,
+      [dietaryEnabled ?? null, unlistedEnabled ?? null, eventId],
+    );
     return res.json(result.rows[0]);
   } catch (error) { console.error('Error updating RSVP settings:', error); return res.status(500).json({ error: 'Failed to update RSVP settings' }); }
 });
@@ -302,17 +323,21 @@ publicRsvpRouter.post('/lookup', async (req, res) => {
   const { event_id: eventId, name, status, party_count: partyCount = 0, contact_email: contactEmail, contact_phone: contactPhone, dietary_notes: dietaryNotes, plus_one_count: plusOneCount = 0, attendee_names: attendeeNames } = req.body as { event_id?: string; name?: string; status?: unknown; party_count?: unknown; contact_email?: string; contact_phone?: string; dietary_notes?: string; plus_one_count?: unknown; attendee_names?: unknown };
   if (!eventId || typeof name !== 'string' || !name.trim() || name.trim().length > 255) return res.status(400).json({ error: 'Enter a name of 255 characters or fewer' });
   try {
-    const event = await pool.query('SELECT 1 FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
+    const event = await pool.query<{ rsvp_unlisted_requests_enabled: boolean; rsvp_dietary_notes_enabled: boolean }>(
+      'SELECT rsvp_unlisted_requests_enabled, rsvp_dietary_notes_enabled FROM events WHERE id = $1 AND is_active = TRUE', [eventId]);
     if (event.rowCount === 0) return res.status(404).json({ error: 'Invitation not found' });
     const matches = await findPublicMatches(eventId, name);
     if (matches.length > 0) return res.json({ matches });
+    if (!event.rows[0].rsvp_unlisted_requests_enabled) {
+      if (isStatus(status)) return res.status(403).json({ error: 'Your name is not on the guest list. Unlisted RSVP requests are not allowed for this event.' });
+      return res.json({ matches: [], unlisted_blocked: true });
+    }
     if (!isStatus(status)) return res.json({ matches: [], needs_response: true });
     const normalizedPartyCount = Number(partyCount);
     const normalizedPlusOneCount = Number(plusOneCount);
     if (!Number.isInteger(normalizedPartyCount) || normalizedPartyCount < 0 || normalizedPartyCount > 20 || !Number.isInteger(normalizedPlusOneCount) || normalizedPlusOneCount < 0 || normalizedPlusOneCount > 20) return res.status(400).json({ error: 'Enter a valid party count' });
-    const eventSettings = await pool.query<{ rsvp_dietary_notes_enabled: boolean }>('SELECT rsvp_dietary_notes_enabled FROM events WHERE id = $1', [eventId]);
     if (normalizedPlusOneCount !== 0 || (status === 'attending' ? normalizedPartyCount !== 1 : normalizedPartyCount !== 0)) return res.status(400).json({ error: 'Unlisted guests cannot include additional guests' });
-    if (!eventSettings.rows[0].rsvp_dietary_notes_enabled && typeof dietaryNotes === 'string' && dietaryNotes.trim()) return res.status(400).json({ error: 'Dietary notes are disabled for this event' });
+    if (!event.rows[0].rsvp_dietary_notes_enabled && typeof dietaryNotes === 'string' && dietaryNotes.trim()) return res.status(400).json({ error: 'Dietary notes are disabled for this event' });
     if (attendeeNames !== undefined && (!Array.isArray(attendeeNames) || attendeeNames.length !== normalizedPlusOneCount || attendeeNames.some(value => typeof value !== 'string' || value.trim().length > 255))) return res.status(400).json({ error: 'Enter a valid name for each additional guest' });
     const names = Array.isArray(attendeeNames) ? attendeeNames.map((value: string, index: number) => value.trim() || `${name.trim().slice(0, 230)} friend #${index + 1}`) : Array.from({ length: normalizedPlusOneCount }, (_, index) => `${name.trim().slice(0, 230)} friend #${index + 1}`);
     await pool.query(

@@ -31,6 +31,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS price_php INTEGER NOT NULL DEFAULT 0
 ALTER TABLE events ADD COLUMN IF NOT EXISTS payment_status VARCHAR(10) NOT NULL DEFAULT 'unpaid' CHECK (payment_status IN ('unpaid', 'partial', 'paid'));
 ALTER TABLE events ADD COLUMN IF NOT EXISTS rsvp_plus_limit INTEGER NOT NULL DEFAULT 0 CHECK (rsvp_plus_limit >= 0);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS rsvp_dietary_notes_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS rsvp_unlisted_requests_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE events DROP CONSTRAINT IF EXISTS events_rsvp_plus_limit_check;
 ALTER TABLE events ADD CONSTRAINT events_rsvp_plus_limit_check CHECK (rsvp_plus_limit >= 0);
 ALTER TABLE events ALTER COLUMN guest_limit SET DEFAULT 30;
@@ -111,7 +112,10 @@ CREATE TABLE IF NOT EXISTS seating_tables (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE seating_tables ADD COLUMN IF NOT EXISTS numbered_seats BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS table_id UUID REFERENCES seating_tables(id) ON DELETE SET NULL;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS seat_number INTEGER CHECK (seat_number > 0);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_guests_table_seat_number ON guests(table_id, seat_number) WHERE seat_number IS NOT NULL;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS companion_label VARCHAR(255);
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS is_rsvp_companion BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS rsvp_response_id UUID;

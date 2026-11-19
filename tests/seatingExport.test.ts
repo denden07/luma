@@ -5,23 +5,23 @@ import type { SeatingPlan } from '../src/services/seatingService';
 
 test('exports assigned and unassigned guests with occupancy and origin labels', () => {
   const plan: SeatingPlan = {
-    tables: [{ id: 'one', event_id: 'event', name: 'Family, "front"', capacity: 1, occupancy: 2 }],
+    tables: [{ id: 'one', event_id: 'event', name: 'Family, "front"', capacity: 1, numbered_seats: true, occupancy: 2 }],
     guests: [
-      { id: 'a', event_id: 'event', group_id: null, full_name: 'Aldrin', email: null, phone: null, companion_label: null, rsvp_status: 'attending', table_id: 'one' },
-      { id: 'b', event_id: 'event', group_id: null, full_name: 'Maya', email: null, phone: null, companion_label: "Aldrin's friend #1", rsvp_status: 'attending', table_id: 'one' },
-      { id: 'c', event_id: 'event', group_id: null, full_name: '=2+2', email: null, phone: null, companion_label: null, rsvp_status: null, table_id: null },
+      { id: 'a', event_id: 'event', group_id: null, full_name: 'Aldrin', email: null, phone: null, companion_label: null, rsvp_status: 'attending', table_id: 'one', seat_number: 1 },
+      { id: 'b', event_id: 'event', group_id: null, full_name: 'Maya', email: null, phone: null, companion_label: "Aldrin's friend #1", rsvp_status: 'attending', table_id: 'one', seat_number: null },
+      { id: 'c', event_id: 'event', group_id: null, full_name: '=2+2', email: null, phone: null, companion_label: null, rsvp_status: null, table_id: null, seat_number: null },
     ],
   };
   assert.equal(seatingCsv(plan),
-    '"Table","Capacity","Occupancy","Capacity status","Guest","Origin","RSVP"\r\n' +
-    '"Family, ""front""","1","2","Over capacity by 1","Aldrin","","attending"\r\n' +
-    '"Family, ""front""","1","2","Over capacity by 1","Maya","Aldrin\'s friend #1","attending"\r\n' +
-    '"Unassigned","","","","\'=2+2","","Awaiting"\r\n');
+    '"Table","Capacity","Occupancy","Capacity status","Seat #","Guest","Origin","RSVP"\r\n' +
+    '"Family, ""front""","1","2","Over capacity by 1","1","Aldrin","","attending"\r\n' +
+    '"Family, ""front""","1","2","Over capacity by 1","","Maya","Aldrin\'s friend #1","attending"\r\n' +
+    '"Unassigned","","","","","\'=2+2","","Awaiting"\r\n');
 });
 
 test('includes empty tables in an export', () => {
   assert.equal(seatingCsv({
-    tables: [{ id: 'one', event_id: 'event', name: 'Quiet', capacity: 8, occupancy: 0 }],
+    tables: [{ id: 'one', event_id: 'event', name: 'Quiet', capacity: 8, numbered_seats: false, occupancy: 0 }],
     guests: [],
-  }), '"Table","Capacity","Occupancy","Capacity status","Guest","Origin","RSVP"\r\n"Quiet","8","0","Within capacity","","",""\r\n');
+  }), '"Table","Capacity","Occupancy","Capacity status","Seat #","Guest","Origin","RSVP"\r\n"Quiet","8","0","Within capacity","","","",""\r\n');
 });

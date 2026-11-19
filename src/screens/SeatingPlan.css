@@ -20,10 +20,13 @@
 .seating-form form { align-items: end; display: flex; flex-wrap: wrap; gap: 12px; }
 .seating-plan label { color: #40503f; display: grid; font-size: 12px; font-weight: 700; gap: 6px; letter-spacing: .03em; text-transform: uppercase; }
 .seating-form label { flex: 1 1 145px; }
+.seating-numbered-option { align-items: center; display: flex !important; flex: 0 1 auto; font-size: 13px !important; gap: 8px; text-transform: none !important; }
 .seating-plan input, .seating-plan select { background: #fffdf7; border: 1px solid #bdc5b9; box-sizing: border-box; color: #202820; font: inherit; font-size: 15px; min-height: 42px; min-width: 0; padding: 8px; text-transform: none; width: 100%; }
+.seating-plan .seating-numbered-option input[type="checkbox"] { accent-color: #263a32; flex: none; height: 16px; margin: 0; min-height: 16px; padding: 0; width: 16px; }
 .seating-plan button:disabled, .seating-plan select:disabled { cursor: not-allowed; opacity: .55; }
 .seating-search { align-items: center; display: flex !important; margin: 34px 0 18px; max-width: 460px; }
 .seating-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.seating-unassigned { order: -1; }
 .seating-table { background: #fffdf7; border: 1px solid #cbd3c6; min-width: 0; padding: 18px; }
 .seating-table h2 { margin: 0; }
 .seating-table h2 small { color: #60705d; font-family: sans-serif; font-size: 14px; }
@@ -39,13 +42,18 @@
 .seating-edit label { flex: 1 1 100px; }
 .seating-edit button:last-child { background: #e7ece4; color: #263a32; }
 .seating-table ul { list-style: none; margin: 14px 0 0; padding: 0; }
-.seating-table li { align-items: center; border-top: 1px solid #e1e6de; display: flex; gap: 8px; justify-content: space-between; padding: 12px 0; }
-.seating-person { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.seating-table li { align-items: center; border-top: 1px solid #e1e6de; display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding: 12px 0; }
+.seating-person { display: grid; flex: 1 1 120px; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
 .seating-person small, .seating-origin { color: #60705d; font-size: 12px; }
+.seating-seat-label { color: #263a32; font-size: 13px; font-weight: 700; }
 .seating-origin { color: #925d2e; font-weight: 700; }
 .seating-assignment { flex: 0 0 132px; }
 .seating-assignment select { font-size: 13px; }
-@media (max-width: 600px) { .seating-header h1 { font-size: 25px; } .seating-summary { align-items: start; flex-direction: column; } .seating-export { margin: 0; } .seating-table li { align-items: stretch; flex-direction: column; } .seating-assignment { flex: auto; width: 100%; } }
+.seating-seat-form { align-items: center; display: flex; flex: 0 0 124px; gap: 4px; }
+.seating-seat-form label { flex: 1; min-width: 0; }
+.seating-seat-form input { font-size: 13px; }
+.seating-seat-form button { background: #263a32; border: 0; color: #fffdf7; cursor: pointer; min-height: 42px; padding: 8px; }
+@media (max-width: 600px) { .seating-header h1 { font-size: 25px; } .seating-summary { align-items: start; flex-direction: column; } .seating-export { margin: 0; } .seating-table li { align-items: stretch; flex-direction: column; } .seating-assignment, .seating-seat-form { flex: auto; width: 100%; } }
 @media (max-width: 760px) {
   .seating-content { padding: 24px 16px 48px; }
   .seating-export { flex-wrap: wrap; }
@@ -55,9 +63,10 @@
 @media print {
   .seating-plan { background: #fff; color: #000; }
   .seating-print-title { display: block; }
-  .seating-header, .seating-export, .seating-form, .seating-search, .seating-table-actions, .seating-edit, .seating-assignment { display: none !important; }
+  .seating-header, .seating-export, .seating-form, .seating-search, .seating-table-actions, .seating-edit, .seating-assignment, .seating-seat-form { display: none !important; }
   .seating-content { max-width: none; padding: 0; }
-  .seating-grid { display: block; }
-  .seating-table { border: 1px solid #888; break-inside: avoid; margin-bottom: 16px; }
+  .seating-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .seating-unassigned { order: 0; }
+  .seating-table { border: 1px solid #888; break-inside: avoid; }
   .seating-warning { color: #000; }
 }

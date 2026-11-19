@@ -5,6 +5,7 @@ export interface SeatingTable {
   event_id: string;
   name: string;
   capacity: number;
+  numbered_seats: boolean;
   occupancy: number;
 }
 
@@ -18,6 +19,7 @@ export interface SeatingGuest {
   companion_label: string | null;
   rsvp_status: 'attending' | 'declined' | 'undecided' | null;
   table_id: string | null;
+  seat_number: number | null;
 }
 
 export interface SeatingPlan {
@@ -46,17 +48,17 @@ const base = (eventId: string) => `/api/events/${encodeURIComponent(eventId)}/se
 export const getSeatingPlan = (eventId: string, hostCode: string) =>
   request<SeatingPlan>(`${base(eventId)}?host_code=${encodeURIComponent(hostCode)}`);
 
-export const createSeatingTable = (eventId: string, hostCode: string, name: string, capacity: number) =>
-  request<SeatingTable>(`${base(eventId)}/tables`, json({ host_code: hostCode, name, capacity }, 'POST'));
+export const createSeatingTable = (eventId: string, hostCode: string, name: string, capacity: number, numberedSeats = false) =>
+  request<SeatingTable>(`${base(eventId)}/tables`, json({ host_code: hostCode, name, capacity, numbered_seats: numberedSeats }, 'POST'));
 
-export const updateSeatingTable = (eventId: string, hostCode: string, tableId: string, name: string, capacity: number) =>
-  request<SeatingTable>(`${base(eventId)}/tables/${encodeURIComponent(tableId)}`, json({ host_code: hostCode, name, capacity }, 'PATCH'));
+export const updateSeatingTable = (eventId: string, hostCode: string, tableId: string, name: string, capacity: number, numberedSeats: boolean) =>
+  request<SeatingTable>(`${base(eventId)}/tables/${encodeURIComponent(tableId)}`, json({ host_code: hostCode, name, capacity, numbered_seats: numberedSeats }, 'PATCH'));
 
 export const deleteSeatingTable = (eventId: string, hostCode: string, tableId: string) =>
   request<void>(`${base(eventId)}/tables/${encodeURIComponent(tableId)}?host_code=${encodeURIComponent(hostCode)}`, { method: 'DELETE' });
 
-export const assignSeatingGuest = (eventId: string, hostCode: string, guestId: string, tableId: string | null) =>
-  request<SeatingGuest>(`${base(eventId)}/assignments/${encodeURIComponent(guestId)}`, json({ host_code: hostCode, table_id: tableId }, 'PUT'));
+export const assignSeatingGuest = (eventId: string, hostCode: string, guestId: string, tableId: string | null, seatNumber?: number | null) =>
+  request<SeatingGuest>(`${base(eventId)}/assignments/${encodeURIComponent(guestId)}`, json({ host_code: hostCode, table_id: tableId, ...(seatNumber !== undefined ? { seat_number: seatNumber } : {}) }, 'PUT'));
 
 export const createSeatingGuest = (eventId: string, hostCode: string, guest: { fullName: string; email: string; phone: string; groupId: string | null; tableId: string }) =>
   request<SeatingGuest>(`${base(eventId)}/guests`, json({

@@ -1,9 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export type RsvpStatus = 'attending' | 'declined' | 'undecided';
-export interface NamedCompanion { id: string; full_name: string; status: RsvpStatus | null; is_proxy?: boolean }
+export interface GuestSeating { table_name: string | null; seat_number: number | null }
+export interface NamedCompanion extends Partial<GuestSeating> { id: string; full_name: string; status: RsvpStatus | null; is_proxy?: boolean }
 export interface CompanionChoice { id: string; status: RsvpStatus }
-export interface ReservedSeatChoice { name: string; status: RsvpStatus; is_proxy?: boolean }
+export interface ReservedSeatChoice { name: string; status: RsvpStatus; is_proxy?: boolean; table_name?: string | null; seat_number?: number | null }
 export type RsvpProxy = { id: string } | { index: number };
 
 export interface RsvpResponse {
@@ -34,7 +35,7 @@ export interface RsvpVerificationRequest {
   attendee_names: string[] | null;
 }
 
-export interface PublicGuestMatch { id: string; full_name: string; group_id?: string; members?: NamedCompanion[]; plus_limit: number; companions: NamedCompanion[]; response_status?: RsvpStatus | null; reserved_seats?: ReservedSeatChoice[] }
+export interface PublicGuestMatch extends GuestSeating { id: string; full_name: string; group_id?: string; members?: NamedCompanion[]; plus_limit: number; companions: NamedCompanion[]; response_status?: RsvpStatus | null; reserved_seats?: ReservedSeatChoice[] }
 
 export async function submitPublicGroupRsvp(eventId: string, group: PublicGuestMatch, members: CompanionChoice[], dietaryNotes?: string): Promise<Pick<RsvpResponse, 'id' | 'submitted_at'>> {
   const response = await fetch(`${API_BASE_URL}/api/rsvp/group/${group.id}`, {
@@ -53,7 +54,7 @@ export async function searchPublicRsvpGuests(eventId: string, name: string): Pro
   return Array.isArray(payload.matches) ? payload.matches : [];
 }
 
-export async function submitPublicRsvpLookup(eventId: string, name: string, responseData?: { status: RsvpStatus; partyCount: number; plusOneCount: number; attendeeNames: string[]; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<{ matches: PublicGuestMatch[]; message?: string; needs_response?: boolean }> {
+export async function submitPublicRsvpLookup(eventId: string, name: string, responseData?: { status: RsvpStatus; partyCount: number; plusOneCount: number; attendeeNames: string[]; contactEmail?: string; contactPhone?: string; dietaryNotes?: string }): Promise<{ matches: PublicGuestMatch[]; message?: string; needs_response?: boolean; unlisted_blocked?: boolean }> {
   const response = await fetch(`${API_BASE_URL}/api/rsvp/lookup`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event_id: eventId, name, ...(responseData ? { status: responseData.status, party_count: responseData.partyCount, plus_one_count: responseData.plusOneCount, attendee_names: responseData.attendeeNames, contact_email: responseData.contactEmail, contact_phone: responseData.contactPhone, dietary_notes: responseData.dietaryNotes } : {}) }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.error || 'Could not send RSVP request');
@@ -64,6 +65,11 @@ export async function getRsvpResponses(eventId: string, hostCode: string): Promi
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp?host_code=${encodeURIComponent(hostCode)}`);
   if (!response.ok) throw new Error('Failed to load RSVP responses');
   return response.json();
+}
+
+export async function updateRsvpUnlistedEnabled(eventId: string, hostCode: string, enabled: boolean): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/rsvp-settings`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host_code: hostCode, unlisted_requests_enabled: enabled }) });
+  if (!response.ok) { const payload = await response.json().catch(() => ({})); throw new Error(payload.error || 'Failed to update unlisted RSVP setting'); }
 }
 
 export async function getRsvpVerificationRequests(eventId: string, hostCode: string): Promise<RsvpVerificationRequest[]> {

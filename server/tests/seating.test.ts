@@ -9,7 +9,7 @@ import pool from '../db/index.js';
 after(async () => { await pool.end(); });
 
 test('seating remains event-scoped and RSVP roster reconciliation is stable', { timeout: 15000 }, async context => {
-  try { await pool.query('SELECT 1'); }
+  try { await pool.query('SELECT numbered_seats FROM seating_tables LIMIT 0'); await pool.query('SELECT seat_number FROM guests LIMIT 0'); }
   catch { context.skip('Postgres unavailable; seating integration test requires a reachable database'); return; }
   const hostCode = randomUUID();
   const otherCode = randomUUID();
@@ -50,6 +50,42 @@ test('seating remains event-scoped and RSVP roster reconciliation is stable', { 
     assert.equal(table.status, 201);
     const tableId = table.data.id;
     assert.equal(table.data.occupancy, 0);
+    assert.equal(table.data.numbered_seats, false);
+    assert.equal((await request(`${seating}/assignments/${invited.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 1,
+    })).status, 400);
+    assert.equal((await request(`${seating}/tables/${tableId}`, 'PATCH', {
+      host_code: hostCode, numbered_seats: true,
+    })).data.numbered_seats, true);
+    assert.equal((await request(`${seating}/assignments/${invited.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 1,
+    })).data.seat_number, 1);
+    const spare = await pool.query<{ id: string }>(
+      'INSERT INTO guests (event_id, full_name) VALUES ($1, $2) RETURNING id', [eventId, 'Spare seat test guest'],
+    );
+    assert.equal((await request(`${seating}/assignments/${spare.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 1,
+    })).status, 409);
+    assert.equal((await request(`${seating}/assignments/${spare.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 2,
+    })).status, 400);
+    assert.equal((await request(`${seating}/tables/${tableId}`, 'PATCH', {
+      host_code: hostCode, capacity: 2,
+    })).status, 200);
+    assert.equal((await request(`${seating}/assignments/${spare.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 2,
+    })).data.seat_number, 2);
+    assert.equal((await request(`${seating}/tables/${tableId}`, 'PATCH', {
+      host_code: hostCode, capacity: 1,
+    })).status, 409);
+    assert.equal((await request(`${seating}/assignments/${spare.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: null,
+    })).data.seat_number, null);
+    await pool.query('DELETE FROM guests WHERE id = $1', [spare.rows[0].id]);
+    assert.equal((await request(`${seating}/tables/${tableId}`, 'PATCH', {
+      host_code: hostCode, capacity: 1, numbered_seats: false,
+    })).data.numbered_seats, false);
+    assert.equal((await request(`${seating}?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === invited.rows[0].id).seat_number, null);
     const otherTable = await request(`/api/events/${otherId}/seating/tables`, 'POST', { host_code: otherCode, name: 'Other', capacity: 1 });
     assert.equal((await request(`${seating}/assignments/${invited.rows[0].id}`, 'PUT', { host_code: hostCode, table_id: otherTable.data.id })).status, 404);
     assert.equal((await request(`${seating}/assignments/${invited.rows[0].id}`, 'PUT', { host_code: hostCode, table_id: tableId })).status, 200);
@@ -138,9 +174,17 @@ test('seating remains event-scoped and RSVP roster reconciliation is stable', { 
     const declined = await request(`${seating}?host_code=${hostCode}`);
     assert.equal(declined.data.guests.some((g: { id: string }) => g.id === companion.id), false);
     assert.equal(declined.data.guests.some((g: { id: string }) => g.id === invited.rows[0].id), true);
+    assert.equal((await request(`${seating}/tables/${tableId}`, 'PATCH', {
+      host_code: hostCode, numbered_seats: true,
+    })).status, 200);
+    assert.equal((await request(`${seating}/assignments/${invited.rows[0].id}`, 'PUT', {
+      host_code: hostCode, table_id: tableId, seat_number: 1,
+    })).data.seat_number, 1);
     assert.equal((await request(`${seating}/tables/${tableId}`, 'DELETE')).status, 404);
     assert.equal((await request(`${seating}/tables/${tableId}?host_code=${hostCode}`, 'DELETE')).status, 204);
-    assert.equal((await request(`${seating}?host_code=${hostCode}`)).data.guests.find((g: { id: string }) => g.id === invited.rows[0].id).table_id, null);
+    const afterTableDeletion = (await request(`${seating}?host_code=${hostCode}`)).data.guests.find((g: { id: string }) => g.id === invited.rows[0].id);
+    assert.equal(afterTableDeletion.table_id, null);
+    assert.equal(afterTableDeletion.seat_number, null);
   } finally {
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));

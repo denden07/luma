@@ -6,6 +6,7 @@ const router = Router();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validId = (value: unknown): value is string => typeof value === 'string' && uuid.test(value);
 const optionalContact = (value: unknown, limit: number) => value === undefined || value === null || (typeof value === 'string' && value.trim().length <= limit);
+const validSeatNumber = (value: unknown) => value === null || (typeof value === 'number' && Number.isInteger(value) && value > 0);
 
 type Response = {
   id: string; event_id: string; guest_id: string | null; group_id: string | null;
@@ -108,7 +109,8 @@ export async function reconcileResponse(client: PoolClient, responseId: string):
       if (previous.full_name !== seat.full_name || previous.companion_label !== label ||
         previous.rsvp_companion_status !== seat.status || previous.rsvp_proxy_for_id !== proxyFor)
         await client.query(`UPDATE guests SET full_name = $1, companion_label = $2, rsvp_companion_status = $3,
-          rsvp_proxy_for_id = $4, table_id = CASE WHEN $3::varchar = 'attending' THEN table_id ELSE NULL END WHERE id = $5`,
+          rsvp_proxy_for_id = $4, table_id = CASE WHEN $3::varchar = 'attending' THEN table_id ELSE NULL END,
+          seat_number = CASE WHEN $3::varchar = 'attending' THEN seat_number ELSE NULL END WHERE id = $5`,
           [seat.full_name, label, seat.status, proxyFor, previous.id]);
     } else {
       await client.query(
@@ -131,7 +133,7 @@ async function authorized(eventId: string, code: unknown): Promise<boolean> {
 
 const guestQuery = `SELECT g.id, g.event_id, g.group_id, g.full_name, g.email, g.phone,
   g.companion_label, g.is_rsvp_companion, COALESCE(own.status, CASE WHEN g.group_id IS NOT NULL THEN g.rsvp_companion_status END, grp.status, g.rsvp_companion_status, companion.status) AS rsvp_status,
-  proxy_owner.full_name AS proxy_of, g.table_id
+  proxy_owner.full_name AS proxy_of, g.table_id, g.seat_number
   FROM guests g
   LEFT JOIN rsvp_responses own ON own.guest_id = g.id
   LEFT JOIN rsvp_responses grp ON grp.group_id = g.group_id
@@ -149,7 +151,7 @@ router.get('/:eventId/seating', async (req, res) => {
       const responses = await client.query<{ id: string }>('SELECT id FROM rsvp_responses WHERE event_id = $1 ORDER BY id', [eventId]);
       for (const response of responses.rows) await reconcileResponse(client, response.id);
       const tables = await client.query(
-        `SELECT t.id, t.event_id, t.name, t.capacity, COUNT(g.id)::integer AS occupancy
+        `SELECT t.id, t.event_id, t.name, t.capacity, t.numbered_seats, COUNT(g.id)::integer AS occupancy
          FROM seating_tables t LEFT JOIN guests g ON g.table_id = t.id
          WHERE t.event_id = $1 GROUP BY t.id ORDER BY t.created_at, t.id`, [eventId],
       );
@@ -163,14 +165,14 @@ router.get('/:eventId/seating', async (req, res) => {
 
 router.post('/:eventId/seating/tables', async (req, res) => {
   const { eventId } = req.params;
-  const { host_code: code, name, capacity } = req.body ?? {};
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 255 || !Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647)
+  const { host_code: code, name, capacity, numbered_seats: numberedSeats = false } = req.body ?? {};
+  if (typeof name !== 'string' || !name.trim() || name.trim().length > 255 || !Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647 || typeof numberedSeats !== 'boolean')
     return res.status(400).json({ error: 'A name and positive integer capacity are required' });
   try {
     if (!await authorized(eventId, code)) return res.status(404).json({ error: 'Event not found' });
     const result = await pool.query(
-      'INSERT INTO seating_tables (event_id, name, capacity) VALUES ($1, $2, $3) RETURNING id, event_id, name, capacity, 0 AS occupancy',
-      [eventId, name.trim(), capacity],
+      'INSERT INTO seating_tables (event_id, name, capacity, numbered_seats) VALUES ($1, $2, $3, $4) RETURNING id, event_id, name, capacity, numbered_seats, 0 AS occupancy',
+      [eventId, name.trim(), capacity, numberedSeats],
     );
     return res.status(201).json(result.rows[0]);
   } catch (error) { console.error('Error creating table:', error); return res.status(500).json({ error: 'Failed to create table' }); }
@@ -178,52 +180,90 @@ router.post('/:eventId/seating/tables', async (req, res) => {
 
 router.patch('/:eventId/seating/tables/:tableId', async (req, res) => {
   const { eventId, tableId } = req.params;
-  const { host_code: code, name, capacity } = req.body ?? {};
-  if (!validId(tableId) || (name === undefined && capacity === undefined) ||
+  const { host_code: code, name, capacity, numbered_seats: numberedSeats } = req.body ?? {};
+  if (!validId(tableId) || (name === undefined && capacity === undefined && numberedSeats === undefined) ||
       (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 255)) ||
-      (capacity !== undefined && (!Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647)))
+      (capacity !== undefined && (!Number.isInteger(capacity) || capacity < 1 || capacity > 2147483647)) ||
+      (numberedSeats !== undefined && typeof numberedSeats !== 'boolean'))
     return res.status(400).json({ error: 'Invalid table update' });
+  let client: PoolClient | undefined;
   try {
     if (!await authorized(eventId, code)) return res.status(404).json({ error: 'Event not found' });
-    const result = await pool.query(
-      `UPDATE seating_tables SET name = COALESCE($1, name), capacity = COALESCE($2, capacity)
-       WHERE id = $3 AND event_id = $4 RETURNING id, event_id, name, capacity,
-       (SELECT COUNT(*)::integer FROM guests WHERE table_id = $3) AS occupancy`,
-      [name?.trim() ?? null, capacity ?? null, tableId, eventId],
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const table = await client.query<{ capacity: number; numbered_seats: boolean }>(
+      'SELECT capacity, numbered_seats FROM seating_tables WHERE id = $1 AND event_id = $2 FOR UPDATE', [tableId, eventId]);
+    if (!table.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Table not found' }); }
+    const nextCapacity = capacity ?? table.rows[0].capacity;
+    const nextNumbered = numberedSeats ?? table.rows[0].numbered_seats;
+    if (nextNumbered && (await client.query('SELECT 1 FROM guests WHERE table_id = $1 AND seat_number > $2 LIMIT 1', [tableId, nextCapacity])).rowCount) {
+      await client.query('ROLLBACK'); return res.status(409).json({ error: 'Move or clear seat numbers above the new table capacity first' });
+    }
+    if (!nextNumbered) await client.query('UPDATE guests SET seat_number = NULL WHERE table_id = $1 AND seat_number IS NOT NULL', [tableId]);
+    const result = await client.query(
+      `UPDATE seating_tables SET name = COALESCE($1, name), capacity = $2, numbered_seats = $3
+       WHERE id = $4 AND event_id = $5 RETURNING id, event_id, name, capacity, numbered_seats,
+       (SELECT COUNT(*)::integer FROM guests WHERE table_id = $4) AS occupancy`,
+      [name?.trim() ?? null, nextCapacity, nextNumbered, tableId, eventId],
     );
-    if (!result.rowCount) return res.status(404).json({ error: 'Table not found' });
+    await client.query('COMMIT');
     return res.json(result.rows[0]);
-  } catch (error) { console.error('Error updating table:', error); return res.status(500).json({ error: 'Failed to update table' }); }
+  } catch (error) { if (client) await client.query('ROLLBACK'); console.error('Error updating table:', error); return res.status(500).json({ error: 'Failed to update table' }); }
+  finally { client?.release(); }
 });
 
 router.delete('/:eventId/seating/tables/:tableId', async (req, res) => {
   const { eventId, tableId } = req.params;
+  if (!validId(tableId)) return res.status(400).json({ error: 'Invalid table ID' });
+  let client: PoolClient | undefined;
   try {
     if (!await authorized(eventId, req.query.host_code)) return res.status(404).json({ error: 'Event not found' });
-    if (!validId(tableId)) return res.status(400).json({ error: 'Invalid table ID' });
-    const result = await pool.query('DELETE FROM seating_tables WHERE id = $1 AND event_id = $2 RETURNING id', [tableId, eventId]);
-    if (!result.rowCount) return res.status(404).json({ error: 'Table not found' });
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const table = await client.query('SELECT id FROM seating_tables WHERE id = $1 AND event_id = $2 FOR UPDATE', [tableId, eventId]);
+    if (!table.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Table not found' }); }
+    await client.query('UPDATE guests SET table_id = NULL, seat_number = NULL WHERE table_id = $1', [tableId]);
+    await client.query('DELETE FROM seating_tables WHERE id = $1 AND event_id = $2', [tableId, eventId]);
+    await client.query('COMMIT');
     return res.status(204).end();
-  } catch (error) { console.error('Error deleting table:', error); return res.status(500).json({ error: 'Failed to delete table' }); }
+  } catch (error) { if (client) await client.query('ROLLBACK'); console.error('Error deleting table:', error); return res.status(500).json({ error: 'Failed to delete table' }); }
+  finally { client?.release(); }
 });
 
 router.put('/:eventId/seating/assignments/:guestId', async (req, res) => {
   const { eventId, guestId } = req.params;
-  const { host_code: code, table_id: tableId } = req.body ?? {};
-  if (!validId(guestId) || !(tableId === null || validId(tableId)))
+  const { host_code: code, table_id: tableId, seat_number: seatNumber } = req.body ?? {};
+  if (!validId(guestId) || !(tableId === null || validId(tableId)) || (seatNumber !== undefined && !validSeatNumber(seatNumber)) ||
+      (tableId === null && seatNumber !== undefined && seatNumber !== null))
     return res.status(400).json({ error: 'A valid table_id or null is required' });
+  let client: PoolClient | undefined;
   try {
     if (!await authorized(eventId, code)) return res.status(404).json({ error: 'Event not found' });
-    if (tableId && !(await pool.query('SELECT 1 FROM seating_tables WHERE id = $1 AND event_id = $2', [tableId, eventId])).rowCount)
-      return res.status(404).json({ error: 'Table not found' });
-    const updated = await pool.query(
-      `UPDATE guests SET table_id = $1 WHERE id = $2 AND event_id = $3
-       RETURNING id`, [tableId, guestId, eventId],
+    client = await pool.connect();
+    await client.query('BEGIN');
+    if (tableId) {
+      const table = await client.query<{ capacity: number; numbered_seats: boolean }>(
+        'SELECT capacity, numbered_seats FROM seating_tables WHERE id = $1 AND event_id = $2 FOR UPDATE', [tableId, eventId]);
+      if (!table.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Table not found' }); }
+      if (seatNumber != null && (!table.rows[0].numbered_seats || seatNumber > table.rows[0].capacity)) {
+        await client.query('ROLLBACK'); return res.status(400).json({ error: 'Choose a seat number within a table with numbered seats enabled' });
+      }
+    }
+    const updated = await client.query(
+      `UPDATE guests SET table_id = $1,
+       seat_number = CASE WHEN $4::boolean THEN $5::integer WHEN table_id IS DISTINCT FROM $1::uuid THEN NULL ELSE seat_number END
+       WHERE id = $2 AND event_id = $3 RETURNING id`,
+      [tableId, guestId, eventId, seatNumber !== undefined, seatNumber ?? null],
     );
-    if (!updated.rowCount) return res.status(404).json({ error: 'Guest not found' });
-    const guest = await pool.query(`${guestQuery} WHERE g.id = $1 AND g.event_id = $2`, [guestId, eventId]);
+    if (!updated.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Guest not found' }); }
+    const guest = await client.query(`${guestQuery} WHERE g.id = $1 AND g.event_id = $2`, [guestId, eventId]);
+    await client.query('COMMIT');
     return res.json(guest.rows[0]);
-  } catch (error) { console.error('Error assigning guest:', error); return res.status(500).json({ error: 'Failed to assign guest' }); }
+  } catch (error) {
+    if (client) await client.query('ROLLBACK');
+    if ((error as { code?: string }).code === '23505') return res.status(409).json({ error: 'That seat number is already assigned at this table' });
+    console.error('Error assigning guest:', error); return res.status(500).json({ error: 'Failed to assign guest' });
+  } finally { client?.release(); }
 });
 
 router.post('/:eventId/seating/guests', async (req, res) => {

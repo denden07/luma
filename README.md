@@ -59,7 +59,7 @@ layout as the published invitation. Cover photos, palette, and heading style
 remain editable after choosing a look. Each template includes entrance and
 scroll motion, with ambient details where appropriate; motion is disabled
 when the visitor requests reduced motion.
-In **Event details**, enter the ceremony first, followed by the venue or
+In **Event details**, edit the section title and enter the ceremony first, followed by the venue or
 reception; both locations support a map link. Separate **Timeline**, **Clothing
 motif & colors**, and **Gift instructions** sections let you add and reorder
 timeline events with a time, name, and optional details, pick and display up to six clothing palette colors with optional
@@ -115,6 +115,13 @@ In **Seating plan**, create tables with a seat
 count, search the unassigned guest roster, and choose a table for each guest.
 Guests may be moved or unassigned; removing a table leaves its guests unassigned.
 If a table exceeds its seat count, the plan warns you but permits the assignment.
+Enable **Numbered seats** for tables with a specific seating arrangement, then
+enter a seat number for each guest as needed. Seat numbers must be unique within
+that table and no greater than its capacity; tables without numbered seats
+remain unchanged. Turning numbering off clears the table's seat assignments.
+Numbered seats appear in the printed plan and CSV export.
+After submitting an RSVP, the receipt and its PDF list only attending guests,
+with any table and seat number beside each name.
 Use **Add and seat a guest** to create a guest-list entry and place them at a table
 in one step, with an optional existing invitation group. The roster's total
 counts each guest once.
@@ -158,14 +165,20 @@ shows a guest-list receipt with the invitation name, responses, submission
 time, and reference, downloadable as a PDF generated entirely in the browser
 (including on Android and iOS). Unlisted names instead receive a request
 receipt clearly marked pending host review, not guest-list confirmation.
+In the guest list's **RSVP settings**, select **Guest list only** to prevent
+unlisted visitors from sending requests. They see a name-not-found modal
+instead; listed guests can still RSVP. The default **Allow host-review
+requests** keeps the existing verification queue available.
 On the public invitation, RSVP search, submission, and receipt-download errors
 appear in a dismissible upper-right notification; a failed submission keeps
 the guest's answers so they can retry.
+When RSVP content exceeds the modal height, a visible scroll cue appears before
+the guest starts scrolling.
 RSVP party totals include only attending guests; declined or undecided reserved
 seats are removed from table assignments. Changing an RSVP
 reconciles only guests created from that RSVP and their seating assignments.
 Use **Print** for a
-print-friendly plan or **Export CSV** for the current assignments and unassigned
+two-column print-friendly plan (with unassigned guests last) or **Export CSV** for the current assignments and unassigned
 guests. Run `npm run db:migrate` after updating an existing installation to add
 the seating schema; opening the host guest list or seating plan reconciles
 earlier responses.

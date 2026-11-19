@@ -1,10 +1,14 @@
 import type { RsvpStatus } from '../services/rsvpService';
 
+export type RsvpReceiptSeating = { tableName: string | null; seatNumber: number | null };
+
 export type RsvpReceipt = {
   kind: 'listed' | 'pending';
   guestName: string;
+  isGroup?: boolean;
   status: RsvpStatus;
   companions: { name: string; status: RsvpStatus }[];
+  seating?: { invitation?: RsvpReceiptSeating; companions: RsvpReceiptSeating[] };
   proxyName?: string;
   submittedAt: string;
   reference?: string;
@@ -12,6 +16,21 @@ export type RsvpReceipt = {
 
 export const rsvpStatusLabel = (value: RsvpStatus) =>
   value === 'attending' ? 'Attending' : value === 'declined' ? 'Not attending' : 'Still deciding';
+
+export const rsvpSeatingLabel = ({ tableName, seatNumber }: RsvpReceiptSeating) =>
+  tableName ? `Table: ${tableName}${seatNumber !== null ? ` - Seat ${seatNumber}` : ''}` : 'Not assigned to a table';
+
+export const rsvpNameWithSeating = (name: string, seating?: RsvpReceiptSeating) =>
+  seating ? `${name} (${rsvpSeatingLabel(seating)})` : name;
+
+export const rsvpAttendingGuests = (receipt: RsvpReceipt): { name: string; seating?: RsvpReceiptSeating }[] => {
+  if (receipt.kind !== 'listed') return [];
+  return [
+    ...(!receipt.isGroup && receipt.status === 'attending' ? [{ name: receipt.guestName, seating: receipt.seating?.invitation }] : []),
+    ...receipt.companions.flatMap((companion, index) =>
+      companion.status === 'attending' ? [{ name: companion.name, seating: receipt.seating?.companions[index] }] : []),
+  ];
+};
 
 let pdfModule: typeof import('jspdf') | null = null;
 
@@ -79,10 +98,15 @@ export function downloadRsvpReceiptPdf(receipt: RsvpReceipt, eventName: string):
     pageNumber++;
     y = startPage();
   };
-  const rows = [
+  const attendingGuests = rsvpAttendingGuests(receipt);
+  const rows: { label: string; value: string; compact?: boolean }[] = [
     { label: receipt.kind === 'listed' ? 'Invitation' : 'Requested name', value: receipt.guestName },
     { label: receipt.kind === 'listed' ? 'Your RSVP' : 'Requested response', value: rsvpStatusLabel(receipt.status) },
-    ...receipt.companions.map(companion => ({ label: 'Additional guest', value: `${companion.name} - ${rsvpStatusLabel(companion.status)}` })),
+    ...(receipt.kind === 'listed'
+      ? attendingGuests.length
+        ? attendingGuests.map((guest, index) => ({ label: index === 0 ? 'Attending' : '', value: rsvpNameWithSeating(guest.name, guest.seating), compact: true }))
+        : [{ label: 'Attending', value: 'No guests attending', compact: true }]
+      : []),
     ...(receipt.proxyName ? [{ label: 'Proxy of', value: `${receipt.guestName}: ${receipt.proxyName}` }] : []),
     { label: 'Submitted', value: new Date(receipt.submittedAt).toLocaleString() },
     ...(receipt.reference ? [{ label: 'Reference', value: receipt.reference }] : []),
@@ -90,7 +114,7 @@ export function downloadRsvpReceiptPdf(receipt: RsvpReceipt, eventName: string):
   for (const row of rows) {
     context.font = '15px Arial, sans-serif';
     const lines = wrap(row.value, width - 229);
-    const rowHeight = Math.max(43, lines.length * 21 + 18);
+    const rowHeight = Math.max(row.compact ? 30 : 43, lines.length * 21 + (row.compact ? 8 : 18));
     if (y + rowHeight > height - 90) nextPage();
     context.fillStyle = '#495b4c';
     context.font = 'bold 13px Arial, sans-serif';

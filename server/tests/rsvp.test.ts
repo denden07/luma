@@ -9,7 +9,7 @@ import pool from '../db/index.js';
 after(async () => { await pool.end(); });
 
 test('guest-specific allowances, companion names and host-reviewed requests', { timeout: 15000 }, async context => {
-  try { await pool.query('SELECT is_group_responder FROM guests LIMIT 0'); await pool.query('SELECT attendee_names FROM rsvp_verification_requests LIMIT 0'); }
+  try { await pool.query('SELECT is_group_responder FROM guests LIMIT 0'); await pool.query('SELECT attendee_names FROM rsvp_verification_requests LIMIT 0'); await pool.query('SELECT rsvp_unlisted_requests_enabled FROM events LIMIT 0'); }
   catch { context.skip('Migrated Postgres unavailable'); return; }
   const hostCode = randomUUID();
   const event = await pool.query<{ id: string }>(
@@ -147,10 +147,28 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     const attendingResponse = (await request(`/api/events/${eventId}/rsvp?host_code=${hostCode}`)).data.find((response: { guest_id: string }) => response.guest_id === guestId);
     assert.equal(attendingResponse.party_count, 1);
     assert.equal(attendingResponse.plus_one_count, 1);
-    const table = await request(`/api/events/${eventId}/seating/tables`, 'POST', { host_code: hostCode, name: 'Proxy table', capacity: 2 });
+    const table = await request(`/api/events/${eventId}/seating/tables`, 'POST', { host_code: hostCode, name: 'Proxy table', capacity: 2, numbered_seats: true });
     assert.equal(table.status, 201);
-    assert.equal((await request(`/api/events/${eventId}/seating/assignments/${proxyGuest.id}`, 'PUT', { host_code: hostCode, table_id: table.data.id })).status, 200);
+    assert.equal((await request(`/api/events/${eventId}/seating/assignments/${proxyGuest.id}`, 'PUT', { host_code: hostCode, table_id: table.data.id, seat_number: 1 })).status, 200);
     assert.equal((await request(`/api/events/${eventId}/seating?host_code=${hostCode}`)).data.tables[0].occupancy, 1);
+    const guestTable = await request(`/api/events/${eventId}/seating/tables`, 'POST', { host_code: hostCode, name: 'Guest seating', capacity: 3, numbered_seats: true });
+    assert.equal(guestTable.status, 201);
+    for (const [id, seatNumber] of [[guestId, 1], [named.data.id, 2], [member.data.id, 3]] as [string, number][]) {
+      assert.equal((await request(`/api/events/${eventId}/seating/assignments/${id}`, 'PUT', {
+        host_code: hostCode, table_id: guestTable.data.id, seat_number: seatNumber,
+      })).status, 200);
+    }
+    const seatedMatch = (await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches[0];
+    assert.equal(seatedMatch.table_name, 'Guest seating');
+    assert.equal(seatedMatch.seat_number, 1);
+    assert.equal(seatedMatch.companions[0].table_name, 'Guest seating');
+    assert.equal(seatedMatch.companions[0].seat_number, 2);
+    assert.equal(seatedMatch.reserved_seats[0].table_name, 'Proxy table');
+    assert.equal(seatedMatch.reserved_seats[0].seat_number, 1);
+    assert.equal((await request('/api/rsvp/search', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches[0].table_name, 'Guest seating');
+    const groupSeating = (await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Example family' })).data.matches[0];
+    assert.equal(groupSeating.members.find((guest: { id: string }) => guest.id === member.data.id).seat_number, 3);
+    assert.equal(groupSeating.members.find((guest: { id: string }) => guest.id === member.data.id).table_name, 'Guest seating');
     const undecidedReply = await reservedReply('attending', [{ name: '', status: 'undecided' }], null, 'declined');
     assert.equal(undecidedReply.status, 200, JSON.stringify(undecidedReply.data));
     const undecidedRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
@@ -158,6 +176,7 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     assert.equal(undecidedRoster.data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).full_name, 'Alex Example friend #1');
     assert.equal(undecidedRoster.data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).proxy_of, null);
     assert.equal((await request(`/api/events/${eventId}/seating?host_code=${hostCode}`)).data.tables[0].occupancy, 0);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches[0].reserved_seats[0].table_name, null);
     assert.equal((await reservedReply('attending', [{ name: 'Taylor Proxy', status: 'declined' }], null, 'undecided')).status, 200);
     assert.equal((await request(`/api/events/${eventId}/guests?host_code=${hostCode}`)).data.guests.find((guest: { id: string }) => guest.id === proxyGuest.id).rsvp_status, 'declined');
     assert.equal((await reservedReply('attending', [{ name: 'Taylor Proxy', status: 'attending' }, { name: 'Extra', status: 'attending' }], null)).status, 400);
@@ -185,6 +204,18 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     })).status, 200);
     const approvedRoster = await request(`/api/events/${eventId}/guests?host_code=${hostCode}`);
     assert.ok(approvedRoster.data.guests.some((guest: { full_name: string }) => guest.full_name === 'Unknown Example'));
+    const disabled = await request(`/api/events/${eventId}/rsvp-settings`, 'PATCH', { host_code: hostCode, unlisted_requests_enabled: false });
+    assert.equal(disabled.status, 200);
+    assert.equal(disabled.data.rsvp_unlisted_requests_enabled, false);
+    assert.equal(disabled.data.rsvp_dietary_notes_enabled, false);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Another Unknown' })).data.unlisted_blocked, true);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Another Unknown', status: 'attending', party_count: 1 })).status, 403);
+    assert.equal((await request(`/api/events/${eventId}/rsvp-verification-requests?host_code=${hostCode}`)).data.some((item: { submitted_name: string }) => item.submitted_name === 'Another Unknown'), false);
+    assert.ok((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Alex Example' })).data.matches.length > 0);
+    assert.equal((await request(`/api/events/${eventId}/rsvp-settings`, 'PATCH', { host_code: 'wrong', unlisted_requests_enabled: true })).status, 404);
+    assert.equal((await request(`/api/events/${eventId}/rsvp-settings`, 'PATCH', { host_code: hostCode, unlisted_requests_enabled: 'yes' })).status, 400);
+    assert.equal((await request(`/api/events/${eventId}/rsvp-settings`, 'PATCH', { host_code: hostCode, unlisted_requests_enabled: true })).status, 200);
+    assert.equal((await request('/api/rsvp/lookup', 'POST', { event_id: eventId, name: 'Another Unknown' })).data.needs_response, true);
   } finally {
     server.close();
     await pool.query('DELETE FROM events WHERE id = $1', [eventId]);

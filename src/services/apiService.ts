@@ -22,6 +22,7 @@ export interface Event {
   payment_status: 'unpaid' | 'partial' | 'paid';
   rsvp_plus_limit: number;
   rsvp_dietary_notes_enabled: boolean;
+  rsvp_unlisted_requests_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
