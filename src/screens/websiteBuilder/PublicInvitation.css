@@ -100,7 +100,13 @@
 .public-rsvp-modal .public-rsvp-reference { color: #5e6d60; font-size: 11px; overflow-wrap: anywhere; }
 .public-rsvp-modal .public-rsvp-receipt-note { font-size: 12px; margin: 0; }
 .public-invitation-section { box-sizing: border-box; min-height: 240px; padding: 72px max(24px, calc((100vw - 680px) / 2)); text-align: center; }.public-invitation-section p { font-size: 18px; line-height: 1.7; margin: 0 auto; max-width: 620px; }.public-invitation-section-kicker { font-family: var(--font-editorial); font-size: clamp(30px, 7vw, 54px); line-height: 1; margin-bottom: 22px !important; }.public-invitation-story { background: #fffdf7; }.public-invitation-details { background: #e7dfd1; }.public-invitation-details p + p { margin-top: 8px; }.public-invitation-closing { background: #1d211c; color: #fffdf7; display: grid; font-family: var(--font-editorial); font-size: clamp(30px, 7vw, 56px); line-height: 1.05; }
-.public-invitation-gallery { background: #fffdf7; }.public-gallery-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin: 28px auto 0; max-width: 720px; }.public-gallery-grid img { aspect-ratio: 1; }.public-gallery-strip { display: flex; gap: 12px; margin: 28px auto 0; max-width: 720px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }.public-gallery-strip img { flex: 0 0 min(72vw, 360px); scroll-snap-align: center; }.public-invitation-gallery img { display: block; object-fit: cover; width: 100%; }.public-invitation-entourage { background: #e7dfd1; }.public-invitation-entourage > div { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 28px auto 0; max-width: 720px; }.public-invitation-entourage h2 { font-family: var(--font-editorial); font-size: 28px; margin: 0 0 14px; }.public-invitation-entourage ul { list-style: none; margin: 0; padding: 0; }.public-invitation-entourage li { line-height: 1.7; }
+.public-invitation-gallery { background: #fffdf7; }.public-gallery-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin: 28px auto 0; max-width: 720px; }.public-gallery-grid img { aspect-ratio: 1; }.public-gallery-strip { display: flex; gap: 12px; margin: 28px auto 0; max-width: 720px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }.public-gallery-strip img { flex: 0 0 min(72vw, 360px); scroll-snap-align: center; }.public-invitation-entourage { background: #e7dfd1; }.public-invitation-entourage .public-entourage-party h2 { font-family: var(--font-editorial); font-size: 28px; margin: 0 0 14px; }.public-invitation-entourage ul { list-style: none; margin: 0; padding: 0; }.public-invitation-entourage li { line-height: 1.7; }
+.public-invitation-entourage .public-entourage-sponsors { margin: 0 auto; max-width: 720px; }
+.public-invitation-entourage .public-entourage-sponsors.has-party { border-top: 1px solid color-mix(in srgb, var(--invitation-accent) 35%, transparent); margin-top: 44px; padding-top: 42px; }
+.public-invitation-entourage .public-entourage-sponsors h2 { color: inherit; }
+.public-entourage-sponsors ul { columns: 2; column-gap: 32px; }
+.public-entourage-sponsors li { break-inside: avoid; padding: 2px 0; }
+.public-invitation-entourage .public-entourage-party { display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 28px auto 0; max-width: 720px; }
 
 .public-invitation-garden { background: #e5eee2; color: #264333; }.public-invitation-garden .public-invitation-hero::before { border: 1px solid rgba(38, 67, 51, .45); content: ''; inset: 24px; position: absolute; }.public-invitation-garden .public-invitation-hero.has-cover::before { display: none; }.public-invitation-garden .public-invitation-rsvp { background: #fffdf7; }
 .public-invitation-modern { background: #1d211c; color: #fffdf7; }.public-invitation-modern .public-invitation-hero::before { background: #e1c86b; content: ''; height: 2px; left: -10%; position: absolute; top: 49%; transform: rotate(-12deg); width: 120%; }.public-invitation-modern .public-invitation-rsvp { background: #e1c86b; color: #1d211c; }
@@ -181,7 +187,8 @@
   .public-gallery-strip img:first-child { grid-column: span 2; grid-row: auto; }
   .public-gallery-grid img:first-child { grid-column: span 2; grid-row: auto; }
   .public-gallery-carousel { aspect-ratio: 4 / 5; }
-  .public-invitation-entourage > div { grid-template-columns: 1fr; }
+  .public-invitation-entourage .public-entourage-party { grid-template-columns: 1fr; }
+  .public-entourage-sponsors ul { columns: 1; }
 }
 
 @container (max-width: 420px) {

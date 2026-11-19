@@ -393,7 +393,22 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           const layout = selectedLayout === 'strip' || selectedLayout === 'carousel' ? selectedLayout : 'grid';
           return <section className="public-invitation-section public-invitation-gallery" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><InvitationGallery paths={paths} layout={layout} /></section>;
         }
-        if (section.type === 'entourage') return <section className="public-invitation-section public-invitation-entourage" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><div>{entourageGroups(section.content).map(group => { const members = group.members.map(member => member.trim()).filter(Boolean); return <article key={group.id}><h2>{group.title}</h2>{members.length > 0 && <ul>{members.map(member => <li key={member}>{member}</li>)}</ul>}</article>; })}</div></section>;
+        if (section.type === 'entourage') {
+          const groups = entourageGroups(section.content).map(group => ({ ...group, members: group.members.map(member => member.trim()).filter(Boolean) }));
+          const sponsors = groups.find(group => group.id === 'sponsors');
+          const party = groups.filter(group => group.id !== 'sponsors' && group.members.length > 0);
+          return <section className="public-invitation-section public-invitation-entourage" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            {(party.length > 0 || !sponsors?.members.length) && <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>}
+            {party.length > 0 && <div className="public-entourage-party">{party.map(group => <article key={group.id}>
+              <h2>{group.title}</h2>
+              <ul>{group.members.map((member, index) => <li key={`${index}-${member}`}>{member}</li>)}</ul>
+            </article>)}</div>}
+            {sponsors && sponsors.members.length > 0 && <div className={`public-entourage-sponsors ${party.length > 0 ? 'has-party' : ''}`}>
+              <h2 className="public-invitation-section-kicker">{sponsors.title}</h2>
+              <ul>{sponsors.members.map((member, index) => <li key={`${index}-${member}`}>{member}</li>)}</ul>
+            </div>}
+          </section>;
+        }
         if (section.type === 'closing') return <section className="public-invitation-section public-invitation-closing" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
         return null;
       })}

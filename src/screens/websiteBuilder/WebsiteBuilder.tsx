@@ -253,6 +253,8 @@ const WebsiteBuilder = () => {
   const galleryLayout = contentText(gallery?.content, 'layout') || 'grid';
   const galleryLimit = galleryLayout === 'strip' || galleryLayout === 'carousel' ? 5 : 6;
   const currentEntourageGroups = entourageGroups(entourage?.content);
+  const sponsorGroup = currentEntourageGroups.find(group => group.id === 'sponsors') ?? { id: 'sponsors', title: 'Sponsors', members: [] };
+  const partyGroups = currentEntourageGroups.filter(group => group.id !== 'sponsors');
   const timeline = invitationTimeline(timelineSection?.content);
   const attireColors = invitationColors(attire?.content);
 
@@ -302,6 +304,12 @@ const WebsiteBuilder = () => {
     if (!document || !entourage?.id) return;
     setDocument({ ...document, sections: document.sections.map(section => section.id === entourage.id ? { ...section, content: { ...section.content, groups } } : section) });
     markDirty();
+  };
+
+  const updateSponsorGroup = (group: EntourageGroup) => {
+    updateEntourageGroups(currentEntourageGroups.some(current => current.id === 'sponsors')
+      ? currentEntourageGroups.map(current => current.id === 'sponsors' ? group : current)
+      : [group, ...currentEntourageGroups]);
   };
 
   const updateTimeline = (entries: TimelineEntry[]) => {
@@ -581,15 +589,24 @@ const WebsiteBuilder = () => {
             </div>
           </fieldset>
           <fieldset className="website-section-fields">
-            <legend>Entourage</legend>
+            <legend>Entourage &amp; sponsors</legend>
             <label htmlFor="invitation-entourage-title">Section title<input id="invitation-entourage-title" value={contentText(entourage?.content, 'title')} onChange={(input) => updateSection(entourage?.id, 'title', input.target.value)} maxLength={80} /></label>
             <div className="entourage-groups">
-              {currentEntourageGroups.map(group => <div className="entourage-group" key={group.id}>
+              {partyGroups.map(group => <div className="entourage-group" key={group.id}>
                 <label htmlFor={`entourage-title-${group.id}`}>Category<input id={`entourage-title-${group.id}`} value={group.title} onChange={(input) => updateEntourageGroups(currentEntourageGroups.map(current => current.id === group.id ? { ...current, title: input.target.value } : current))} maxLength={80} /></label>
                 <label htmlFor={`entourage-members-${group.id}`}>Names, one per line<textarea id={`entourage-members-${group.id}`} value={group.members.join('\n')} onChange={(input) => updateEntourageGroups(currentEntourageGroups.map(current => current.id === group.id ? { ...current, members: input.target.value.split('\n') } : current))} maxLength={800} rows={3} /></label>
-                <button type="button" onClick={() => updateEntourageGroups(currentEntourageGroups.filter(current => current.id !== group.id))} disabled={currentEntourageGroups.length === 1} aria-label={`Remove ${group.title}`} title="Remove group"><Trash2 size={16} aria-hidden="true" /> Remove</button>
+                <button type="button" onClick={() => updateEntourageGroups(currentEntourageGroups.filter(current => current.id !== group.id))} aria-label={`Remove ${group.title}`} title="Remove group"><Trash2 size={16} aria-hidden="true" /> Remove</button>
               </div>)}
               <button type="button" className="add-entourage-group" onClick={() => updateEntourageGroups([...currentEntourageGroups, { id: crypto.randomUUID(), title: 'New Group', members: [] }])}><Plus size={16} aria-hidden="true" /> Add group</button>
+            </div>
+            <div className="entourage-sponsors-fields">
+              <span className="website-detail-heading">Sponsors</span>
+              <label htmlFor="invitation-sponsors-title">Heading
+                <input id="invitation-sponsors-title" value={sponsorGroup.title} onChange={input => updateSponsorGroup({ ...sponsorGroup, title: input.target.value })} maxLength={80} />
+              </label>
+              <label htmlFor="invitation-sponsors-members">Names, one per line
+                <textarea id="invitation-sponsors-members" value={sponsorGroup.members.join('\n')} onChange={input => updateSponsorGroup({ ...sponsorGroup, members: input.target.value.split('\n') })} maxLength={800} rows={4} />
+              </label>
             </div>
           </fieldset>
           <fieldset className="website-section-fields">
