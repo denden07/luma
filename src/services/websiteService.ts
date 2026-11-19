@@ -54,7 +54,7 @@ export function createWebsiteDraft(eventName: string, eventDate: string, templat
         },
       },
       { id: 'countdown', type: 'countdown', visible: true, content: { title: 'Until our day', target_at: countdownTarget(eventStartTime || eventDate) } },
-      { id: 'story', type: 'story', visible: true, content: { title: 'Our Story', body: 'A little more about the people and moments that brought us here.' } },
+      { id: 'story', type: 'story', visible: true, content: { title: 'Our Story', body: 'A little more about the people and moments that brought us here.', photo_paths: [] } },
       { id: 'details', type: 'details', visible: true, content: {
         title: 'Event Details',
         ceremony_place: '', ceremony_time: '', ceremony_directions_url: '',

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, CircleAlert, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
 import { invitationSectionId, withLegacyInvitationSections } from '../../utils/invitationSections';
 import { invitationTimeline } from '../../utils/invitationTimeline';
+import type { TimelineEntry } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
 import { countdownRemaining } from '../../utils/invitationCountdown';
 import attireIllustration from '../../assets/images/attire-illustration.svg';
@@ -69,6 +70,37 @@ const InvitationCountdown = ({ targetAt, title, id }: { targetAt: string; title:
       {units.map(unit => <div key={unit.label}><strong>{String(unit.value).padStart(2, '0')}</strong><span>{unit.label}</span></div>)}
     </div>
     <p className="public-countdown-date">{new Date(targetAt).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+  </section>;
+};
+
+const InvitationTimeline = ({ entries, title, id }: { entries: TimelineEntry[]; title: string; id: string }) => {
+  const listRef = useRef<HTMLOListElement>(null);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const observer = new IntersectionObserver(items => {
+      for (const item of items) {
+        if (!item.isIntersecting) continue;
+        item.target.classList.add('is-visible');
+        observer.unobserve(item.target);
+      }
+    }, { rootMargin: '0px 0px -12% 0px' });
+    list.classList.add('timeline-reveal-ready');
+    for (const item of list.children) observer.observe(item);
+    return () => {
+      observer.disconnect();
+      list.classList.remove('timeline-reveal-ready');
+    };
+  }, [entries]);
+
+  return <section className="public-invitation-section public-invitation-timeline-section" id={id} tabIndex={-1}>
+    <p className="public-invitation-section-kicker">{title}</p>
+    <ol className="public-invitation-timeline" ref={listRef}>{entries.map(entry => <li key={entry.id}><div>
+      {entry.time.trim() && <span className="public-timeline-time">{entry.time}</span>}
+      {entry.title.trim() && <strong>{entry.title}</strong>}
+      {entry.details?.trim() && <p className="public-timeline-details">{entry.details}</p>}
+    </div></li>)}</ol>
   </section>;
 };
 
@@ -360,7 +392,16 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           return countdownRemaining(targetAt, 0) ? <InvitationCountdown key={section.id} id={invitationSectionId(section)} targetAt={targetAt} title={contentText(section.content, 'title') || 'Counting down'} /> : null;
         }
         if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} eventName={names} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
-        if (section.type === 'story') return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><p>{contentText(section.content, 'body')}</p></section>;
+        if (section.type === 'story') {
+          const photos = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string' && Boolean(path.trim())).slice(0, 2) : [];
+          return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
+            <p>{contentText(section.content, 'body')}</p>
+            {photos.length > 0 && <div className={`public-story-collage ${photos.length === 1 ? 'single' : ''}`} aria-label="Our Story photos">
+              {photos.map((path, index) => <div className="public-story-photo" key={`${path}-${index}`}><img src={getPhotoUrl(path)} alt={`Our Story photo ${index + 1}`} loading="lazy" /></div>)}
+            </div>}
+          </section>;
+        }
         if (section.type === 'details') {
           const venue = contentText(section.content, 'venue');
           const ceremonyPlace = contentText(section.content, 'ceremony_place');
@@ -387,14 +428,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         if (section.type === 'timeline') {
           const entries = invitationTimeline(section.content).filter(entry => entry.time.trim() || entry.title.trim() || entry.details?.trim());
           if (entries.length === 0) return null;
-          return <section className="public-invitation-section public-invitation-timeline-section" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
-            <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
-            <ol className="public-invitation-timeline">{entries.map(entry => <li key={entry.id}><div>
-              {entry.time.trim() && <span className="public-timeline-time">{entry.time}</span>}
-              {entry.title.trim() && <strong>{entry.title}</strong>}
-              {entry.details?.trim() && <p className="public-timeline-details">{entry.details}</p>}
-            </div></li>)}</ol>
-          </section>;
+          return <InvitationTimeline key={section.id} id={invitationSectionId(section)} title={contentText(section.content, 'title')} entries={entries} />;
         }
         if (section.type === 'attire') {
           const motif = contentText(section.content, 'motif');

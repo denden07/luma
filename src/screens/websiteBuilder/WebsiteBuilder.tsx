@@ -251,6 +251,7 @@ const WebsiteBuilder = () => {
   const entourage = document?.sections.find(section => section.type === 'entourage');
   const rsvp = document?.sections.find(section => section.type === 'rsvp');
   const contentText = (content: Record<string, unknown> | undefined, field: string) => typeof content?.[field] === 'string' ? content[field] as string : '';
+  const storyPhotoPaths = Array.isArray(story?.content.photo_paths) ? story.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
   const galleryPhotoPaths = Array.isArray(gallery?.content.photo_paths) ? gallery.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
   const galleryLayout = contentText(gallery?.content, 'layout') || 'grid';
   const galleryLimit = galleryLayout === 'strip' || galleryLayout === 'carousel' ? 5 : 6;
@@ -286,6 +287,19 @@ const WebsiteBuilder = () => {
   const updateTheme = (field: 'palette_id' | 'font_pair_id', value: string) => {
     if (!document) return;
     setDocument({ ...document, theme: { ...document.theme, [field]: value } });
+    markDirty();
+  };
+
+  const toggleStoryPhoto = (storagePath: string) => {
+    if (!storyPhotoPaths.includes(storagePath) && storyPhotoPaths.length >= 2) {
+      notifyError('Choose up to two photos for the Our Story collage.');
+      return;
+    }
+    if (!document || !story?.id) return;
+    const paths = storyPhotoPaths.includes(storagePath)
+      ? storyPhotoPaths.filter(path => path !== storagePath)
+      : [...storyPhotoPaths, storagePath];
+    setDocument({ ...document, sections: document.sections.map(section => section.id === story.id ? { ...section, content: { ...section.content, photo_paths: paths } } : section) });
     markDirty();
   };
 
@@ -330,14 +344,19 @@ const WebsiteBuilder = () => {
     markDirty();
   };
 
-  const uploadGalleryImage = async (file: File | null) => {
+  const uploadGalleryImage = async (file: File | null, destination: 'gallery' | 'story' = 'gallery') => {
     const hostCode = getHostCode();
     if (!file || !hostCode) return;
+    if (destination === 'story' && storyPhotoPaths.length >= 2) {
+      notifyError('Remove a story photo before uploading another.');
+      return;
+    }
     setIsUploadingGalleryImage(true);
     try {
       const asset = await uploadWebsiteAsset(event.id, hostCode, file);
       setWebsiteAssets(current => [asset, ...current]);
-      if (!galleryPhotoPaths.includes(asset.storage_path)) toggleGalleryPhoto(asset.storage_path);
+      if (destination === 'story') toggleStoryPhoto(asset.storage_path);
+      else if (!galleryPhotoPaths.includes(asset.storage_path)) toggleGalleryPhoto(asset.storage_path);
     } catch {
       notifyError('Could not upload the invitation image. Please try again.');
     } finally {
@@ -369,6 +388,7 @@ const WebsiteBuilder = () => {
       setWebsiteAssets(current => current.filter(current => current.id !== asset.id));
       setDocument({ ...document, sections: document.sections.map(section => {
         if (section.id === gallery.id) return { ...section, content: { ...section.content, photo_paths: paths } };
+        if (section.id === story?.id) return { ...section, content: { ...section.content, photo_paths: storyPhotoPaths.filter(path => path !== asset.storage_path) } };
         if (section.type === 'hero' && shareImagePath === asset.storage_path) return { ...section, content: { ...section.content, share_image_path: '' } };
         return section;
       }) });
@@ -582,6 +602,15 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-story">Story
               <textarea id="invitation-story" value={contentText(story?.content, 'body')} onChange={(input) => updateSection(story?.id, 'body', input.target.value)} maxLength={800} rows={4} />
             </label>
+            <p>Add up to two photos for a layered collage below your story. Select them in the order you want them shown.</p>
+            <label className="website-gallery-upload" htmlFor="invitation-story-upload"><span>{isUploadingGalleryImage ? 'Uploading image...' : 'Add story photo'}</span><input id="invitation-story-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingGalleryImage} onChange={(input) => { void uploadGalleryImage(input.target.files?.[0] ?? null, 'story'); input.target.value = ''; }} /></label>
+            <p className="gallery-selection-count" role="status">{storyPhotoPaths.length} of 2 story photos selected</p>
+            <div className="website-gallery-picker" aria-label="Select photos for the Our Story collage">
+              {websiteAssets.length === 0 ? <p>Upload photos to add them to your story.</p> : websiteAssets.map(asset => <div className={`website-gallery-asset ${storyPhotoPaths.includes(asset.storage_path) ? 'selected' : ''}`} key={asset.id}>
+                <button type="button" className="gallery-asset-select" onClick={() => toggleStoryPhoto(asset.storage_path)} aria-pressed={storyPhotoPaths.includes(asset.storage_path)} aria-label={`${storyPhotoPaths.includes(asset.storage_path) ? 'Remove' : 'Add'} ${asset.original_filename} ${storyPhotoPaths.includes(asset.storage_path) ? 'from' : 'to'} Our Story`}><img src={getPhotoUrl(asset.storage_path)} alt="" /><span>{storyPhotoPaths.includes(asset.storage_path) ? `Photo ${storyPhotoPaths.indexOf(asset.storage_path) + 1} - ` : ''}{asset.original_filename}</span></button>
+                <div className="gallery-asset-actions"><button type="button" onClick={() => setPreviewedGalleryAsset(asset)} aria-label={`Preview ${asset.original_filename}`} title="Preview image"><Eye size={15} aria-hidden="true" /></button></div>
+              </div>)}
+            </div>
           </fieldset>
           <fieldset className="website-section-fields">
             <legend>Photo gallery</legend>

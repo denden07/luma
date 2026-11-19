@@ -63,6 +63,8 @@ names (unnamed colors display as swatches without hex codes), and share
 gift preferences. A decorative clothing illustration appears automatically
 when the Attire section has content. Empty optional sections stay hidden until filled in, and
 each section can be reordered or hidden from **Section order**.
+Timeline events and their center-line dots reveal one at a time as visitors
+scroll, with motion disabled when reduced motion is requested.
 The invitation alternates light and muted section backgrounds in the visible
 order, while RSVP and Closing retain their accent colors.
 The **Countdown** is a separate, reorderable section immediately after the
@@ -70,6 +72,9 @@ cover by default. Its date and time initially follow the event schedule and
 can be adjusted in the editor; visitors see a live countdown in their local
 time zone. The cover remains first, and the countdown can be hidden or moved
 among the other sections.
+In **Our Story**, upload or select up to two invitation photos to show a
+layered collage below the story text. The photos can also be reused in the
+gallery; they appear in selection order and remain editable in the builder.
 The **Entourage & sponsors** editor keeps sponsors in a dedicated field group.
 On the invitation, sponsors appear after the wedding party within the same
 Entourage section; empty groups are not shown.
