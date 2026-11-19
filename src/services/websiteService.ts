@@ -145,10 +145,13 @@ export function ensureWebsiteSections(document: WebsiteDocument, eventDate?: str
   return { ...document, sections };
 }
 
+export type WebsiteAssetUsage = 'story' | 'gallery' | 'share';
+
 export interface WebsiteAsset {
   id: string;
   storage_path: string;
   original_filename: string;
+  asset_usage: WebsiteAssetUsage | null;
   created_at: string;
 }
 
@@ -158,10 +161,11 @@ export async function getWebsiteAssets(eventId: string, hostCode: string): Promi
   return response.json();
 }
 
-export async function uploadWebsiteAsset(eventId: string, hostCode: string, file: File): Promise<WebsiteAsset> {
+export async function uploadWebsiteAsset(eventId: string, hostCode: string, file: File, usage: WebsiteAssetUsage): Promise<WebsiteAsset> {
   const formData = new FormData();
   formData.append('host_code', hostCode);
   formData.append('asset', file);
+  formData.append('asset_usage', usage);
   const response = await fetch(`${API_BASE_URL}/api/events/${eventId}/website/assets`, { method: 'POST', body: formData });
   if (!response.ok) throw new Error('Failed to upload invitation image');
   return response.json();

@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, Eye, EyeOff, Globe2, LayoutTemplate, LoaderCircle, Monitor, Plus, Smartphone, Tablet, Trash2, Waves, X } from 'lucide-react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { deleteEventCover, getEventsByHostCode, getPhotoUrl, uploadEventCover } from '../../services/dataService';
 import type { Event } from '../../services/dataService';
 import { createWebsiteDraft, deleteWebsiteAsset, ensureWebsiteSections, getEventWebsite, getWebsiteAssets, publishEventWebsite, saveEventWebsite, uploadWebsiteAsset } from '../../services/websiteService';
 import { invitationSlug, invitationSlugTitle, slugifyInvitationName } from '../../utils/invitationSlug';
+import { invitationWaveDivider } from '../../utils/invitationSections';
 import { invitationTimeline } from '../../utils/invitationTimeline';
 import type { TimelineEntry } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
 import { countdownInputValue, countdownTarget } from '../../utils/invitationCountdown';
+import { assetsForInvitationSection } from '../../utils/websiteAssets';
 import type { InvitationColor } from '../../utils/invitationColors';
-import type { WebsiteAsset } from '../../services/websiteService';
+import type { WebsiteAsset, WebsiteAssetUsage } from '../../services/websiteService';
 import type { WebsiteDocument, WebsiteTemplateId } from '../../services/websiteService';
 import { getHostCode } from '../../utils/hostAuth';
 import { copyTextToClipboard } from '../../utils/clipboard';
@@ -57,7 +59,7 @@ const WebsiteBuilder = () => {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [websiteAssets, setWebsiteAssets] = useState<WebsiteAsset[]>([]);
-  const [isUploadingGalleryImage, setIsUploadingGalleryImage] = useState(false);
+  const [uploadingAssetUsage, setUploadingAssetUsage] = useState<WebsiteAssetUsage | null>(null);
   const [previewedGalleryAsset, setPreviewedGalleryAsset] = useState<WebsiteAsset | null>(null);
   const [isCoverPreviewOpen, setIsCoverPreviewOpen] = useState(false);
   const revision = useRef(0);
@@ -253,6 +255,9 @@ const WebsiteBuilder = () => {
   const contentText = (content: Record<string, unknown> | undefined, field: string) => typeof content?.[field] === 'string' ? content[field] as string : '';
   const storyPhotoPaths = Array.isArray(story?.content.photo_paths) ? story.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
   const galleryPhotoPaths = Array.isArray(gallery?.content.photo_paths) ? gallery.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
+  const storyAssets = assetsForInvitationSection(websiteAssets, 'story', storyPhotoPaths, galleryPhotoPaths, shareImagePath);
+  const galleryAssets = assetsForInvitationSection(websiteAssets, 'gallery', storyPhotoPaths, galleryPhotoPaths, shareImagePath);
+  const shareAssets = assetsForInvitationSection(websiteAssets, 'share', storyPhotoPaths, galleryPhotoPaths, shareImagePath);
   const galleryLayout = contentText(gallery?.content, 'layout') || 'grid';
   const galleryLimit = galleryLayout === 'strip' || galleryLayout === 'carousel' ? 5 : 6;
   const currentEntourageGroups = entourageGroups(entourage?.content);
@@ -344,54 +349,55 @@ const WebsiteBuilder = () => {
     markDirty();
   };
 
-  const uploadGalleryImage = async (file: File | null, destination: 'gallery' | 'story' = 'gallery') => {
+  const uploadInvitationImage = async (file: File | null, destination: WebsiteAssetUsage) => {
     const hostCode = getHostCode();
-    if (!file || !hostCode) return;
+    if (!file) return;
+    if (!hostCode) {
+      notifyError('Host access is required to upload invitation photos.');
+      return;
+    }
     if (destination === 'story' && storyPhotoPaths.length >= 2) {
       notifyError('Remove a story photo before uploading another.');
       return;
     }
-    setIsUploadingGalleryImage(true);
+    if (destination === 'gallery' && galleryPhotoPaths.length >= galleryLimit) {
+      notifyError(`Remove a gallery photo before uploading another (limit ${galleryLimit}).`);
+      return;
+    }
+    setUploadingAssetUsage(destination);
     try {
-      const asset = await uploadWebsiteAsset(event.id, hostCode, file);
+      const asset = await uploadWebsiteAsset(event.id, hostCode, file, destination);
       setWebsiteAssets(current => [asset, ...current]);
-      if (destination === 'story') toggleStoryPhoto(asset.storage_path);
-      else if (!galleryPhotoPaths.includes(asset.storage_path)) toggleGalleryPhoto(asset.storage_path);
+      setDocument(current => current ? { ...current, sections: current.sections.map(section => {
+        if (destination === 'share' && section.type === 'hero') return { ...section, content: { ...section.content, share_image_path: asset.storage_path } };
+        if (destination !== 'share' && section.type === destination) {
+          const paths = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
+          return { ...section, content: { ...section.content, photo_paths: [...paths, asset.storage_path] } };
+        }
+        return section;
+      }) } : current);
+      markDirty();
     } catch {
       notifyError('Could not upload the invitation image. Please try again.');
     } finally {
-      setIsUploadingGalleryImage(false);
+      setUploadingAssetUsage(null);
     }
   };
 
-  const uploadShareImage = async (file: File | null) => {
+  const deleteInvitationImage = async (asset: WebsiteAsset) => {
     const hostCode = getHostCode();
-    if (!file || !hostCode) return;
-    setIsUploadingGalleryImage(true);
-    try {
-      const asset = await uploadWebsiteAsset(event.id, hostCode, file);
-      setWebsiteAssets(current => [asset, ...current]);
-      updateHero('share_image_path', asset.storage_path);
-    } catch {
-      notifyError('Could not upload the link preview image. Please try again.');
-    } finally {
-      setIsUploadingGalleryImage(false);
-    }
-  };
-
-  const deleteGalleryImage = async (asset: WebsiteAsset) => {
-    const hostCode = getHostCode();
-    if (!hostCode || !document || !gallery?.id) return;
+    if (!hostCode || !document) return;
     try {
       await deleteWebsiteAsset(event.id, hostCode, asset.id);
-      const paths = galleryPhotoPaths.filter(path => path !== asset.storage_path);
       setWebsiteAssets(current => current.filter(current => current.id !== asset.id));
-      setDocument({ ...document, sections: document.sections.map(section => {
-        if (section.id === gallery.id) return { ...section, content: { ...section.content, photo_paths: paths } };
-        if (section.id === story?.id) return { ...section, content: { ...section.content, photo_paths: storyPhotoPaths.filter(path => path !== asset.storage_path) } };
-        if (section.type === 'hero' && shareImagePath === asset.storage_path) return { ...section, content: { ...section.content, share_image_path: '' } };
+      setDocument(current => current ? { ...current, sections: current.sections.map(section => {
+        if (section.type === 'gallery' || section.type === 'story') {
+          const paths = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string' && path !== asset.storage_path) : [];
+          return { ...section, content: { ...section.content, photo_paths: paths } };
+        }
+        if (section.type === 'hero' && section.content.share_image_path === asset.storage_path) return { ...section, content: { ...section.content, share_image_path: '' } };
         return section;
-      }) });
+      }) } : current);
       markDirty();
       setPreviewedGalleryAsset(null);
     } catch {
@@ -404,6 +410,17 @@ const WebsiteBuilder = () => {
     setDocument({
       ...document,
       sections: document.sections.map(section => section.id === sectionId ? { ...section, visible: !section.visible } : section),
+    });
+    markDirty();
+  };
+
+  const toggleSectionWave = (sectionId: string) => {
+    if (!document) return;
+    setDocument({
+      ...document,
+      sections: document.sections.map(section => section.id === sectionId
+        ? { ...section, content: { ...section.content, wave_divider: !invitationWaveDivider(section) } }
+        : section),
     });
     markDirty();
   };
@@ -575,12 +592,12 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-share-image">Preview image
               <select id="invitation-share-image" value={shareImagePath} onChange={input => updateHero('share_image_path', input.target.value)}>
                 <option value="">Use cover photo</option>
-                {websiteAssets.map(asset => <option key={asset.id} value={asset.storage_path}>{asset.original_filename}</option>)}
+                {shareAssets.map(asset => <option key={asset.id} value={asset.storage_path}>{asset.original_filename}</option>)}
               </select>
             </label>
             <label className="website-gallery-upload" htmlFor="invitation-share-upload">
-              <span>{isUploadingGalleryImage ? 'Uploading image...' : 'Upload link preview image'}</span>
-              <input id="invitation-share-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingGalleryImage} onChange={input => { void uploadShareImage(input.target.files?.[0] ?? null); input.target.value = ''; }} />
+              <span>{uploadingAssetUsage === 'share' ? 'Uploading image...' : 'Upload link preview image'}</span>
+              <input id="invitation-share-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAssetUsage !== null} onChange={input => { void uploadInvitationImage(input.target.files?.[0] ?? null, 'share'); input.target.value = ''; }} />
             </label>
             {(shareImagePath || coverPhotoUrl) && <img className="website-share-image" src={getPhotoUrl(shareImagePath || coverPhotoPath || '')} alt="Selected link preview" />}
           </fieldset>
@@ -602,12 +619,12 @@ const WebsiteBuilder = () => {
             <label htmlFor="invitation-story">Story
               <textarea id="invitation-story" value={contentText(story?.content, 'body')} onChange={(input) => updateSection(story?.id, 'body', input.target.value)} maxLength={800} rows={4} />
             </label>
-            <p>Add up to two photos for a layered collage below your story. Select them in the order you want them shown.</p>
-            <label className="website-gallery-upload" htmlFor="invitation-story-upload"><span>{isUploadingGalleryImage ? 'Uploading image...' : 'Add story photo'}</span><input id="invitation-story-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingGalleryImage} onChange={(input) => { void uploadGalleryImage(input.target.files?.[0] ?? null, 'story'); input.target.value = ''; }} /></label>
+            <p>Add up to two photos for a layered collage below your story. Select your story photos in the order you want them shown.</p>
+            <label className="website-gallery-upload" htmlFor="invitation-story-upload"><span>{uploadingAssetUsage === 'story' ? 'Uploading image...' : 'Add story photo'}</span><input id="invitation-story-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAssetUsage !== null} onChange={(input) => { void uploadInvitationImage(input.target.files?.[0] ?? null, 'story'); input.target.value = ''; }} /></label>
             <p className="gallery-selection-count" role="status">{storyPhotoPaths.length} of 2 story photos selected</p>
             <div className="website-gallery-picker" aria-label="Select photos for the Our Story collage">
-              {websiteAssets.length === 0 ? <p>Upload photos to add them to your story.</p> : websiteAssets.map(asset => <div className={`website-gallery-asset ${storyPhotoPaths.includes(asset.storage_path) ? 'selected' : ''}`} key={asset.id}>
-                <button type="button" className="gallery-asset-select" onClick={() => toggleStoryPhoto(asset.storage_path)} aria-pressed={storyPhotoPaths.includes(asset.storage_path)} aria-label={`${storyPhotoPaths.includes(asset.storage_path) ? 'Remove' : 'Add'} ${asset.original_filename} ${storyPhotoPaths.includes(asset.storage_path) ? 'from' : 'to'} Our Story`}><img src={getPhotoUrl(asset.storage_path)} alt="" /><span>{storyPhotoPaths.includes(asset.storage_path) ? `Photo ${storyPhotoPaths.indexOf(asset.storage_path) + 1} - ` : ''}{asset.original_filename}</span></button>
+              {storyAssets.length === 0 ? <p>Upload photos to add them to your story.</p> : storyAssets.map(asset => <div className={`website-gallery-asset ${storyPhotoPaths.includes(asset.storage_path) ? 'selected' : ''}`} key={asset.id}>
+                <button type="button" className="gallery-asset-select" disabled={uploadingAssetUsage !== null} onClick={() => toggleStoryPhoto(asset.storage_path)} aria-pressed={storyPhotoPaths.includes(asset.storage_path)} aria-label={`${storyPhotoPaths.includes(asset.storage_path) ? 'Remove' : 'Add'} ${asset.original_filename} ${storyPhotoPaths.includes(asset.storage_path) ? 'from' : 'to'} Our Story`}><img src={getPhotoUrl(asset.storage_path)} alt="" /><span>{storyPhotoPaths.includes(asset.storage_path) ? `Photo ${storyPhotoPaths.indexOf(asset.storage_path) + 1} - ` : ''}{asset.original_filename}</span></button>
                 <div className="gallery-asset-actions"><button type="button" onClick={() => setPreviewedGalleryAsset(asset)} aria-label={`Preview ${asset.original_filename}`} title="Preview image"><Eye size={15} aria-hidden="true" /></button></div>
               </div>)}
             </div>
@@ -624,10 +641,10 @@ const WebsiteBuilder = () => {
                 <option value="carousel">Carousel</option>
               </select>
             </label>
-            <label className="website-gallery-upload" htmlFor="invitation-gallery-upload"><span>{isUploadingGalleryImage ? 'Uploading image...' : 'Add invitation photos'}</span><input id="invitation-gallery-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={isUploadingGalleryImage} onChange={(input) => uploadGalleryImage(input.target.files?.[0] ?? null)} /></label>
+            <label className="website-gallery-upload" htmlFor="invitation-gallery-upload"><span>{uploadingAssetUsage === 'gallery' ? 'Uploading image...' : 'Add gallery photos'}</span><input id="invitation-gallery-upload" type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingAssetUsage !== null} onChange={(input) => { void uploadInvitationImage(input.target.files?.[0] ?? null, 'gallery'); input.target.value = ''; }} /></label>
             <p className="gallery-selection-count" role="status">{galleryPhotoPaths.length} of {galleryLimit} photos selected</p>
             <div className="website-gallery-picker" aria-label="Select invitation photos for the gallery">
-              {websiteAssets.length === 0 ? <p>Upload engagement or pre-wedding photos for this invitation.</p> : websiteAssets.map(asset => <div className={`website-gallery-asset ${galleryPhotoPaths.includes(asset.storage_path) ? 'selected' : ''}`} key={asset.id}><button type="button" className="gallery-asset-select" onClick={() => toggleGalleryPhoto(asset.storage_path)} aria-pressed={galleryPhotoPaths.includes(asset.storage_path)} title={galleryPhotoPaths.includes(asset.storage_path) ? 'Remove from invitation gallery' : 'Add to invitation gallery'}><img src={getPhotoUrl(asset.storage_path)} alt={asset.original_filename} onError={(image) => { image.currentTarget.style.display = 'none'; image.currentTarget.parentElement?.parentElement?.classList.add('unavailable'); }} /><span>{asset.original_filename}</span></button><div className="gallery-asset-actions"><button type="button" onClick={() => setPreviewedGalleryAsset(asset)} aria-label={`Preview ${asset.original_filename}`} title="Preview image"><Eye size={15} aria-hidden="true" /></button><button type="button" onClick={() => deleteGalleryImage(asset)} aria-label={`Delete ${asset.original_filename}`} title="Delete image"><Trash2 size={15} aria-hidden="true" /></button></div></div>)}
+              {galleryAssets.length === 0 ? <p>Upload engagement or pre-wedding photos for the gallery.</p> : galleryAssets.map(asset => <div className={`website-gallery-asset ${galleryPhotoPaths.includes(asset.storage_path) ? 'selected' : ''}`} key={asset.id}><button type="button" className="gallery-asset-select" disabled={uploadingAssetUsage !== null} onClick={() => toggleGalleryPhoto(asset.storage_path)} aria-pressed={galleryPhotoPaths.includes(asset.storage_path)} title={galleryPhotoPaths.includes(asset.storage_path) ? 'Remove from invitation gallery' : 'Add to invitation gallery'}><img src={getPhotoUrl(asset.storage_path)} alt={asset.original_filename} onError={(image) => { image.currentTarget.style.display = 'none'; image.currentTarget.parentElement?.parentElement?.classList.add('unavailable'); }} /><span>{asset.original_filename}</span></button><div className="gallery-asset-actions"><button type="button" onClick={() => setPreviewedGalleryAsset(asset)} aria-label={`Preview ${asset.original_filename}`} title="Preview image"><Eye size={15} aria-hidden="true" /></button><button type="button" onClick={() => deleteInvitationImage(asset)} aria-label={`Delete ${asset.original_filename}`} title="Delete image"><Trash2 size={15} aria-hidden="true" /></button></div></div>)}
             </div>
           </fieldset>
           <fieldset className="website-section-fields">
@@ -764,12 +781,13 @@ const WebsiteBuilder = () => {
           </fieldset>
           <fieldset className="website-section-manager">
             <legend>Section order</legend>
-            <p>Choose what guests see and arrange the flow of your invitation.</p>
+            <p>Choose what guests see, arrange the flow, and turn the wave above each section on or off.</p>
             <div>
               {document?.sections.map((section, index) => (
                 <div className="website-section-row" key={section.id}>
                   <span>{section.type === 'hero' ? 'Cover' : section.type === 'countdown' ? 'Countdown' : section.type === 'rsvp' ? 'RSVP' : section.type === 'attire' ? 'Clothing motif & colors' : section.type === 'gifts' ? 'Gift instructions' : section.type === 'timeline' ? 'Timeline' : section.type}</span>
                   <div>
+                    {section.type !== 'hero' && <button type="button" className="section-wave-toggle" onClick={() => toggleSectionWave(section.id)} aria-pressed={invitationWaveDivider(section)} aria-label={`${invitationWaveDivider(section) ? 'Turn off' : 'Turn on'} wave above ${section.type}`} title={`Wave above ${section.type}: ${invitationWaveDivider(section) ? 'on' : 'off'}`}><Waves size={16} aria-hidden="true" /> Wave</button>}
                     <button type="button" onClick={() => toggleSection(section.id)} aria-label={`${section.visible ? 'Hide' : 'Show'} ${section.type}`} title={section.visible ? 'Hide section' : 'Show section'}>
                       {section.visible ? <Eye size={16} aria-hidden="true" /> : <EyeOff size={16} aria-hidden="true" />}
                     </button>
@@ -798,7 +816,7 @@ const WebsiteBuilder = () => {
         </div>
       </section>
       <Modal isOpen={Boolean(previewedGalleryAsset)} onClose={() => setPreviewedGalleryAsset(null)} className="website-image-preview-modal">
-        {previewedGalleryAsset && <div className="website-image-preview"><img src={getPhotoUrl(previewedGalleryAsset.storage_path)} alt={previewedGalleryAsset.original_filename} /><div><p>{previewedGalleryAsset.original_filename}</p><button type="button" onClick={() => setPreviewedGalleryAsset(null)}><X size={16} aria-hidden="true" /> Close preview</button><button type="button" className="delete-preview-image" onClick={() => deleteGalleryImage(previewedGalleryAsset)}><Trash2 size={16} aria-hidden="true" /> Delete image</button></div></div>}
+        {previewedGalleryAsset && <div className="website-image-preview"><img src={getPhotoUrl(previewedGalleryAsset.storage_path)} alt={previewedGalleryAsset.original_filename} /><div><p>{previewedGalleryAsset.original_filename}</p><button type="button" onClick={() => setPreviewedGalleryAsset(null)}><X size={16} aria-hidden="true" /> Close preview</button><button type="button" className="delete-preview-image" onClick={() => deleteInvitationImage(previewedGalleryAsset)}><Trash2 size={16} aria-hidden="true" /> Delete image</button></div></div>}
       </Modal>
       <Modal isOpen={isCoverPreviewOpen} onClose={() => setIsCoverPreviewOpen(false)} className="website-image-preview-modal">
         {coverPhotoUrl && <div className="website-image-preview"><img src={coverPhotoUrl} alt="Invitation cover preview" /><div><p>Cover photo</p><button type="button" onClick={() => setIsCoverPreviewOpen(false)}><X size={16} aria-hidden="true" /> Close preview</button><button type="button" className="delete-preview-image" onClick={removeCover}><Trash2 size={16} aria-hidden="true" /> Remove cover</button></div></div>}

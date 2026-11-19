@@ -20,6 +20,9 @@ const sectionNames: Record<WebsiteSectionType, string> = {
 export const invitationSectionId = (section: WebsiteSection): string =>
   section.type === 'rsvp' ? 'rsvp' : `invitation-${section.id}`;
 
+export const invitationWaveDivider = (section: WebsiteSection): boolean =>
+  section.content.wave_divider !== false;
+
 export const invitationSectionLabel = (section: WebsiteSection): string => {
   const title = section.content[section.type === 'hero' ? 'couple_names' : 'title'];
   return typeof title === 'string' && title.trim() ? title.trim() : sectionNames[section.type];

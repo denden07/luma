@@ -62,9 +62,11 @@ CREATE TABLE IF NOT EXISTS event_website_assets (
   event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   storage_path VARCHAR(500) NOT NULL,
   original_filename VARCHAR(255) NOT NULL,
+  asset_usage VARCHAR(20) CHECK (asset_usage IN ('story', 'gallery', 'share')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE event_website_assets ADD COLUMN IF NOT EXISTS asset_usage VARCHAR(20) CHECK (asset_usage IN ('story', 'gallery', 'share'));
 CREATE INDEX IF NOT EXISTS idx_event_website_assets_event_id ON event_website_assets(event_id, created_at DESC);
 
 -- Invitation guest management is intentionally separate from camera participants.

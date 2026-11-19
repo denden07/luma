@@ -100,7 +100,7 @@ router.get('/:eventId/website/assets', async (req, res) => {
   const { eventId } = req.params;
   try {
     if (!await hostOwnsEvent(eventId, req.query.host_code)) return res.status(404).json({ error: 'Event not found' });
-    const result = await pool.query('SELECT id, storage_path, original_filename, created_at FROM event_website_assets WHERE event_id = $1 ORDER BY created_at DESC', [eventId]);
+    const result = await pool.query('SELECT id, storage_path, original_filename, asset_usage, created_at FROM event_website_assets WHERE event_id = $1 ORDER BY created_at DESC', [eventId]);
     return res.json(result.rows);
   } catch (error) {
     console.error('Error loading invitation assets:', error);
@@ -113,6 +113,8 @@ router.post('/:eventId/website/assets', websiteAssetUpload.single('asset'), asyn
   const hostCode = req.body.host_code;
   const file = req.file;
   if (!file) return res.status(400).json({ error: 'A JPEG, PNG, or WebP image is required' });
+  const assetUsage = req.body.asset_usage;
+  if (assetUsage !== 'story' && assetUsage !== 'gallery' && assetUsage !== 'share') return res.status(400).json({ error: 'Choose a destination for this invitation image' });
 
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
@@ -121,8 +123,8 @@ router.post('/:eventId/website/assets', websiteAssetUpload.single('asset'), asyn
     const storagePath = `/events/${eventId}/website-assets/${filename}`;
     await saveImage(storagePath, file.buffer, file.mimetype);
     const result = await pool.query(
-      'INSERT INTO event_website_assets (event_id, storage_path, original_filename) VALUES ($1, $2, $3) RETURNING id, storage_path, original_filename, created_at',
-      [eventId, storagePath, file.originalname],
+      'INSERT INTO event_website_assets (event_id, storage_path, original_filename, asset_usage) VALUES ($1, $2, $3, $4) RETURNING id, storage_path, original_filename, asset_usage, created_at',
+      [eventId, storagePath, file.originalname, assetUsage],
     );
     return res.status(201).json(result.rows[0]);
   } catch (error) {

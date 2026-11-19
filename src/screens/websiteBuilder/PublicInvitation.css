@@ -123,12 +123,25 @@
 .public-invitation.palette-modern { --invitation-page: #1d211c; --invitation-surface: #292e27; --invitation-muted-surface: #373c34; --invitation-ink: #fffdf7; --invitation-accent: #e1c86b; --invitation-strong: #0e110e; }
 .public-invitation.palette-classic { --invitation-page: #f1dfc7; --invitation-surface: #fffaf1; --invitation-muted-surface: #e7cfae; --invitation-ink: #3b2a20; --invitation-accent: #8d5b48; --invitation-strong: #3b2a20; }
 .public-invitation.palette-garden { --invitation-page: #e5eee2; --invitation-surface: #fffdf7; --invitation-muted-surface: #d4e0ce; --invitation-ink: #264333; --invitation-accent: #49604b; --invitation-strong: #1d211c; }
-.public-invitation > .public-invitation-section:not(.public-invitation-closing) { --invitation-section-bg: var(--invitation-surface); background: var(--invitation-section-bg); color: var(--invitation-ink); }
+.public-invitation > .public-invitation-section:not(.public-invitation-closing) { --invitation-section-bg: var(--invitation-surface); --invitation-divider-bg: var(--invitation-section-bg); background: var(--invitation-section-bg); color: var(--invitation-ink); }
 .public-invitation > .public-invitation-section:nth-of-type(even):not(.public-invitation-closing) { --invitation-section-bg: var(--invitation-muted-surface); }
-.public-invitation .public-invitation-closing { background: var(--invitation-strong); color: #fffdf7; }
+.public-invitation .public-invitation-closing { --invitation-divider-bg: var(--invitation-strong); background: var(--invitation-strong); color: #fffdf7; }
 .public-invitation-footer { background: var(--invitation-strong); }
-.public-invitation .public-invitation-rsvp { background: var(--invitation-accent); color: #fffdf7; }
+.public-invitation .public-invitation-rsvp { --invitation-divider-bg: var(--invitation-accent); background: var(--invitation-accent); color: #fffdf7; }
 .public-invitation.palette-modern .public-invitation-rsvp { color: #1d211c; }
+.public-invitation > section + section { position: relative; }
+.public-invitation > section + section.has-wave-divider::before {
+  background: var(--invitation-divider-bg);
+  content: '';
+  height: clamp(48px, 7cqw, 86px);
+  left: 0;
+  mask: url('../../assets/images/invitation-divider-wave.svg') center / 100% 100% no-repeat;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: calc(12px - clamp(48px, 7cqw, 86px));
+  z-index: 1;
+}
 .public-countdown-units { display: grid; gap: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 30px auto 0; max-width: 600px; }
 .public-countdown-units > div { display: grid; gap: 8px; min-width: 0; padding: 8px; }
 .public-countdown-units > div + div { border-left: 1px solid color-mix(in srgb, var(--invitation-accent) 35%, transparent); }
@@ -147,6 +160,12 @@
 @container (max-width: 360px) {
   .public-story-collage { padding-inline: 5px; }
   .public-story-photo { border-width: 5px; padding-bottom: 10px; }
+}
+@container (max-width: 480px) {
+  .public-story-collage { align-items: stretch; flex-direction: column; padding: 12px 12px 40px; }
+  .public-story-photo { flex: none; margin-top: 0; max-width: 360px; width: 82%; }
+  .public-story-photo + .public-story-photo { align-self: flex-end; margin: -32px 0 0; }
+  .public-story-collage.single .public-story-photo { align-self: center; flex: none; width: 88%; }
 }
 
 /* Each template adds a reliable image treatment when a cover is present. */
@@ -229,18 +248,12 @@
   .invitation-document-preview .public-invitation-rsvp { animation: none; }
 }
 
-/* Each template moves differently while sections enter the viewport. Browsers without view timelines retain the static layout. */
+/* Keep cover movement independent of section backgrounds and dividers. */
 @supports (animation-timeline: view()) {
-  .public-invitation-garden .public-invitation-section:not(.public-invitation-closing) { animation: garden-scroll-reveal linear both; animation-timeline: view(); animation-range: entry 8% cover 38%; }
-  .public-invitation-modern .public-invitation-section:not(.public-invitation-closing) { animation: modern-scroll-reveal linear both; animation-timeline: view(); animation-range: entry 10% cover 42%; }
-  .public-invitation-classic .public-invitation-section:not(.public-invitation-closing) { animation: classic-scroll-reveal linear both; animation-timeline: view(); animation-range: entry 8% cover 40%; }
   .public-invitation-garden .public-invitation-cover-media { animation: garden-cover-drift linear both; animation-timeline: scroll(nearest block); }
   .public-invitation-modern .public-invitation-cover-media { animation: modern-cover-shift linear both; animation-timeline: scroll(nearest block); }
   .public-invitation-classic .public-invitation-cover-media { animation: classic-cover-soften linear both; animation-timeline: scroll(nearest block); }
 }
-@keyframes garden-scroll-reveal { from { opacity: .2; transform: translateY(36px) rotate(.5deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
-@keyframes modern-scroll-reveal { from { clip-path: inset(0 0 100% 0); opacity: .35; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
-@keyframes classic-scroll-reveal { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
 @keyframes garden-cover-drift { from { transform: scale(1.08) translateY(-2%); } to { transform: scale(1) translateY(2%); } }
 @keyframes modern-cover-shift { from { transform: scale(1.12) translateX(-2%); } to { transform: scale(1.02) translateX(2%); } }
 @keyframes classic-cover-soften { from { transform: scale(1.06); filter: sepia(.65) brightness(1.03); } to { transform: scale(1); filter: sepia(.42) brightness(1.12); } }
@@ -342,7 +355,7 @@
   letter-spacing: -.06em;
   text-transform: uppercase;
 }
-.public-invitation-modern .public-invitation-section { border-top: 1px solid rgba(225, 200, 107, .25); }
+.public-invitation-modern .public-invitation-section { border-top: 0; }
 .public-invitation-modern .public-invitation-ornament { animation: modern-orbit 18s linear infinite; }
 
 .public-invitation-classic .public-invitation-hero {
@@ -399,6 +412,11 @@
 .public-invitation.font-editorial .public-invitation-section-kicker { font-family: var(--font-editorial); }
 .public-invitation.font-classic .public-invitation-hero h1,
 .public-invitation.font-classic .public-invitation-section-kicker { font-family: Georgia, serif; }
+
+@container (max-width: 480px) {
+  .public-invitation-story > .public-invitation-section-kicker { font-size: clamp(32px, 9cqw, 38px); line-height: 1.15; }
+  .public-invitation-story > p:not(.public-invitation-section-kicker) { font-size: 20px; line-height: 1.65; }
+}
 
 .public-invitation-garden .public-invitation-hero h1 { animation: garden-unfold 1.3s .12s cubic-bezier(.16, 1, .3, 1) both; }
 .public-invitation-modern .public-invitation-hero h1 { animation: modern-arrive 1s .12s cubic-bezier(.16, 1, .3, 1) both; }

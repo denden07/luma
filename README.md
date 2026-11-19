@@ -66,15 +66,21 @@ each section can be reordered or hidden from **Section order**.
 Timeline events and their center-line dots reveal one at a time as visitors
 scroll, with motion disabled when reduced motion is requested.
 The invitation alternates light and muted section backgrounds in the visible
-order, while RSVP and Closing retain their accent colors.
+order, while RSVP and Closing retain their accent colors. Each non-cover row
+in **Section order** has a Wave switch for the divider above it (on by
+default), including the divider below the cover. The section-wide scroll
+dimming has been removed; timeline events still reveal as guests scroll.
 The **Countdown** is a separate, reorderable section immediately after the
 cover by default. Its date and time initially follow the event schedule and
 can be adjusted in the editor; visitors see a live countdown in their local
 time zone. The cover remains first, and the countdown can be hidden or moved
 among the other sections.
-In **Our Story**, upload or select up to two invitation photos to show a
-layered collage below the story text. The photos can also be reused in the
-gallery; they appear in selection order and remain editable in the builder.
+In **Our Story**, upload or select up to two photos to show a layered collage
+below the story text; they appear in selection order. Story, gallery, and
+shared-link-preview uploads have separate image libraries. Images already used
+in older invitations remain available in their respective sections. After
+upgrading an existing installation, run `npm run db:migrate` to add the image
+destination column before starting the API.
 The **Entourage & sponsors** editor keeps sponsors in a dedicated field group.
 On the invitation, sponsors appear after the wedding party within the same
 Entourage section; empty groups are not shown.

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, CircleAlert, MapPinned, X } from 'lucide-react';
 import { getPhotoUrl } from '../../services/dataService';
 import type { WebsiteDocument } from '../../services/websiteService';
-import { invitationSectionId, withLegacyInvitationSections } from '../../utils/invitationSections';
+import { invitationSectionId, invitationWaveDivider, withLegacyInvitationSections } from '../../utils/invitationSections';
 import { invitationTimeline } from '../../utils/invitationTimeline';
 import type { TimelineEntry } from '../../utils/invitationTimeline';
 import { invitationColors } from '../../utils/invitationColors';
@@ -50,7 +50,7 @@ interface InvitationDocumentProps {
   preview?: boolean;
 }
 
-const InvitationCountdown = ({ targetAt, title, id }: { targetAt: string; title: string; id: string }) => {
+const InvitationCountdown = ({ targetAt, title, id, waveDivider }: { targetAt: string; title: string; id: string; waveDivider: boolean }) => {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
@@ -64,7 +64,7 @@ const InvitationCountdown = ({ targetAt, title, id }: { targetAt: string; title:
     { label: 'Minutes', value: remaining.minutes },
     { label: 'Seconds', value: remaining.seconds },
   ];
-  return <section className="public-invitation-section public-invitation-countdown" id={id} tabIndex={-1}>
+  return <section className={`public-invitation-section public-invitation-countdown${waveDivider ? ' has-wave-divider' : ''}`} id={id} tabIndex={-1}>
     <p className="public-invitation-section-kicker">{title}</p>
     <div className="public-countdown-units" role="timer" aria-label={`${remaining.days} days, ${remaining.hours} hours, ${remaining.minutes} minutes, ${remaining.seconds} seconds remaining`}>
       {units.map(unit => <div key={unit.label}><strong>{String(unit.value).padStart(2, '0')}</strong><span>{unit.label}</span></div>)}
@@ -73,7 +73,7 @@ const InvitationCountdown = ({ targetAt, title, id }: { targetAt: string; title:
   </section>;
 };
 
-const InvitationTimeline = ({ entries, title, id }: { entries: TimelineEntry[]; title: string; id: string }) => {
+const InvitationTimeline = ({ entries, title, id, waveDivider }: { entries: TimelineEntry[]; title: string; id: string; waveDivider: boolean }) => {
   const listRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
@@ -94,7 +94,7 @@ const InvitationTimeline = ({ entries, title, id }: { entries: TimelineEntry[]; 
     };
   }, [entries]);
 
-  return <section className="public-invitation-section public-invitation-timeline-section" id={id} tabIndex={-1}>
+  return <section className={`public-invitation-section public-invitation-timeline-section${waveDivider ? ' has-wave-divider' : ''}`} id={id} tabIndex={-1}>
     <p className="public-invitation-section-kicker">{title}</p>
     <ol className="public-invitation-timeline" ref={listRef}>{entries.map(entry => <li key={entry.id}><div>
       {entry.time.trim() && <span className="public-timeline-time">{entry.time}</span>}
@@ -387,14 +387,15 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         <p className="public-invitation-date">{date}</p><h1>{names}</h1><p className="public-invitation-message">{message}</p><a href="#rsvp" className="public-invitation-rsvp-link">RSVP</a>
       </section>}
       {sections.filter(section => section.visible && section.type !== 'hero').map(section => {
+        const waveClass = invitationWaveDivider(section) ? ' has-wave-divider' : '';
         if (section.type === 'countdown') {
           const targetAt = contentText(section.content, 'target_at');
-          return countdownRemaining(targetAt, 0) ? <InvitationCountdown key={section.id} id={invitationSectionId(section)} targetAt={targetAt} title={contentText(section.content, 'title') || 'Counting down'} /> : null;
+          return countdownRemaining(targetAt, 0) ? <InvitationCountdown key={section.id} id={invitationSectionId(section)} targetAt={targetAt} title={contentText(section.content, 'title') || 'Counting down'} waveDivider={invitationWaveDivider(section)} /> : null;
         }
-        if (section.type === 'rsvp') return <section className="public-invitation-rsvp is-visible" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} eventName={names} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
+        if (section.type === 'rsvp') return <section className={`public-invitation-rsvp is-visible${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}><div><p className="public-invitation-rsvp-kicker">Celebrate with us</p><h2>{contentText(section.content, 'title')}</h2><p>Search your name to find your invitation and respond.</p><PublicRsvpLookup eventId={eventId} eventName={names} dietaryEnabled={dietaryEnabled} buttonLabel={contentText(section.content, 'button_label') || 'Respond'} preview={preview} /></div></section>;
         if (section.type === 'story') {
           const photos = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string' && Boolean(path.trim())).slice(0, 2) : [];
-          return <section className="public-invitation-section public-invitation-story" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+          return <section className={`public-invitation-section public-invitation-story${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
             <p>{contentText(section.content, 'body')}</p>
             {photos.length > 0 && <div className={`public-story-collage ${photos.length === 1 ? 'single' : ''}`} aria-label="Our Story photos">
@@ -411,7 +412,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
             { label: 'Ceremony', place: ceremonyPlace, time: contentText(section.content, 'ceremony_time'), directions: ceremonyDirections },
             { label: 'Venue', place: venue, time: contentText(section.content, 'venue_time'), directions: venueDirections },
           ].filter(location => location.place || location.time);
-          return <section className="public-invitation-section public-invitation-details" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+          return <section className={`public-invitation-section public-invitation-details${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
             {locations.length > 0 && <div className="public-invitation-locations">{locations.map(location => {
               const mapEmbedUrl = googleMapsEmbedUrl(location.place);
@@ -428,14 +429,14 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         if (section.type === 'timeline') {
           const entries = invitationTimeline(section.content).filter(entry => entry.time.trim() || entry.title.trim() || entry.details?.trim());
           if (entries.length === 0) return null;
-          return <InvitationTimeline key={section.id} id={invitationSectionId(section)} title={contentText(section.content, 'title')} entries={entries} />;
+          return <InvitationTimeline key={section.id} id={invitationSectionId(section)} title={contentText(section.content, 'title')} entries={entries} waveDivider={invitationWaveDivider(section)} />;
         }
         if (section.type === 'attire') {
           const motif = contentText(section.content, 'motif');
           const note = contentText(section.content, 'color_note');
           const colors = invitationColors(section.content);
           if (!motif.trim() && !note.trim() && colors.length === 0) return null;
-          return <section className="public-invitation-section public-invitation-attire" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+          return <section className={`public-invitation-section public-invitation-attire${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
             <span className="public-attire-illustration" aria-hidden="true" style={{ maskImage: `url("${attireIllustration}")` }} />
             {motif && <p className="public-attire-motif">{motif}</p>}
@@ -446,7 +447,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
         if (section.type === 'gifts') {
           const instructions = contentText(section.content, 'instructions');
           if (!instructions.trim()) return null;
-          return <section className="public-invitation-section public-invitation-gifts" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+          return <section className={`public-invitation-section public-invitation-gifts${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>
             <p>{instructions}</p>
           </section>;
@@ -455,13 +456,13 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
           const paths = Array.isArray(section.content.photo_paths) ? section.content.photo_paths.filter((path): path is string => typeof path === 'string') : [];
           const selectedLayout = contentText(section.content, 'layout');
           const layout = selectedLayout === 'strip' || selectedLayout === 'carousel' ? selectedLayout : 'grid';
-          return <section className="public-invitation-section public-invitation-gallery" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><InvitationGallery paths={paths} layout={layout} /></section>;
+          return <section className={`public-invitation-section public-invitation-gallery${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p><InvitationGallery paths={paths} layout={layout} /></section>;
         }
         if (section.type === 'entourage') {
           const groups = entourageGroups(section.content).map(group => ({ ...group, members: group.members.map(member => member.trim()).filter(Boolean) }));
           const sponsors = groups.find(group => group.id === 'sponsors');
           const party = groups.filter(group => group.id !== 'sponsors' && group.members.length > 0);
-          return <section className="public-invitation-section public-invitation-entourage" id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
+          return <section className={`public-invitation-section public-invitation-entourage${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}>
             {(party.length > 0 || !sponsors?.members.length) && <p className="public-invitation-section-kicker">{contentText(section.content, 'title')}</p>}
             {party.length > 0 && <div className="public-entourage-party">{party.map(group => <article key={group.id}>
               <h2>{group.title}</h2>
@@ -473,7 +474,7 @@ const InvitationDocument = ({ document, eventName, eventId, dietaryEnabled = tru
             </div>}
           </section>;
         }
-        if (section.type === 'closing') return <section className="public-invitation-section public-invitation-closing" id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
+        if (section.type === 'closing') return <section className={`public-invitation-section public-invitation-closing${waveClass}`} id={invitationSectionId(section)} tabIndex={-1} key={section.id}><p>{contentText(section.content, 'message')}</p></section>;
         return null;
       })}
       <CopyrightFooter className="public-invitation-footer" />
