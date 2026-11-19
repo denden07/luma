@@ -83,7 +83,9 @@ upgrading an existing installation, run `npm run db:migrate` to add the image
 destination column before starting the API.
 The **Entourage & sponsors** editor keeps sponsors in a dedicated field group.
 On the invitation, sponsors appear after the wedding party within the same
-Entourage section; empty groups are not shown.
+Entourage section; empty groups are not shown. Paper-style panels display the
+wedding party and sponsors, with two columns on mobile for both the party
+categories and sponsor names.
 The preview shows the current draft; publish again after edits to update the
 public invitation. The RSVP search button uses the editor's Button label in
 both views, and the closing message stays visible at the end of the page.
