@@ -55,7 +55,7 @@ router.post('/bootstrap', async (req, res, next) => {
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const ipHash = requestIpHash(req.ip);
+    const ipHash = requestIpHash(req.ip ?? req.socket.remoteAddress ?? '');
     const recentAttempts = await pool.query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM admin_login_attempts
        WHERE ip_hash = $1 AND attempted_at > NOW() - INTERVAL '${LOGIN_WINDOW_MINUTES} minutes'`,

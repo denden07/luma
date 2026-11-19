@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { extname, join } from 'path';
+import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import pool from '../db/index.js';
 import type { EventWebsite, UpdateEventWebsiteRequest, WebsiteDocument, WebsiteSection, WebsiteSectionType } from '../types.js';
+import { deleteImage, saveImage } from '../storage.js';
 
 const router = Router();
 export const publicWebsitesRouter = Router();
@@ -12,7 +12,6 @@ const templateIds = new Set(['garden', 'modern', 'classic']);
 const sectionTypes = new Set<WebsiteSectionType>(['hero', 'story', 'details', 'gallery', 'entourage', 'rsvp', 'closing']);
 const paletteIds = new Set(['garden', 'modern', 'classic']);
 const fontPairIds = new Set(['modern', 'editorial', 'classic']);
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const websiteAssetUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024, files: 1 },
@@ -118,11 +117,9 @@ router.post('/:eventId/website/assets', websiteAssetUpload.single('asset'), asyn
   try {
     if (!await hostOwnsEvent(eventId, hostCode)) return res.status(404).json({ error: 'Event not found' });
     const extension = extname(file.originalname).toLowerCase() || (file.mimetype === 'image/png' ? '.png' : file.mimetype === 'image/webp' ? '.webp' : '.jpg');
-    const assetDirectory = join(UPLOAD_DIR, 'events', eventId, 'website-assets');
-    if (!existsSync(assetDirectory)) mkdirSync(assetDirectory, { recursive: true });
     const filename = `${randomUUID()}${extension}`;
     const storagePath = `/events/${eventId}/website-assets/${filename}`;
-    writeFileSync(join(UPLOAD_DIR, storagePath), file.buffer);
+    await saveImage(storagePath, file.buffer, file.mimetype);
     const result = await pool.query(
       'INSERT INTO event_website_assets (event_id, storage_path, original_filename) VALUES ($1, $2, $3) RETURNING id, storage_path, original_filename, created_at',
       [eventId, storagePath, file.originalname],
@@ -143,8 +140,7 @@ router.delete('/:eventId/website/assets/:assetId', async (req, res) => {
       [assetId, eventId],
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'Invitation image not found' });
-    const imagePath = join(UPLOAD_DIR, result.rows[0].storage_path);
-    if (existsSync(imagePath)) unlinkSync(imagePath);
+    await deleteImage(result.rows[0].storage_path);
     return res.status(204).end();
   } catch (error) {
     console.error('Error deleting invitation asset:', error);

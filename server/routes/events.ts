@@ -1,15 +1,14 @@
 import express from 'express';
 import multer from 'multer';
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
-import { extname, join } from 'path';
+import { extname } from 'path';
 import { randomUUID } from 'crypto';
 import pool from '../db/index.js';
 import type { CreateEventRequest, Event } from '../types.js';
+import { deleteImage, saveImage } from '../storage.js';
 
 const router = express.Router();
 
 const allowedFilters = new Set(['original', 'mono', 'warm-film', 'cool-film', 'high-contrast', 'soft-fade']);
-const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const coverUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024, files: 1 },
@@ -135,12 +134,9 @@ router.post('/:id/cover', coverUpload.single('cover'), async (req, res) => {
 
     const extension = extname(file.originalname).toLowerCase() ||
       (file.mimetype === 'image/png' ? '.png' : file.mimetype === 'image/webp' ? '.webp' : '.jpg');
-    const coverDirectory = join(UPLOAD_DIR, 'events', eventId, 'cover');
-    if (!existsSync(coverDirectory)) mkdirSync(coverDirectory, { recursive: true });
-
     const filename = `${randomUUID()}${extension}`;
     const storagePath = `/events/${eventId}/cover/${filename}`;
-    writeFileSync(join(UPLOAD_DIR, storagePath), file.buffer);
+    await saveImage(storagePath, file.buffer, file.mimetype);
 
     const updateResult = await pool.query<Event>(
       'UPDATE events SET cover_photo_path = $1 WHERE id = $2 RETURNING *',
@@ -149,8 +145,7 @@ router.post('/:id/cover', coverUpload.single('cover'), async (req, res) => {
 
     const previousPath = eventResult.rows[0].cover_photo_path;
     if (previousPath) {
-      const previousFile = join(UPLOAD_DIR, previousPath);
-      if (existsSync(previousFile)) unlinkSync(previousFile);
+      await deleteImage(previousPath);
     }
 
     return res.status(201).json(updateResult.rows[0]);
@@ -179,8 +174,7 @@ router.delete('/:id/cover', async (req, res) => {
       [eventId],
     );
     if (previousPath) {
-      const previousFile = join(UPLOAD_DIR, previousPath);
-      if (existsSync(previousFile)) unlinkSync(previousFile);
+      await deleteImage(previousPath);
     }
     return res.json(updateResult.rows[0]);
   } catch (error) {

@@ -1,0 +1,23 @@
+[Unit]
+Description=Luma Express API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=luma
+Group=luma
+WorkingDirectory=/srv/luma
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/luma/luma.env
+ExecStart=/usr/bin/node /srv/luma/dist/server/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/srv/luma/uploads /tmp
+
+[Install]
+WantedBy=multi-user.target

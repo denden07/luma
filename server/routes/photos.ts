@@ -1,12 +1,14 @@
 import express from 'express';
-import multer from 'multer';
 import busboy from 'busboy';
 import * as archiver from 'archiver';
 import sharp from 'sharp';
-import { mkdirSync, existsSync, renameSync, unlinkSync, createWriteStream, readFileSync, writeFileSync } from 'fs';
+import { mkdirSync, existsSync, renameSync, unlinkSync, createWriteStream, readFileSync } from 'fs';
 import { basename, extname, join } from 'path';
+import { tmpdir } from 'node:os';
+import { Readable } from 'node:stream';
 import pool from '../db/index.js';
 import type { Photo } from '../types.js';
+import { deleteImage, imageStream, isR2Storage, saveImage } from '../storage.js';
 
 const router = express.Router();
 
@@ -62,7 +64,6 @@ async function createFilteredPhoto(eventId: string, photoId: string, originalBuf
     [eventId]
   );
   const filterId = eventResult.rows[0]?.enabled_filters[0] ?? 'original';
-  const uploadPath = join(UPLOAD_DIR, 'events', eventId, 'photos');
   const filename = `${photoId}-filtered.jpg`;
   let image = sharp(originalBuffer).rotate();
 
@@ -78,117 +79,18 @@ async function createFilteredPhoto(eventId: string, photoId: string, originalBuf
   if (filterId === 'warm-film' || filterId === 'high-contrast') {
     image = image.composite([{ input: Buffer.from(flareSvg), gravity: 'northeast' }]);
   }
-  await image.composite([{ input: Buffer.from(stampSvg), gravity: 'southeast' }]).jpeg({ quality: 92 }).toFile(join(uploadPath, filename));
+  const filteredBuffer = await image.composite([{ input: Buffer.from(stampSvg), gravity: 'southeast' }]).jpeg({ quality: 92 }).toBuffer();
   const storagePath = `/events/${eventId}/photos/${filename}`;
+  await saveImage(storagePath, filteredBuffer, 'image/jpeg');
   await pool.query('UPDATE photos SET filtered_storage_path = $1 WHERE id = $2 AND event_id = $3', [storagePath, photoId, eventId]);
   console.log('[Filtered Photo Upload] Generated fallback:', storagePath);
   return storagePath;
 }
 
-// Configure multer for file uploads
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 
-// Ensure upload directory exists
-if (!existsSync(UPLOAD_DIR)) {
+if (!isR2Storage && !existsSync(UPLOAD_DIR)) {
   mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    try {
-      console.log('[Multer Storage] destination called for eventId:', req.params.eventId);
-      const eventId = req.params.eventId;
-      const uploadPath = join(UPLOAD_DIR, 'events', eventId, 'photos');
-      
-      console.log('[Multer Storage] Creating directory:', uploadPath);
-      
-      // Create directory if it doesn't exist
-      if (!existsSync(uploadPath)) {
-        mkdirSync(uploadPath, { recursive: true });
-        console.log('[Multer Storage] Directory created:', uploadPath);
-      } else {
-        console.log('[Multer Storage] Directory already exists:', uploadPath);
-      }
-      
-      cb(null, uploadPath);
-    } catch (error) {
-      console.error('[Multer Storage] ❌ Error in destination:', error);
-      cb(error as Error, '');
-    }
-  },
-  filename: function (req, file, cb) {
-    try {
-      console.log('[Multer Storage] filename called, file:', {
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        encoding: file.encoding,
-        mimetype: file.mimetype
-      });
-      
-      // Generate temporary filename - will be renamed after we get the body
-      const tempName = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const ext = file.mimetype === 'image/webp' ? 'webp' : 'jpg';
-      const filename = `${tempName}.${ext}`;
-      
-      console.log('[Multer Storage] Generated filename:', filename);
-      cb(null, filename);
-    } catch (error) {
-      console.error('[Multer Storage] ❌ Error in filename:', error);
-      cb(error as Error, '');
-    }
-  }
-});
-
-const upload = multer({ 
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-    files: 1,
-    fields: 10,
-    parts: 100
-  },
-  fileFilter: (req, file, cb) => {
-    console.log('[Multer Filter] Checking file:', {
-      fieldname: file.fieldname,
-      originalname: file.originalname,
-      mimetype: file.mimetype
-    });
-    
-    if (file.mimetype.startsWith('image/')) {
-      console.log('[Multer Filter] ✅ File accepted');
-      cb(null, true);
-    } else {
-      console.log('[Multer Filter] ❌ File rejected - not an image');
-      cb(new Error('Only image files are allowed'));
-    }
-  }
-});
-
-// Multer error handling middleware
-function handleMulterError(err: any, req: express.Request, res: express.Response, next: express.NextFunction) {
-  console.error('[Multer Error Handler] ❌❌❌ Multer error:', {
-    error: err.message,
-    code: err.code,
-    field: err.field,
-    stack: err.stack
-  });
-  
-  if (err instanceof multer.MulterError) {
-    console.error('[Multer Error Handler] MulterError type:', err.code);
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(413).json({ error: 'File too large (max 10MB)' });
-    }
-    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({ error: 'Unexpected file field' });
-    }
-    return res.status(400).json({ error: err.message });
-  }
-  
-  if (err) {
-    return res.status(500).json({ error: err.message || 'Upload failed' });
-  }
-  
-  next();
 }
 
 // GET /api/events/:eventId/photos - Get all photos for an event
@@ -204,10 +106,10 @@ router.get('/:eventId/photos', async (req, res) => {
        ORDER BY p.created_at DESC`,
       [eventId]
     );
-    res.json(result.rows);
+    return res.json(result.rows);
   } catch (error) {
     console.error('Error fetching photos:', error);
-    res.status(500).json({ error: 'Failed to fetch photos' });
+    return res.status(500).json({ error: 'Failed to fetch photos' });
   }
 });
 
@@ -248,23 +150,26 @@ router.get('/:eventId/photos/download', async (req, res) => {
       }
     });
 
-    archive.pipe(res);
     for (const photo of result.rows) {
-      const relativePath = photo.storage_path.replace(/^[/\\]+/, '');
-      const filePath = join(UPLOAD_DIR, relativePath);
-      if (!existsSync(filePath)) continue;
-
       const participantName = (photo.participant_name || 'guest').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-      const extension = extname(basename(filePath)) || '.jpg';
-      archive.file(filePath, { name: `${participantName}-${photo.id}${extension}` });
+      const extension = extname(basename(photo.storage_path)) || '.jpg';
+      const path = photo.storage_path;
+      archive.append(Readable.from((async function* () {
+        const { stream } = await imageStream(path);
+        yield* stream;
+      })()), { name: `${participantName}-${photo.id}${extension}` });
     }
 
+    archive.pipe(res);
     await archive.finalize();
+    return;
   } catch (error) {
     console.error('Error creating photo ZIP:', error);
     if (!res.headersSent) {
       return res.status(500).json({ error: 'Could not prepare the photo download' });
     }
+    res.destroy(error instanceof Error ? error : undefined);
+    return;
   }
 });
 
@@ -296,19 +201,14 @@ router.post('/:eventId/photos-json', async (req, res) => {
     return res.status(400).json({ error: 'Photo ID, participant ID, and an image are required' });
   }
 
-  const uploadPath = join(UPLOAD_DIR, 'events', eventId, 'photos');
   const extension = dataUrlMatch[1] === 'webp' ? 'webp' : 'jpg';
   const filename = `${photoId}.${extension}`;
-  const filePath = join(uploadPath, filename);
 
+  let savedToDatabase = false;
   try {
     const uploadError = await getPhotoUploadError(eventId, participantId, photoId);
     if (uploadError) {
       return res.status(uploadError === 'Event not found' ? 404 : 409).json({ error: uploadError });
-    }
-
-    if (!existsSync(uploadPath)) {
-      mkdirSync(uploadPath, { recursive: true });
     }
 
     const imageBuffer = Buffer.from(dataUrlMatch[2], 'base64');
@@ -316,10 +216,10 @@ router.post('/:eventId/photos-json', async (req, res) => {
       return res.status(400).json({ error: 'Photo image is empty' });
     }
 
-    const replacedExistingFile = existsSync(filePath);
-    writeFileSync(filePath, imageBuffer);
-
+    const filteredBuffer = filteredDataUrlMatch ? Buffer.from(filteredDataUrlMatch[2], 'base64') : undefined;
+    if (filteredBuffer && !filteredBuffer.length) return res.status(400).json({ error: 'Filtered image is empty' });
     const storagePath = `/events/${eventId}/photos/${filename}`;
+    await saveImage(storagePath, imageBuffer, `image/${dataUrlMatch[1]}`);
     const result = await pool.query<Photo>(
       `INSERT INTO photos (id, event_id, participant_id, storage_path)
        VALUES ($1, $2, $3, $4)
@@ -327,14 +227,13 @@ router.post('/:eventId/photos-json', async (req, res) => {
        RETURNING *`,
       [photoId, eventId, participantId, storagePath]
     );
+    savedToDatabase = true;
 
-    if (filteredDataUrlMatch) {
-      const filteredBuffer = Buffer.from(filteredDataUrlMatch[2], 'base64');
-      if (!filteredBuffer.length) return res.status(400).json({ error: 'Filtered image is empty' });
+    if (filteredDataUrlMatch && filteredBuffer) {
       const filteredExtension = filteredDataUrlMatch[1] === 'webp' ? 'webp' : 'jpg';
       const filteredFilename = `${photoId}-filtered.${filteredExtension}`;
       const filteredStoragePath = `/events/${eventId}/photos/${filteredFilename}`;
-      writeFileSync(join(uploadPath, filteredFilename), filteredBuffer);
+      await saveImage(filteredStoragePath, filteredBuffer, `image/${filteredDataUrlMatch[1]}`);
       await pool.query('UPDATE photos SET filtered_storage_path = $1 WHERE id = $2 AND event_id = $3', [filteredStoragePath, photoId, eventId]);
       console.log('[Filtered Photo Upload] Saved client-prepared derivative:', filteredStoragePath);
     } else {
@@ -343,13 +242,14 @@ router.post('/:eventId/photos-json', async (req, res) => {
 
     console.log('[Photo Upload JSON] Photo saved successfully:', photoId);
     const savedPhoto = await pool.query<Photo>('SELECT * FROM photos WHERE id = $1', [photoId]);
-    res.status(201).json(savedPhoto.rows[0] ?? result.rows[0]);
+    return res.status(201).json(savedPhoto.rows[0] ?? result.rows[0]);
   } catch (error) {
     console.error('[Photo Upload JSON] Error saving photo:', error);
-    if (existsSync(filePath)) {
-      unlinkSync(filePath);
+    if (!savedToDatabase) {
+      try { await deleteImage(`/events/${eventId}/photos/${filename}`); }
+      catch (cleanupError) { console.error('[Photo Upload JSON] Cleanup failed:', cleanupError); }
     }
-    res.status(500).json({ error: 'Failed to upload photo' });
+    return res.status(500).json({ error: 'Failed to upload photo' });
   }
 });
 
@@ -358,14 +258,10 @@ async function saveFilteredPhoto(eventId: string, photoId: string, imageBuffer: 
   const photo = photoResult.rows[0];
   if (!photo) throw new Error('Original photo not found');
 
-  const uploadPath = join(UPLOAD_DIR, 'events', eventId, 'photos');
-  if (!existsSync(uploadPath)) mkdirSync(uploadPath, { recursive: true });
   const extension = mimeType === 'image/webp' ? 'webp' : 'jpg';
   const filename = `${photoId}-filtered.${extension}`;
-  const filePath = join(uploadPath, filename);
-  writeFileSync(filePath, imageBuffer);
-
   const filteredStoragePath = `/events/${eventId}/photos/${filename}`;
+  await saveImage(filteredStoragePath, imageBuffer, mimeType);
   const result = await pool.query<Photo>(
     'UPDATE photos SET filtered_storage_path = $1 WHERE id = $2 AND event_id = $3 RETURNING *',
     [filteredStoragePath, photoId, eventId]
@@ -382,10 +278,10 @@ router.post('/:eventId/photos/:photoId/filtered-json', async (req, res) => {
     const imageBuffer = Buffer.from(dataUrlMatch[2], 'base64');
     if (!imageBuffer.length) return res.status(400).json({ error: 'Filtered image is empty' });
     const photo = await saveFilteredPhoto(req.params.eventId, req.params.photoId, imageBuffer, `image/${dataUrlMatch[1]}`);
-    res.status(201).json(photo);
+    return res.status(201).json(photo);
   } catch (error) {
     console.error('[Filtered Photo Upload JSON] Error:', error);
-    res.status(404).json({ error: error instanceof Error ? error.message : 'Failed to upload filtered photo' });
+    return res.status(404).json({ error: error instanceof Error ? error.message : 'Failed to upload filtered photo' });
   }
 });
 
@@ -410,10 +306,10 @@ router.post('/:eventId/photos/:photoId/filtered', (req, res) => {
     if (parseError || !imageBuffer?.length || !mimeType) return res.status(400).json({ error: parseError?.message || 'A filtered image is required' });
     try {
       const photo = await saveFilteredPhoto(req.params.eventId, req.params.photoId, imageBuffer, mimeType);
-      res.status(201).json(photo);
+      return res.status(201).json(photo);
     } catch (error) {
       console.error('[Filtered Photo Upload] Error:', error);
-      res.status(404).json({ error: error instanceof Error ? error.message : 'Failed to upload filtered photo' });
+      return res.status(404).json({ error: error instanceof Error ? error.message : 'Failed to upload filtered photo' });
     }
   });
   req.pipe(bb);
@@ -435,7 +331,10 @@ router.post('/:eventId/photos', async (req, res) => {
   }
   
   const { eventId } = req.params;
-  const uploadPath = join(UPLOAD_DIR, 'events', eventId, 'photos');
+  if (!/^[0-9a-f-]{36}$/i.test(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
+  const uploadPath = isR2Storage
+    ? join(tmpdir(), 'luma-uploads', eventId)
+    : join(UPLOAD_DIR, 'events', eventId, 'photos');
   
   // Ensure directory exists
   if (!existsSync(uploadPath)) {
@@ -518,7 +417,7 @@ router.post('/:eventId/photos', async (req, res) => {
         unlinkSync(uploadedFilePath);
       }
       if (!res.headersSent) {
-        res.status(500).json({ error: 'File upload failed', details: error.message });
+        res.status(500).json({ error: 'File upload failed', details: error instanceof Error ? error.message : 'Upload failed' });
       }
     });
     
@@ -529,7 +428,7 @@ router.post('/:eventId/photos', async (req, res) => {
       
       try {
         // Validate required fields
-        if (!photoId || !participantId) {
+        if (!photoId || !participantId || !/^[0-9a-f-]{36}$/i.test(photoId)) {
           console.error('[Photo Upload] ❌ Missing required fields:', { photoId, participantId });
           if (uploadedFilePath && existsSync(uploadedFilePath)) {
             unlinkSync(uploadedFilePath);
@@ -566,6 +465,11 @@ router.post('/:eventId/photos', async (req, res) => {
         }
         
         const storagePath = `/events/${eventId}/photos/${newFilename}`;
+        const originalBuffer = readFileSync(newFilePath);
+        if (isR2Storage) {
+          await saveImage(storagePath, originalBuffer, fileMimetype ?? 'image/jpeg');
+          unlinkSync(newFilePath);
+        }
 
         let filteredStoragePath: string | undefined;
         if (filteredFilePath && existsSync(filteredFilePath)) {
@@ -575,6 +479,10 @@ router.post('/:eventId/photos', async (req, res) => {
           if (existsSync(filteredDestinationPath)) unlinkSync(filteredDestinationPath);
           renameSync(filteredFilePath, filteredDestinationPath);
           filteredStoragePath = `/events/${eventId}/photos/${filteredFilename}`;
+          if (isR2Storage) {
+            await saveImage(filteredStoragePath, readFileSync(filteredDestinationPath), filteredFileMimetype ?? 'image/jpeg');
+            unlinkSync(filteredDestinationPath);
+          }
         }
         
         // Check if photo already exists in database
@@ -603,12 +511,12 @@ router.post('/:eventId/photos', async (req, res) => {
           await pool.query('UPDATE photos SET filtered_storage_path = $1 WHERE id = $2 AND event_id = $3', [filteredStoragePath, photoId, eventId]);
           console.log('[Filtered Photo Upload] Saved client-prepared derivative:', filteredStoragePath);
         } else {
-          await createFilteredPhoto(eventId, photoId, readFileSync(newFilePath));
+          await createFilteredPhoto(eventId, photoId, originalBuffer);
         }
         
         console.log('[Photo Upload] ✅ Photo saved successfully:', photoId);
         const savedPhoto = await pool.query<Photo>('SELECT * FROM photos WHERE id = $1', [photoId]);
-        res.status(201).json(savedPhoto.rows[0] ?? result.rows[0]);
+        return res.status(201).json(savedPhoto.rows[0] ?? result.rows[0]);
         
       } catch (error) {
         console.error('[Photo Upload] ❌ Error saving to database:', error);
@@ -623,8 +531,9 @@ router.post('/:eventId/photos', async (req, res) => {
         }
         
         if (!res.headersSent) {
-          res.status(500).json({ error: 'Failed to upload photo' });
+          return res.status(500).json({ error: 'Failed to upload photo' });
         }
+        return;
       }
     });
     
@@ -649,10 +558,11 @@ router.post('/:eventId/photos', async (req, res) => {
         }
       }
     }, 10000);
+    return;
     
   } catch (error) {
     console.error('[Photo Route] ❌ Error initializing busboy:', error);
-    res.status(500).json({ error: 'Failed to process upload' });
+    return res.status(500).json({ error: 'Failed to process upload' });
   }
 });
 
@@ -671,10 +581,10 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Photo not found' });
     }
     
-    res.json(result.rows[0]);
+    return res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching photo:', error);
-    res.status(500).json({ error: 'Failed to fetch photo' });
+    return res.status(500).json({ error: 'Failed to fetch photo' });
   }
 });
 
@@ -682,7 +592,7 @@ router.get('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query(
+    const result = await pool.query<Photo>(
       'DELETE FROM photos WHERE id = $1 RETURNING *',
       [id]
     );
@@ -691,15 +601,17 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Photo not found' });
     }
     
-    res.json({ message: 'Photo deleted successfully' });
+    await deleteImage(result.rows[0].storage_path);
+    if (result.rows[0].filtered_storage_path) await deleteImage(result.rows[0].filtered_storage_path);
+    return res.json({ message: 'Photo deleted successfully' });
   } catch (error) {
     console.error('Error deleting photo:', error);
-    res.status(500).json({ error: 'Failed to delete photo' });
+    return res.status(500).json({ error: 'Failed to delete photo' });
   }
 });
 
 // Error handling for any unhandled errors in photo routes
-router.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+router.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('[Photo Routes] ❌❌❌ Unhandled error:', {
     error: err.message,
     stack: err.stack,

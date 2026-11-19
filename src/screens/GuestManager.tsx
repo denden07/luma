@@ -198,7 +198,6 @@ const GuestManager = () => {
           <label>Rows<select value={pageSize} onChange={input => { const value = input.target.value; setPageSize(value === 'all' ? 'all' : Number(value)); setPage(1); }}><option value="5">5</option><option value="15">15</option><option value="30">30</option><option value="all">All</option></select></label>
         </div>
         <div className="guest-table-wrap"><table><thead><tr><th>#</th><th>Guest</th><th>RSVP relationship</th><th>Group</th><th>Email</th><th>Contact</th><th>RSVP</th><th>Responded</th><th /></tr></thead><tbody>{displayedGuests.map((guest, index) => {
-          const response = responseFor(guest);
           const recordedResponse = recordedResponseFor(guest);
           const status = statusFor(guest) ?? 'awaiting';
           const companionOrigin = companionOriginFor(guest);

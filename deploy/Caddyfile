@@ -1,0 +1,22 @@
+example.com {
+	encode zstd gzip
+
+	@invitation query invitation_slug=*
+	handle @invitation {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle /uploads/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle {
+		root * /srv/luma/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

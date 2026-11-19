@@ -67,7 +67,7 @@ test('guest-specific allowances, companion names and host-reviewed requests', { 
     assert.equal((await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Second Responder', group_id: group.data.id, is_group_responder: true })).status, 201);
     assert.equal((await request(`/api/events/${eventId}/guests`, 'POST', { host_code: hostCode, full_name: 'Third', group_id: group.data.id, is_group_responder: true })).status, 409);
     const family = await request(`/api/events/${eventId}/guest-groups`, 'POST', { host_code: hostCode, name: 'Dela Cruz family', invited_party_size: 10 });
-    const familyMembers = [];
+    const familyMembers: { id: string }[] = [];
     for (let index = 0; index < 10; index++) {
       const added = await request(`/api/events/${eventId}/guests`, 'POST', {
         host_code: hostCode, full_name: `Family Guest ${index + 1}`, group_id: family.data.id, is_group_responder: index === 0 || index === 1,

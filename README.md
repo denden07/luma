@@ -135,7 +135,13 @@ guests. Run `npm run db:migrate` after updating an existing installation to add
 the seating schema; opening the host guest list or seating plan reconciles
 earlier responses.
 
-## Vercel Deployment
+## Deployment
+
+For a single DigitalOcean Basic Droplet with Caddy, Express, local PostgreSQL,
+and Cloudflare R2, see [deploy/README.md](deploy/README.md). Local development
+continues to use `npm run dev:all` and local filesystem uploads.
+
+### Vercel Deployment
 
 Create one Vercel project with `luma` as its Root Directory. Vercel builds the PWA,
 serves it from `dist`, and routes `/api/*` to `api/index.ts`, which exports the same

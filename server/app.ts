@@ -17,6 +17,7 @@ import websitesRouter, { publicWebsitesRouter } from './routes/websites.js';
 import guestsRouter from './routes/guests.js';
 import rsvpRouter, { publicRsvpRouter } from './routes/rsvp.js';
 import seatingRouter from './routes/seating.js';
+import { imageStream, isR2Storage } from './storage.js';
 
 dotenv.config();
 
@@ -52,11 +53,26 @@ app.use((req, res, next) => {
   });
 });
 
-if (!existsSync(UPLOAD_DIR)) {
-  mkdirSync(UPLOAD_DIR, { recursive: true });
+if (isR2Storage) {
+  app.get<{ '0': string }>('/uploads/*', async (req, res) => {
+    try {
+      const { stream, contentType, contentLength } = await imageStream(`/${req.params['0']}`);
+      if (contentType) res.type(contentType);
+      if (contentLength !== undefined) res.set('Content-Length', String(contentLength));
+      stream.on('error', error => {
+        console.error('Error streaming image:', error);
+        res.destroy(error);
+      });
+      stream.pipe(res);
+    } catch (error) {
+      console.error('Error fetching image:', error);
+      res.status(error instanceof Error && error.name === 'NoSuchKey' ? 404 : 500).json({ error: 'Could not load image' });
+    }
+  });
+} else {
+  if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
+  app.use('/uploads', express.static(UPLOAD_DIR));
 }
-
-app.use('/uploads', express.static(UPLOAD_DIR));
 
 app.use((req, _res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
